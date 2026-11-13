@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">W-Track</string>
+
+    <!-- Bottom navigation (PRD section 10.2) -->
+    <string name="nav_home">Home</string>
+    <string name="nav_activity">Activity</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_review">Review</string>
+
+    <!-- Placeholder screen labels shown until the feature wiring is implemented -->
+    <string name="screen_pending_title">Coming soon</string>
+    <string name="screen_pending_body">This screen will be wired once the domain contract is available.</string>
+</resources>

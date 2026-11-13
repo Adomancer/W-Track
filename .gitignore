@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+build-logic/.gradle/
+
+# Local configuration
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Android
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+output-metadata.json
+
+# Secrets
+*.jks
+*.keystore
