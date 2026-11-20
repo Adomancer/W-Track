@@ -249,9 +249,12 @@ stateDiagram-v2
 
 ### 5.2 Currency Exponent Registry (`CurrencySpec`)
 - Do **not** assume every currency uses exponent 2 (`PRD Section 7.1`). Maintain an explicit `CurrencyRegistry`:
+  - `IDR` → **Recommended: Exponent `2` (`ISO 4217`, `1 IDR = 100 sen`)** `[Confirm before M1 / DB-002]`.
+    - Storage: `Rp 50.000` stores as `5_000_000L`; `Rp 1.250.000,50` stores as `125_000_050L`.
+    - Parsing: `MoneyParser` scales integer Rupiah tokens by `100` cleanly (tested explicitly against **100x scaling mistakes** in addition to `PAR-12` 1,000x separator ambiguities).
+    - Display: `CurrencyFormatter` elides `,00` when `amountMinor % 100L == 0L` (rendering `Rp50.000`), and displays exact 2 decimals otherwise (`Rp1.250.000,50`).
   - `USD`, `EUR`, `SGD`, `MYR` → `minorUnitDigits = 2`
   - `JPY`, `KRW` → `minorUnitDigits = 0`
-  - `IDR` → **`[OWNER DECISION BEFORE M1]`** (Recommended: `2`, storing `Rp 50.000` as `5_000_000L` and `Rp 1.250.000,50` as `125_000_050L`, formatted cleanly without `,00` when `minor % 100 == 0`; see ADR-004).
 
 ### 5.3 Timestamp & Timezone Resolution (`PAR-12`)
 - If the notification text includes a timestamp, parse it using the provider's verified timezone (e.g., `Asia/Jakarta` / `WIB`, `WITA`, `WIT` per provider fixture) and convert to UTC epoch millis.
@@ -354,19 +357,21 @@ When consecutive captured transactions on account $A$ include non-null `reported
 
 **Orthogonal Badge — `Possible gap`:** Displayed alongside account status whenever an overlapping `CaptureGap` (`ACCESS_REVOKED`, `LISTENER_DISCONNECTED`, `HEARTBEAT_STALE`) or unresolved balance checkpoint mismatch (`ACC-07`) exists since `last_reconciled_at`.
 
-### 9.2 Heartbeat Mechanism (`ING-14`)
+### 9.2 Heartbeat Mechanism & Android 16 Doze Behavior (`ING-14`)
 - Persist `last_alive_at` in DataStore:
   - Whenever an allowlisted event finishes processing.
   - Periodically every ~15 minutes while listener service is active (via coroutine timer while alive + `WorkManager` periodic/best-effort refresh).
 - On `onListenerConnected()` or `Application` launch: if `last_alive_at > 0 && (now - last_alive_at) > staleThresholdMillis` (proposed default: `3 hours`), insert `CaptureGap(startedAt = last_alive_at, endedAt = now, reason = HEARTBEAT_STALE)`.
+- **Confirmed `iQOO Z10R (I2505)` / Android 16 Idle Note:** `dumpsys deviceidle` confirms Light Doze and Deep Doze are active with `wait_for_unlock=true`. `WorkManager` maintenance and idle exit may defer until physical screen unlock; therefore `ING-14` heartbeat diagnostics must be evaluated under default battery settings without prematurely auto-whitelisting the app.
+- **Android 16 Notification Behaviors (`API 36`):** Listener extraction must cleanly tolerate lock-screen privacy masking/redaction (`ING-06`), ignore non-transaction `Notification.ProgressStyle` / Live Updates / Promoted Ongoing frequent ticks without blocking Binder threads, and observe whether provider burst notifications trigger Notification Cooldown.
 
 ---
 
 ## 10. Gate G1 Measurement Protocol (`PRD Section 17 & Appendix C`)
 
-Before **Gate G1** opens, ADR-003 locks the final thresholds, test devices, and two initial provider package IDs.
+Before **Gate G1** opens, ADR-003 and [PROVIDERS.md](file:///home/adomancer/Documents/project/W-Track/docs/PROVIDERS.md) track the physical test device (`vivo / iQOO Z10R (I2505)`, Android 16 / API 36 confirmed as primary PoC device; other devices/OEMs remain unverified), the pre-locked thresholds, and the three prioritized PoC provider targets (**1. Bank Jago**, **2. DANA**, **3. BCA** — implemented incrementally after ingestion foundation M0–M2, with exact package IDs and notification formats verified on `iQOO Z10R` first and zero provider logic inside `WtrackNotificationListenerService`).
 
-- **Duration & Sample Floor:** 7–14 consecutive calendar days on the owner's physical device(s); **≥ 30 actual statement transactions per provider** (extend duration if fewer occur).
+- **Duration & Sample Floor:** Minimum **7 consecutive days**, preferably **14 days**, on the owner's physical device; **≥ 30 actual statement transactions per provider** (extend duration if fewer occur).
 - **Metrics:**
   - $A$ = Actual transactions shown in the provider's official app statement during the window.
   - $B$ = Transaction-type notifications captured by W-Track.

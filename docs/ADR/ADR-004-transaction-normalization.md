@@ -6,16 +6,13 @@
 
 ## 1. Status
 
-**Proposed — Core Canonical Model Confirmed; IDR Exponent, 1.3/1.4 Classification Details, and G1 Scope Items Pending Confirmation**
+**Proposed — Core Canonical Model Confirmed; Recommended IDR Exponent `2` (ISO 4217), 1.3/1.4 Classification Details, and G1 Scope Items Pending Confirmation**
 
 - **Confirmed Baseline (PRD v1.4):** Integer minor-unit storage (`Long`, never `Double`/`Float`), `INFLOW`/`OUTFLOW` direction semantics, deterministic `ParseResult` contract (no uncalibrated confidence scores), `NeedsReview` modeled as `NotificationEvent` (not `Transaction`), `posted_at` timestamp fallback (never `received_at`), locale-aware parsing (`PAR-12`) that never guesses ambiguous numbers, and composite 3-tier deduplication (never amount+timestamp alone).
-- **Pending Owner Confirmation Before M1:**
-  1. **IDR Storage Exponent** (`2` vs `0`) — blocking `DB-002` / `PIPE-005` schema & fixture setup.
-  2. Confirmation of PRD 1.3/1.4 accounting & edit proposals (`ADJUSTMENT`, `REFUND` netting, derived transfer fees, `CASH` unpaired classification, `original_json` snapshot vs revision history, void-not-delete).
-- **Decided at Gate G1:**
-  1. Multi-account per source & account-hint resolution (`ACC-05`, `PAR-02`, `REV-07`).
-  2. Credit card signed-ledger scope (`ACC-10`).
-  3. One-payment-announced-by-two-apps handling rule (PRD Section 11).
+- **Recommended Monetary Decision (Pending Owner Sign-Off Before M1):**
+  - **IDR Storage Exponent `2` (ISO 4217 standard, `1 IDR = 100 sen`)** — storage, parsing, display, and accounting implications documented below.
+- **Confirmed/Proposed Accounting Proposals (PRD 1.3/1.4):** `ADJUSTMENT`, `REFUND` netting, derived transfer fees, unpaired `CASH` classification, `original_json` snapshot vs revision history, void-not-delete.
+- **Decided at Gate G1:** Multi-account per source (`ACC-05`/`PAR-02`/`REV-07`), credit card signed ledger (`ACC-10`), and one-payment-announced-by-two-apps rule (PRD Section 11).
 
 ---
 
@@ -36,7 +33,7 @@
 
 Different financial applications format amounts (`Rp50.000`, `Rp 1.250.000,50`, `IDR 50,000.00`), timestamps, transaction statuses, reversals, and transfer fees inconsistently. Without a strict normalization model and explicit accounting rules:
 1. Floating-point arithmetic corrupts balances and aggregates.
-2. Indonesian dot-thousands (`1.500`) vs English dot-decimals (`1.50`) can cause silent **1,000x misreads** (`PAR-12`).
+2. Indonesian dot-thousands (`1.500`) vs English dot-decimals (`1.50`) can cause silent **1,000x misreads** (`PAR-12`), while mixing major-unit IDR (`50_000L`) with ISO 4217 minor units (`5_000_000L`) can cause **100x scaling errors** across storage, UI, and exports.
 3. Internal top-ups (bank → e-wallet), transfer fees, balance corrections, failed attempts, and refunds would inflate income/expense totals or double-deduct balances.
 4. Incomplete notifications forced into a `transactions` table would corrupt balance calculations or violate NOT NULL invariants.
 
@@ -47,8 +44,8 @@ Different financial applications format amounts (`Rp50.000`, `Rp 1.250.000,50`, 
 ### A. Confirmed Baseline (PRD v1.4)
 
 1. **Canonical Transaction Model & Integer Minor Units (PRD Section 7.1):**
-   - Monetary values are stored as signed/non-negative `Long` integers in the currency's minor unit (`amount_minor`, `reported_balance_minor`, `initial_balance_minor`, `fee_minor`). Floating-point `Double`/`Float` is prohibited for money.
-   - An explicit `CurrencySpec(code: String, minorUnitDigits: Int)` lookup handles currency exponents explicitly (e.g., `USD = 2`, `JPY = 0`, `IDR = [Owner Decision]`) rather than assuming every currency has 2 decimals.
+   - Monetary values are stored as `Long` integers in the currency's minor unit (`amount_minor`, `reported_balance_minor`, `initial_balance_minor`, `fee_minor`). Floating-point `Double`/`Float` is prohibited for money.
+   - An explicit `CurrencySpec(code: String, minorUnitDigits: Int)` registry handles currency exponents explicitly (e.g., `USD = 2`, `JPY = 0`, `IDR = 2` recommended below) rather than hardcoding 2 blindly across all currencies.
    - Timestamps are persisted in UTC epoch milliseconds (`Long`) and rendered in the device's local timezone; notification text dates are parsed in the provider's verified timezone, falling back to `NotificationEvent.posted_at` — **never** `received_at` (`PAR-12`).
 2. **Direction vs. Cash-Flow Semantics:**
    - `Direction` (`INFLOW`, `OUTFLOW`) describes account balance movement only, independent of whether an item is income or expense.
@@ -57,52 +54,37 @@ Different financial applications format amounts (`Rp50.000`, `Rp 1.250.000,50`, 
    - Parsers emit deterministic `ParseResult.Success`, `ParseResult.NeedsReview(reason, partial)`, or `ParseResult.NotTransaction(reason)` — no numeric confidence scores in MVP.
    - `NeedsReview` items remain on `NotificationEvent` with `review_draft_json`; no `Transaction` row exists until parsing succeeds or the user explicitly confirms and saves the review item inside an atomic DB transaction.
 4. **Locale-Aware Number Parsing & Ambiguity Guard (`PAR-12`):**
-   - Parsers declare/select the locale matching the notification's language (`id-ID` vs `en-US` / `en-ID`) rather than reading `Locale.getDefault()` of the phone.
-   - Any ambiguous separator pattern where provider fixtures have not established an unambiguous rule (e.g., `1.500` without currency decimals context across mixed-locale providers) returns `NeedsReview(AMBIGUOUS_FIELD)` instead of guessing.
+   - Parsers pass the **provider notification's verified language locale** (`id-ID` vs `en-US` / `en-ID`) — never the phone's `Locale.getDefault()`.
+   - Any ambiguous separator pattern where provider fixtures have not established an unambiguous rule (e.g., `1.500` without decimal suffix across mixed-locale providers) returns `NeedsReview(AMBIGUOUS_FIELD)` instead of guessing.
 5. **3-Tier Deduplication & Idempotency (PRD Section 8.1):**
-   - Precedence order:
-     1. `provider_reference` (scoped to `source_id` / `account_id`) when reliably present.
-     2. `stable_event_key` derived from `package_name` + normalized notification identity (`notification_key`/`id`/`tag` per M3a evidence) + `posted_at` + SHA-256 content hash.
-     3. Composite fingerprint (`account_id`, `amount_minor`, `currency`, `direction`, time bucket, normalized merchant/reference) inside a bounded matching window.
-   - Deduplicating solely on `(amount, timestamp)` is **explicitly prohibited**.
+   - Precedence: (1) `provider_reference` → (2) `stable_event_key` → (3) composite fingerprint (`account_id`, `amount_minor`, `currency`, `direction`, time bucket, normalized merchant/ref) inside a bounded matching window. Never deduplicate solely on `(amount, timestamp)`.
 
 ---
 
-### B. Owner Decisions & Proposed Rules
+### B. Recommended IDR Currency Exponent (`2`, Following ISO 4217) & Implications
 
-#### 1. IDR Storage Exponent (`[OWNER DECISION REQUIRED BEFORE M1]`)
+**Recommended Decision (`[CONFIRM BEFORE M1 / DB-002]`):** Store **`IDR` using exponent `2` (`1 IDR = 100 sen`)**, aligning with ISO 4217 (`Currency.getInstance("IDR").defaultFractionDigits == 2`) and supporting fractional notifications explicitly cited in PRD `PAR-12` (`Rp 1.250.000,50`).
 
-Because PRD `PAR-12` explicitly mentions fractional IDR notation (`Rp 1.250.000,50`) while PRD Section 19 notes that most IDR notifications omit decimals, the storage exponent for `IDR` must be locked before creating the first `Transaction` table (`DB-002`):
+#### Storage, Parsing, Display, Accounting & Export Implications
 
-| Option | Representation of `Rp 50.000` | Representation of `Rp 1.250.000,50` | Trade-Offs |
-| :--- | :--- | :--- | :--- |
-| **Option A (Recommended): Exponent `2` (ISO 4217 standard, 1 IDR = 100 sen)** | `5_000_000L` | `125_000_050L` | **Pros:** Lossless handling of notifications/bank statements with `,50` sen (e.g., interest/admin fees/micro-deductions); directly matches `java.util.Currency.getInstance("IDR").defaultFractionDigits == 2`. **Cons:** Stored integers are 100x larger (still easily fits `Long`, max ~92 quadrillion rupiah); UI formatter hides `,00` when remainder `% 100 == 0`. |
-| **Option B: Exponent `0` (Whole Rupiah)** | `50_000L` | Cannot store losslessly (must round or route `,50` to Needs Review) | **Pros:** Human-readable numbers in raw SQLite inspection. **Cons:** Lossy if any provider reports sen (e.g., bank interest, tax, QRIS/transfer fees with decimals), violating `PAR-12`'s explicit `Rp 1.250.000,50` example. |
+| Layer | Concrete Behavior (`IDR` Exponent `= 2`) | Example (`Rp 50.000`) | Example (`Rp 1.250.000,50`) | Invariant / Guardrail |
+| :--- | :--- | :--- | :--- | :--- |
+| **SQLite / Room Storage** | Stored as integer `Long` minor units (`sen`). `Long.MAX_VALUE` ($9.22 \times 10^{18}$) covers up to `Rp 92.2 quadrillion`, avoiding overflow. | `5_000_000L` | `125_000_050L` | Changing exponent after data exists requires multiplying/dividing every historical row by `100` — lock before M1! |
+| **Parser & Normalization (`PAR-12`)** | `MoneyParser` parses exact decimal string via `BigDecimal` / integer math and scales by $10^{\text{CurrencySpec.minorUnitDigits}}$ (`100` for `IDR`). | `"Rp50.000"` → `5_000_000L` | `"Rp 1.250.000,50"` → `125_000_050L` | Unit tests must assert against **100x scaling errors** (forgetting `× 100` on integer Rupiah) as well as **1,000x separator misreads**. |
+| **Display Formatting (UI)** | Format via `CurrencyFormatter`: when `amountMinor % 100L == 0L`, **omit trailing `,00`** for clean Indonesian readability; when `amountMinor % 100L != 0L`, render exact 2 decimal places (`Rp 1.250.000,50`). | `Rp50.000` | `Rp1.250.000,50` | UI components must **never** divide by `100` manually or format `amountMinor` directly as Rupiah without going through `CurrencyFormatter`. |
+| **Manual Entry & Edits (`TX-03`, `TX-07`)** | Input accepts major-unit Rupiah (`50000`) with optional decimal cents (`,50`) and converts via `CurrencySpec` to minor units before persistence. | User types `50000` → stores `5_000_000L` | User types `1250000,50` → stores `125_000_050L` | Reject >2 fractional digits for `IDR` during manual validation. |
+| **Aggregates, Balances & Transfers** | All sums, `initial_balance_minor`, `reported_balance_minor`, `ADJUSTMENT` diffs (`ACC-08`), and `fee_minor` (`TRF-04`) operate in uniform `Long` minor units with zero rounding drift. | Net fee `6.500` = `650_000L` | Exact sen balance checkpoints preserved | `TransferMatch.fee_minor = outgoing_minor - incoming_minor` remains exact even when fees/interest have sen. |
+| **Backup & CSV Export (`DATA-05`, `DATA-11`)** | Full backup JSON stores exact integer `amountMinor` + `currency` (lossless). CSV export converts minor units to standard decimal string using `CurrencySpec` (`50000.00` or `50000` with explicit currency column). | Backup: `5000000`, CSV: `50000.00` (IDR) | Backup: `125000050`, CSV: `1250000.50` (IDR) | Backup schema records `currency` explicitly alongside `amountMinor` so cross-version restores remain unambiguous. |
 
-**Recommendation:** Adopt **Option A (`IDR` exponent = `2`)** so fractional amounts never cause precision loss or unnecessary `NeedsReview` routing, while formatting clean integer Rupiah (`Rp 50.000`) in the UI whenever `amountMinor % 100 == 0`.
+---
 
-#### 2. Proposed Accounting & Classification Rules (PRD 1.3 / 1.4 — Confirm or Change)
+### C. Proposed Accounting Rules & Gate G1 Scope Decisions (PRD 1.3 / 1.4)
 
-1. **Single 16-Row Classification Table (PRD Section 4.6):** Governs all Dashboard, Insights, and Account aggregate calculations consistently:
-   - `OUTFLOW + PURCHASE` → Expense (its category).
-   - `OUTFLOW + FEE` → Expense (Fees category).
-   - `OUTFLOW + TRANSFER` (unpaired) → Expense; `INFLOW + TRANSFER` (unpaired) → Income.
-   - `TRANSFER` (confirmed pair) → Excluded from Income/Expense; `fee_minor` (`outgoing - incoming >= 0`) reported as a **read-only derived row** in Fees under the outgoing leg's account and date (`TRF-04`, never a 3rd transaction row).
-   - `CASH` paired with cash account → Excluded (internal transfer); unpaired `OUTFLOW + CASH` → Expense ("Cash withdrawal" category); unpaired `INFLOW + CASH` → Income.
-   - `INFLOW + REFUND` → Netted against spending in linked original transaction's category (`TX-09`) or its own category if unlinked — never counted as Income. `OUTFLOW + REFUND` is never produced in MVP (parsers route outgoing reversals to `NeedsReview`).
-   - `INFLOW + OTHER` → Income; `OUTFLOW + OTHER` → Expense.
-   - `ADJUSTMENT` (`ACC-08`) → Excluded from Income/Expense/Cash-Flow totals; reported separately as **Unreconciled Difference** (`DASH-09`), while updating account estimated balance.
-   - `VOIDED` (`TX-08`) → Excluded from totals, balances, and pairs. Captured transactions can only be voided (preserving `event_id` idempotency); manual transactions may be deleted.
-   - **Non-base currency** → Stored and flagged; excluded from base-currency totals (no FX conversion in MVP).
-2. **Failed Attempts (`PAR-09`):** Classified as `NotTransaction(FAILED_ATTEMPT)` with immediate payload purge. Never auto-voids previously confirmed transactions.
-3. **Edit Provenance (`TX-03`):** Replace multi-row revision history with immutable `original_json` snapshot created at capture time, rendered alongside current values.
-4. **Categorization Precedence (`CAT-02`, Section 4.9):** User-set category (`USER`) > most specific matching `TransactionRule` (`RULE`) > most recently created matching `RULE`. User-set categories are never overwritten by rules or re-parses.
-
-#### 3. Gate G1 Scope Decisions (Deferred Until M3a Evidence)
-
-- **Multi-Account Source Resolution (`ACC-05`, `PAR-02`, `REV-07`):** Keep `account_sources.account_hint` in schema from M1; confirm/drop UI & hint complexity at Gate G1 based on whether either initial provider serves multiple accounts on one app.
-- **Credit Card Signed Ledger (`ACC-10`):** Keep `AccountType.CREDIT_CARD` enum; confirm/drop credit-card-specific UI & payment-transfer workflow at Gate G1 (`SHOULD` priority).
-- **One Payment, Two Notifiers (Section 11):** Measure overlap during M3a; default MVP behavior creates separate transactions (user voids duplicate or links transfer) unless M3a justifies an automated suppression rule.
+1. **Single 16-Row Classification Table (PRD Section 4.6):** Governs Dashboard, Insights, and Account summaries identically (`PURCHASE`, `FEE`, paired vs unpaired `TRANSFER`, paired vs unpaired `CASH`, `INFLOW` `REFUND` netting against spending, `OUTFLOW` `REFUND` → `NeedsReview`, `ADJUSTMENT` → Unreconciled Difference only, `VOIDED` excluded, non-base currency stored/flagged/excluded).
+2. **Failed Attempts (`PAR-09`):** `NotTransaction(FAILED_ATTEMPT)` with immediate payload purge; never auto-voids existing transactions.
+3. **Edit Provenance (`TX-03`):** Immutable `original_json` snapshot created at capture time instead of a full revision history table.
+4. **Categorization Precedence (`CAT-02`, Section 4.9):** User-set (`USER`) > most specific matching `TransactionRule` (`RULE`) > most recently created matching `RULE`. User-set categories are never overwritten.
+5. **Gate G1 Deferred Scope Decisions:** Multi-account hints (`ACC-05`/`PAR-02`/`REV-07`), credit card signed ledger (`ACC-10`), and dual-notifier handling (Section 11) stay schema-supported in M1 and are confirmed or dropped from Gate G1 real-device evidence.
 
 ---
 
@@ -110,27 +92,27 @@ Because PRD `PAR-12` explicitly mentions fractional IDR notation (`Rp 1.250.000,
 
 | Alternative | Description | Reason Rejected |
 | :--- | :--- | :--- |
-| **`Double` / `Float` for amounts** | Store decimal amounts directly in SQLite `REAL`. | **Rejected.** Binary floating-point representation causes rounding drift in cumulative sums and balance checkpoints. |
-| **`PENDING_REVIEW` status on `Transaction` table** | Save incomplete parse results directly as pending transactions and filter them out in every query. | **Rejected (PRD 4.4 / Appendix A).** Pollutes foreign-key/NOT-NULL constraints, risks accidental inclusion in balances/totals, and entangles parser retries with accounting state. |
-| **Numeric parser confidence score (`0.0..1.0`)** | Threshold-based routing to Needs Review. | **Rejected for MVP (PRD 6.3).** Arbitrary heuristics obscure failure reasons; deterministic `ReviewReason` enums explain *why* an event stalled. |
-| **Creating a 3rd `FEE` transaction row on transfer link** | Split outgoing transfer into transfer amount + separate fee transaction. | **Rejected (`TRF-04`).** Mutates the captured outgoing account balance twice or forces rewriting captured transaction amounts; derived `fee_minor` on `TransferMatch` preserves captured leg amounts while balancing categories cleanly. |
-| **Full `TransactionRevision` history table** | Append-only audit log of every user edit. | **Cut in PRD 1.4 (`TX-03`).** `original_json` provides full capture-vs-current accountability with far less schema and backup overhead. |
+| **`IDR` Storage Exponent `0` (Whole Rupiah)** | Store `Rp 50.000` as `50_000L` (1 IDR = 1 minor unit). | **Not preferred.** Cannot losslessly store `Rp 1.250.000,50` (explicitly required by PRD `PAR-12` example) without truncating/rounding or routing valid interest/admin/tax decimal notifications to `NeedsReview`. |
+| **`Double` / `Float` for amounts** | Store decimal amounts directly in SQLite `REAL`. | **Rejected.** Floating-point precision loss corrupts sums and balance checkpoints. |
+| **`PENDING_REVIEW` status on `Transaction` table** | Save incomplete parse results directly as pending transactions. | **Rejected (PRD 4.4 / Appendix A).** Risks leaking unconfirmed items into totals and breaks foreign-key invariants. |
+| **Numeric parser confidence score (`0.0..1.0`)** | Heuristic score routing to Needs Review. | **Rejected for MVP (PRD 6.3).** Deterministic `ReviewReason` explains exact failure cause. |
+| **Creating a 3rd `FEE` transaction on transfer link** | Split outgoing transfer into transfer + fee row. | **Rejected (`TRF-04`).** Double-counts outgoing balance; derived `fee_minor` on `TransferMatch` keeps captured legs intact. |
 
 ---
 
 ## 6. Technical Justification
 
-- **Single Classification Table Truth:** Consolidating income/expense/netting rules into one pure-Kotlin domain calculator shared across Dashboard, Insights, and Account summaries eliminates discrepancies between screen totals (`TEST-005`).
-- **Immutability of Capture Provenance (`original_json` + `event_id` retention):** Users can freely fix misparsed categories, descriptions, merchants, or amounts (`TX-03`) or void duplicates (`TX-08`) without ever breaking catch-up scan idempotency or losing the original notification extract.
-- **Strict Separation of `NotificationEvent` and `Transaction`:** Cleanly guarantees zero half-parsed financial records ever enter accounting math.
+- **ISO 4217 Compliance + Clean Formatting:** Exponent `2` eliminates data loss for any Indonesian bank/e-wallet alert that carries `,50` or `.50` sen (bank interest, tax, fee rounding) while UI elision of `,00` preserves familiar `Rp50.000` presentation.
+- **Single Classification Table Truth:** Consolidating income/expense/netting rules into one pure-Kotlin domain calculator prevents report drift (`TEST-005`).
+- **Immutability of Capture Provenance:** `original_json` + retained `event_id` rows preserve auditability across edits, voids, and post-restore catch-up scans.
 
 ---
 
 ## 7. Consequences and Trade-Offs
 
 - **Positive:**
-  - Exact integer accounting across balances, checkpoints, adjustments, refunds, and derived transfer fees.
-  - High parser auditability (`ReviewReason` + `original_json` + verification-window raw text).
+  - Exact lossless representation across `IDR` and standard 2-decimal currencies without schema divergence.
+  - High parser auditability (`ReviewReason`, `original_json`, verification-window text).
 - **Negative / Risks:**
-  - If the owner later switches `IDR` exponent from `0` to `2` (or vice versa) after data exists, a risky data migration multiplying/dividing every historical amount and fee by `100` would be required — hence **locking the IDR exponent before M1** is mandatory.
-  - Because `NeedsReview` items are excluded from full backups (`DATA-05`), unresolved review items should be highlighted to the user before creating a backup.
+  - Every parser, manual-entry viewmodel, formatter, and test must convert between major Rupiah display units and minor `sen` strictly through `CurrencySpec` / `CurrencyFormatter`; forgetting `× 100` in one spot introduces a **100x scaling bug** (mitigated by strict type wrappers or dedicated `TEST-001` assertions).
+  - Locking IDR exponent `2` before `DB-002` avoids costly future `× 100` data migrations.

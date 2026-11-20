@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">W-Track</string>
+
+    <string name="foundation_title">W-Track Foundation</string>
+    <string name="foundation_subtitle">Milestone M0 — Modular Architecture Ready</string>
+    <string name="foundation_status_label">Foundation status</string>
+    <string name="foundation_status_value">Core shell, DI, theme, and pure-Kotlin parser contracts verified.</string>
+    <string name="foundation_scope_note">Persistence encryption (M1), notification capture (M2), and provider parsers (M3a/M3b) will be enabled in subsequent milestones.</string>
+</resources>

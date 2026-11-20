@@ -1,7 +1,7 @@
 # Database Schema & Entity-Relationship Design — W-Track
 
 **Document Status:** M1 Foundation & M3c Completion Schema Specification (PRD v1.4)  
-**Encryption:** SQLCipher for Android (`net.zetetic:sqlcipher-android`) from Schema Version 1 (ADR-005)  
+**Encryption:** SQLCipher for Android (`net.zetetic:sqlcipher-android`: `4.20.0` evaluated / `4.17.0` strict-API-36 fallback; no 5 beta, no EOL `4.5.4`) from Schema Version 1 (Pending final `ADR-005` owner acceptance)  
 **Last Updated:** 2026-11-21
 
 ---
@@ -219,7 +219,7 @@ erDiagram
 | `account_id` | `INTEGER` | NO | — | `FK -> accounts(id) ON DELETE RESTRICT` |
 | `source_id` | `TEXT` | YES | `NULL` | `FK -> transaction_sources(id) ON DELETE SET NULL`; `NULL` for manual & adjustment |
 | `event_id` | `INTEGER` | YES | `NULL` | `FK -> notification_events(id) ON DELETE RESTRICT`; `NULL` for manual & adjustment |
-| `amount_minor` | `INTEGER` | NO | — | `CHECK (amount_minor > 0)` (direction carries sign semantics) |
+| `amount_minor` | `INTEGER` | NO | — | `CHECK (amount_minor > 0)` (direction carries sign semantics; `IDR` exponent `2` ISO 4217 recommended per `ADR-004`) |
 | `currency` | `TEXT` | NO | — | ISO 4217 uppercase code |
 | `direction` | `TEXT` | NO | — | Enum: `INFLOW`, `OUTFLOW` |
 | `transaction_type` | `TEXT` | NO | — | Enum: `PURCHASE`, `TRANSFER`, `FEE`, `REFUND`, `CASH`, `ADJUSTMENT`, `OTHER` |

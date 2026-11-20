@@ -27,20 +27,20 @@ Development is strictly gated into **Phase 1 (Ingestion PoC & Gate G1)** and **P
 
 ## 2. First PoC Milestone Breakdown (`PRD Section 17.1`)
 
-**Objective:** Prove that real notifications from the owner's two chosen financial apps can be safely captured, stored encrypted, parsed (at least one provider), deduplicated, recovered across failures, and measured objectively at Gate G1 — **without polishing full dashboard UI**.
+**Objective:** Prove that real notifications from the owner's initial financial app targets (**1. Bank Jago**, **2. DANA**, **3. BCA**, tracked in [PROVIDERS.md](file:///home/adomancer/Documents/project/W-Track/docs/PROVIDERS.md)) can be safely captured, stored encrypted, parsed incrementally (starting with Priority 1 Bank Jago after ingestion foundation is ready), deduplicated, recovered across failures, and measured objectively at Gate G1 — **without polishing full dashboard UI** and **without delaying M0 or M1**.
 
 ### Step-by-Step PoC Execution Checklist (M0 → Gate G1)
-1. **Pre-M0 Gate:** Owner resolves `minSdk`, `targetSdk`, physical test devices, and initial two target apps in `ADR-003`; confirms `IDR` exponent in `ADR-004` and SQLCipher setup in `ADR-005` before M1 schema creation.
+1. **Pre-M0 Gate:** Owner resolves `compileSdk = 36` vs `37` GA alignment (keeping `minSdk = 26`, `targetSdk = 36`, no Android 17 beta) in `ADR-003` (confirmed primary test device: `vivo / iQOO Z10R (I2505)`, Android 16 / API 36), confirms `IDR` exponent `2` (ISO 4217) in `ADR-004`, and confirms final acceptance of `ADR-005` (`sqlcipher-android:4.20.0` vs `4.17.0` + AFU locked-screen Keystore policy). Provider discovery does **not** block M0 or M1.
 2. **M0 (`CORE-001`..`003`):** Recreate clean 3-module Gradle setup (`app`, `integration:api`, `integration:providers`, `build-logic`), Hilt, theme, detekt/lint, and `domain` purity JUnit test.
-3. **M1 (`SEC-001`, `SEC-003`, `DB-001`..`005`, `TEST-004`):** Implement `DatabaseKeyManager` (`net.zetetic:sqlcipher-android:4.6.1+` + Android Keystore AES-GCM wrapping), verify reboot reopen & `LOCKED_KEY_MISSING_OR_INVALID` state **before** storing real events, and lock Room Schema v1 (`allowBackup="false"`).
-4. **M2 (`PIPE-001`..`008`, `PIPE-015`):** Build `WtrackNotificationListenerService` with synchronous allowlist filter, rebind, `activeNotifications` catch-up, encrypted `notification_events` inbox recording `posted_at` + `notification_key` + `notification_id` + `notification_tag`, `ING-12` startup/connect recovery, `ING-13` `NO_PARSER` ignore/count rule, and a **minimal PoC Compose verification screen** (allowlist toggle, pending Needs Review count, transaction list, capture status, locked-DB screen).
-5. **M3a (`INT-001`, `INT-002` PoC, `TEST-007`):** Lock Gate G1 thresholds in `ADR-003` **before** measurement starts. Enable capture on owner's device for 2 real apps (≥ 7–14 days, ≥ 30 tx/provider), collect optional M3a opt-in samples (≤ 14d), anonymize fixtures for incoming/outgoing/failed/refund/hidden-content cases, implement **at least 1 working provider parser**, verify deduplication on real updates/re-posts, and populate the Appendix C evidence log.
+3. **M1 (`SEC-001`, `SEC-003`, `DB-001`..`005`, `TEST-004`):** Implement `DatabaseKeyManager` (`net.zetetic:sqlcipher-android` `4.20.0` or `4.17.0` per approved `compileSdk` — never SQLCipher 5 beta or EOL `4.5.4` — plus Keystore AES-GCM wrapping with `setUnlockedDeviceRequired(false)` for AFU locked-screen capture), verify locked-screen capture, reboot reopen & `LOCKED_KEY_MISSING_OR_INVALID` state **before** storing real events, and lock Room Schema v1 (`allowBackup="false"`).
+4. **M2 (`PIPE-001`..`008`, `PIPE-015`):** Build provider-agnostic `WtrackNotificationListenerService` with synchronous allowlist filter, rebind, `activeNotifications` catch-up, encrypted `notification_events` inbox recording `posted_at` + `notification_key` + `notification_id` + `notification_tag`, `ING-12` startup/connect recovery, `ING-13` `NO_PARSER` ignore/count rule, and a **minimal PoC Compose verification screen** (allowlist toggle, pending Needs Review count, transaction list, capture status, locked-DB screen). Measure default battery/Doze baseline on `iQOO Z10R` **without** whitelisting first.
+5. **M3a (`INT-001`, `INT-002` PoC, `TEST-007`):** Lock Gate G1 thresholds (`>=90%` coverage, `>=95%` completeness, `0` unexplained wrong amounts/directions, `7–14d`, `>=30 tx/provider`) in `ADR-003` **before** measurement starts. Verify installed package IDs (`com.jago.digitalBanking`, `id.dana`, `com.bca` vs `com.bca.mybca.omni.android`) on `iQOO Z10R`, inspect real notification structures before writing parsers, anonymize fixtures (strictly excluding OTPs/PINs/credentials), implement **Priority 1 (Bank Jago)** first followed incrementally by **DANA** and **BCA**, verify deduplication on real updates/re-posts, and populate the Appendix C / `PROVIDERS.md` evidence log.
 
 **PoC Sprint Success Condition (`Section 17.1`):**
-- Notifications from both actual financial apps are received, identified (with `key`/`id`/`tag` + `posted_at`), and stored encrypted.
-- At least one provider parser parses, deduplicates, and displays transactions in the basic Compose screen without manual entry.
+- Notifications from the verified target financial apps are received, identified (with `key`/`id`/`tag` + `posted_at`), and stored encrypted without hardcoding provider logic into the listener.
+- Incremental provider validation starts with Bank Jago and expands across DANA and BCA, displaying parsed, deduplicated transactions without manual entry.
 - Incomplete/redacted/unparseable events route to `NEEDS_REVIEW` status and recover via `ING-12` (full review UI deferred to M4).
-- Appendix C evidence log is complete for Gate G1 go/no-go decision.
+- Gate G1 evidence log (`PROVIDERS.md` / Appendix C) is complete for go/no-go decision.
 
 ---
 
@@ -54,10 +54,10 @@ All 45 PRD Section 18 backlog IDs are preserved verbatim with exact requirement 
 
 #### `CORE-001` — Initialize Android Project
 - **Priority:** `MUST` | **PRD Refs:** Sections 5, 12, 17.1
-- **Objective:** Configure buildable multi-module Kotlin/Compose Android project (`build-logic`, `app`, `integration:api`, `integration:providers`).
-- **Dependencies:** Owner confirms `minSdk`/`targetSdk` in `ADR-003`.
+- **Objective:** Configure buildable multi-module Kotlin/Compose Android project (`build-logic`, `app`, `integration:api`, `integration:providers`) targeting `minSdk = 26`, `targetSdk = 36` (no Android 17 beta), and approved `compileSdk` (`36` vs `37` GA).
+- **Dependencies:** Owner confirms `ADR-003` Option A (`compileSdk = 36` strict, `core-ktx:1.18.0`, `sqlcipher:4.17.0` if `4.20.0` rejects 36) vs Option B (`compileSdk = 37` GA, `targetSdk = 36`, `sqlcipher:4.20.0`, `core-ktx:1.19.1`), and AGP (`8.13.x` vs `9.0.x` built-in Kotlin).
 - **Deliverables:** `settings.gradle.kts`, `gradle/libs.versions.toml`, `build-logic` convention plugins, baseline `MainActivity` & `WtrackApplication`.
-- **Acceptance Criteria:** Debug APK compiles and launches on target device/emulator; JVM unit test tasks run cleanly.
+- **Acceptance Criteria:** Debug APK compiles cleanly without AAR metadata suppression flags and launches on `iQOO Z10R (I2505)`; JVM unit tests run cleanly.
 - **Required Tests:** Smoke launch test; Gradle build check (`./gradlew assembleDebug testDebugUnitTest`).
 - **Definition of Done:** Clean build on CI/local with zero lint blockers.
 
@@ -85,12 +85,12 @@ All 45 PRD Section 18 backlog IDs are preserved verbatim with exact requirement 
 
 #### `SEC-001` — Implement Database Encryption Before Any Schema Work
 - **Priority:** `MUST` | **PRD Refs:** `DATA-03`, `DATA-04`, Section 9.2, 17.1, `ADR-005`
-- **Objective:** Implement Android Keystore AES-GCM KEK + wrapped 256-bit DEK + `net.zetetic:sqlcipher-android` `SupportOpenHelperFactory` and startup key-failure state machine.
-- **Dependencies:** `CORE-003`, **Owner acceptance of `ADR-005`**.
+- **Objective:** Implement Android Keystore AES-GCM KEK (`setUserAuthenticationRequired(false)`, `setUnlockedDeviceRequired(false)` for AFU locked-screen capture) + wrapped 256-bit DEK + `net.zetetic:sqlcipher-android` (`4.20.0` or `4.17.0` per approved SDK alignment; never 5 beta or EOL `4.5.4`) `SupportOpenHelperFactory` and startup key-failure state machine.
+- **Dependencies:** `CORE-003`, **Final Owner acceptance of `ADR-005`**.
 - **Deliverables:** `DatabaseKeyManager`, `DatabaseStartupState` (`FRESH_INSTALL`, `READY`, `CORRUPT_INITIAL_STATE`, `LOCKED_KEY_MISSING_OR_INVALID`), SQLCipher `SupportOpenHelperFactory` provider.
-- **Acceptance Criteria:** DB file header is encrypted (not plaintext `"SQLite format 3"`); missing/invalid key enters `LOCKED_KEY_MISSING_OR_INVALID` without deleting/overwriting DB file; 16KB page-size native loading works.
-- **Required Tests:** Unit tests for state classification; instrumented tests (`TEST-004` part 1) for reboot reopen, deleted wrapped key, corrupted DEK, invalidated Keystore alias.
-- **Definition of Done:** Encryption verified on disk and key-loss locked screen prevents silent overwrite.
+- **Acceptance Criteria:** DB file header is encrypted (not plaintext `"SQLite format 3"`); missing/invalid key enters `LOCKED_KEY_MISSING_OR_INVALID` without deleting/overwriting DB file; `arm64-v8a`/16KB native loading succeeds on `iQOO Z10R`; KEK unwraps cleanly in locked-screen AFU background context.
+- **Required Tests:** Unit tests for state classification; instrumented tests (`TEST-004`) for locked-screen AFU capture, reboot + post-unlock reopen, deleted wrapped key, corrupted DEK, invalidated Keystore alias.
+- **Definition of Done:** Encryption verified on disk and locked-screen/reboot/key-loss tests pass before any schema stores real events.
 
 #### `SEC-003` — Configure Android Auto Backup Rules
 - **Priority:** `MUST` | **PRD Refs:** `DATA-08`, Section 9.4, `ADR-002`
@@ -103,20 +103,20 @@ All 45 PRD Section 18 backlog IDs are preserved verbatim with exact requirement 
 
 #### `DB-001` — Create Account Schema (with `initial_balance_at`)
 - **Priority:** `MUST` | **PRD Refs:** `ACC-01` to `ACC-05`
-- **Objective:** Implement `accounts` Room entity with opening balance timestamp check constraint.
-- **Dependencies:** `SEC-001`, **Owner confirmation of IDR exponent (`ADR-004`)**.
-- **Deliverables:** `AccountEntity`, mappers to `domain.model.Account`.
+- **Objective:** Implement `accounts` Room entity with opening balance timestamp check constraint and ISO 4217 minor-unit currency discipline (`IDR` exponent `2`).
+- **Dependencies:** `SEC-001`, **Owner confirmation of `ADR-004` IDR exponent `2`**.
+- **Deliverables:** `AccountEntity`, mappers to `domain.model.Account`, `CurrencySpec` registry.
 - **Acceptance Criteria:** Enforces `initial_balance_at` whenever `initial_balance_minor` is non-null.
 - **Required Tests:** Room schema + constraint unit/instrumented test.
 - **Definition of Done:** Entity compiles into exported Room schema v1 JSON.
 
 #### `DB-002` — Create Transaction Schema
 - **Priority:** `MUST` | **PRD Refs:** `TX-03`, `TX-05`, `TX-08`, `TX-09`, `PAR-10`, Section 7.1
-- **Objective:** Implement `transactions` Room entity with integer minor units, `original_json`, `provider_reference`, `related_transaction_id`, `reported_balance_minor`, and partial unique `event_id` index.
+- **Objective:** Implement `transactions` Room entity with integer minor units (`IDR` exponent `2`, `1 IDR = 100 sen`), `original_json`, `provider_reference`, `related_transaction_id`, `reported_balance_minor`, and partial unique `event_id` index.
 - **Dependencies:** `DB-001`, `DB-003`, `DB-007`.
 - **Deliverables:** `TransactionEntity`, indexes, FKs, mappers.
-- **Acceptance Criteria:** All Appendix A indexes present; `amount_minor > 0` check enforced; at most one transaction per `event_id`.
-- **Required Tests:** Constraint & duplicate `event_id` failure tests.
+- **Acceptance Criteria:** All Appendix A indexes present; `amount_minor > 0` check enforced; at most one transaction per `event_id`; formatter/parser tests prevent 100x scaling mistakes.
+- **Required Tests:** Constraint, 100x minor-unit scaling, & duplicate `event_id` failure tests.
 - **Definition of Done:** Exported into Room schema v1.
 
 #### `DB-003` — Create NotificationEvent & TransactionSource Schemas
@@ -264,43 +264,43 @@ All 45 PRD Section 18 backlog IDs are preserved verbatim with exact requirement 
 
 #### `INT-001` — Capture & Anonymize Real-Device Fixtures (+ M3a Sample Collection)
 - **Priority:** `MUST` | **PRD Refs:** Section 11, 14.3, 17, 17.1
-- **Objective:** Confirm package IDs on owner's device, run opt-in sample collection (max 14d, encrypted, 1 source at a time or strictly controlled PoC test), record `key`/`id`/`tag` update/re-post behavior (`TEST-004`), and produce anonymized JSON/text fixtures for incoming, outgoing, failed, refund/reversal, multi-account hint, and Android 15 hidden-content cases.
-- **Dependencies:** `PIPE-008`, `PIPE-015`, **Owner selects 2 target apps & locks Gate G1 thresholds in `ADR-003`**.
-- **Deliverables:** Anonymized fixture files in `integration/providers/src/test/resources/...`; completed provider behavior notes (`key`/`id`/`tag`, language, timezone, dual-notifier overlap).
-- **Acceptance Criteria:** Zero real PII/account numbers committed to git; fixtures cover all transaction classes observed on device.
-- **Required Tests:** Fixture deserialization & validation tests; git pre-commit/review privacy audit.
-- **Definition of Done:** Verified anonymized fixtures exist for both target providers.
+- **Objective:** Verify installed package IDs (`Bank Jago`, `DANA`, `BCA`: `BCA mobile` vs `myBCA`) on `iQOO Z10R`, inspect real notification structures (`title`, `text`, `bigText`, `subText`, `channelId`, directions, amount formats, ambiguities) via opt-in sample collection (max 14d, encrypted, strictly excluding OTPs/PINs/credentials), record `key`/`id`/`tag` update/re-post behavior (`TEST-004`), and commit anonymized fixtures in [PROVIDERS.md](file:///home/adomancer/Documents/project/W-Track/docs/PROVIDERS.md) / `:integration:providers`.
+- **Dependencies:** `PIPE-008`, `PIPE-015`, **Gate G1 thresholds locked in `ADR-003` before capture starts**. Does **not** block M0 or M1.
+- **Deliverables:** Anonymized fixture files in `integration/providers/src/test/resources/...`; completed [PROVIDERS.md](file:///home/adomancer/Documents/project/W-Track/docs/PROVIDERS.md) evidence tables (`key`/`id`/`tag`, language, timezone, dual-notifier overlap).
+- **Acceptance Criteria:** Zero real PII/OTPs/PINs/account numbers committed to git; fixtures cover all transaction classes observed on `iQOO Z10R`.
+- **Required Tests:** Fixture deserialization & validation tests; git privacy audit.
+- **Definition of Done:** Verified anonymized fixtures exist starting with Priority 1 (`Bank Jago`) and extending to `DANA` and `BCA`.
 
-#### `INT-002` (PoC Scope) — Implement First Provider Parser (PoC Level)
+#### `INT-002` (PoC Scope) — Implement Priority 1 Provider Parser (`Bank Jago`, Incremental PoC)
 - **Priority:** `MUST` | **PRD Refs:** `PAR-02`, `PAR-06`, Section 17.1
-- **Objective:** Implement working v1 parser for Provider 1 inside `:integration:providers` so PoC displays parsed, deduplicated real transactions without manual entry.
-- **Dependencies:** `INT-001`, `PIPE-005`.
-- **Deliverables:** `ProviderOneParser` (version = 1), unit fixture tests (`TEST-001` subset).
-- **Acceptance Criteria:** Captures, parses, deduplicates, and persists live Provider 1 notifications on owner's device.
-- **Required Tests:** Unit tests covering valid, promo, failed, partial, and duplicate notifications.
-- **Definition of Done:** PoC Sprint success condition achieved for Provider 1.
+- **Objective:** After ingestion foundation M0–M2 is ready and `Bank Jago` real notifications are inspected on `iQOO Z10R`, implement working v1 `JagoTransactionParser` inside `:integration:providers` (`wtrack.integration.providers.jago`) so PoC displays parsed, deduplicated real transactions without hardcoding provider logic into the listener.
+- **Dependencies:** `INT-001` (Bank Jago verified package & samples), `PIPE-005`.
+- **Deliverables:** `JagoTransactionParser` (version = 1), unit fixture tests (`TEST-001` subset).
+- **Acceptance Criteria:** Captures, parses, deduplicates, and persists live `Bank Jago` notifications on `iQOO Z10R` while preserving pure `TransactionParser` abstraction.
+- **Required Tests:** Unit tests covering valid, promo, failed, partial, pocket-hint, and duplicate notifications.
+- **Definition of Done:** PoC Sprint success condition achieved for Priority 1 (`Bank Jago`) without waiting on `DANA` or `BCA`.
 
-#### `TEST-007` — Run Gate G1 Measurement & Populate Appendix C Evidence Log
+#### `TEST-007` — Run Gate G1 Measurement & Populate Appendix C / `PROVIDERS.md` Evidence Log
 - **Priority:** `MUST` | **PRD Refs:** Section 17, Appendix C, `ADR-003`
-- **Objective:** Run 7–14 consecutive day capture (≥ 30 transactions per provider), reconcile transaction-by-transaction against official provider statements, and record Coverage (`D/A`), Completeness (`C/B`), Correctness, identifiability, and update/duplicate findings.
+- **Objective:** Run ≥7–14 consecutive day capture (≥ 30 transactions per active provider across **Bank Jago**, **DANA**, and **BCA** as available/verified), reconcile transaction-by-transaction against official provider statements, and record Coverage (`D/A`), Completeness (`C/B`), Correctness, identifiability, dual-notifier overlaps, and update/duplicate findings.
 - **Dependencies:** `INT-001`, `INT-002`, **ADR-003 thresholds locked beforehand**.
-- **Deliverables:** Completed Appendix C Evidence Log; formal Gate G1 Go/Re-scope/No-go memo + Gate G1 scope decisions (multi-account, credit card, dual-notifier rule).
-- **Acceptance Criteria:** Sample ≥ 30 per provider; metrics calculated against pre-locked thresholds without post-hoc adjustment.
+- **Deliverables:** Completed Appendix C / `PROVIDERS.md` Evidence Log; formal Gate G1 Go/Re-scope/No-go memo + Gate G1 scope decisions (multi-account, credit card, dual-notifier rule).
+- **Acceptance Criteria:** Sample ≥ 30 per evaluated provider; metrics calculated against pre-locked thresholds without post-hoc adjustment.
 - **Required Tests:** Cross-verification against statement ground truth.
 - **Definition of Done:** Gate G1 decision signed off by owner before starting M3b–M5.
 
 ---
 
-### Milestone M3b: Initial Providers (`5–8 working days`, Post-Gate G1)
+### Milestone M3b: Initial Providers (`5–8 working days`, Incremental across Bank Jago → DANA → BCA)
 
-#### `INT-002` (Full) & `INT-003` — Complete First & Implement Second Provider Parser
+#### `INT-002` (Full) & `INT-003` — Harden `Bank Jago` & Implement `DANA` and `BCA` Parsers Incrementally
 - **Priority:** `MUST` | **PRD Refs:** `PAR-02`, `PAR-06`, `PAR-09`, `PAR-10`, `PAR-12`, Criterion 4
-- **Objective:** Harden Provider 1 parser and implement Provider 2 parser covering incoming, outgoing, fees, failed attempts (`FAILED_ATTEMPT`), refunds/reversals (`REFUND` + `provider_reference`), account hints, reported balances, multi-stage announcements, and Indonesian/English formats.
-- **Dependencies:** Gate G1 `Go` (or `Re-scope`), `INT-001`.
-- **Deliverables:** Versioned `ProviderOneParser` & `ProviderTwoParser` in `:integration:providers`, complete anonymized test suites.
-- **Acceptance Criteria:** Both parsers isolated in `:integration:providers`; handle every observed M3a notification template deterministically.
-- **Required Tests:** `TEST-001` full regression suite.
-- **Definition of Done:** At least two verified provider parsers pass all fixture tests.
+- **Objective:** Harden Priority 1 (`Bank Jago`) and incrementally implement Priority 2 (`DANA`) and Priority 3 (`BCA`: `BCA mobile` and/or `myBCA` per M3a ADB verification) in isolated `:integration:providers` subpackages covering incoming, outgoing, fees, failed attempts (`FAILED_ATTEMPT`), refunds/reversals (`REFUND` + `provider_reference`), account/pocket hints, reported balances, multi-stage announcements, and Indonesian/English formats.
+- **Dependencies:** Gate G1 `Go` (or `Re-scope`), `INT-001` per-provider evidence.
+- **Deliverables:** Versioned `JagoTransactionParser`, `DanaTransactionParser`, and `BcaTransactionParser` in `:integration:providers`, complete anonymized test suites and ambiguity notes in `PROVIDERS.md`.
+- **Acceptance Criteria:** All parsers remain isolated in `:integration:providers` (zero provider hardcoding in listener/pipeline); handle every observed M3a template deterministically across all three PoC target apps.
+- **Required Tests:** `TEST-001` full regression suite per provider.
+- **Definition of Done:** Verified parsers pass all fixture & on-device validation suites incrementally across `Bank Jago`, `DANA`, and `BCA`.
 
 #### `PIPE-009` — Implement Account Resolver Using Account Hints
 - **Priority:** `MUST` (deferred to post-MVP only if Gate G1 confirms 1:1 sources) | **PRD Refs:** `ACC-05`, `PAR-02`, `REV-07`
@@ -629,44 +629,62 @@ Every high-risk requirement and architectural decision maps directly to automate
 
 | High-Risk Area | Specific Failure Modes Targeted | Test Type & Layer | Concrete Verification Criteria |
 | :--- | :--- | :--- | :--- |
-| **1. Financial Amount & Locale Parsing (`PAR-12`)** | Thousand-fold misread (`Rp50.000` vs `50.00` vs `1.500`), floating-point drift, wrong timezone / `received_at` used instead of `posted_at` | Pure-JVM Unit Tests (`:integration:providers`, `:app`) | Parameterized vectors for `id-ID` & `en-US` formats; assert `1.500` ambiguous input returns `NeedsReview(AMBIGUOUS_FIELD)`; verify `occurredAt == postedAt` when text omits timestamp; assert zero `Double` usage. |
+| **1. Financial Amount & Locale Parsing (`PAR-12`, `ADR-004`)** | Thousand-fold misread (`Rp50.000` vs `1.500`), **100x IDR exponent scaling error** (`50_000L` vs `5_000_000L`), floating-point drift, wrong timezone / `received_at` instead of `posted_at` | Pure-JVM Unit Tests (`:integration:providers`, `:app`) | Parameterized vectors for `id-ID` & `en-US` formats; assert `Rp50.000` → `5_000_000L` & `Rp 1.250.000,50` → `125_000_050L` under IDR exponent `2`; assert `,00` UI elision; assert `1.500` ambiguous input → `NeedsReview(AMBIGUOUS_FIELD)`; verify `occurredAt == postedAt`. |
 | **2. Deduplication & Idempotency (`Section 8.1`)** | Catch-up scan or post-restore replay creates 2nd tx; two real purchases with same amount collapsed wrongly; voided tx resurrected | Unit + Room Integration (`TEST-002`, `TEST-006`) | Replay identical event → 1 tx; void tx + replay → stays voided; distinct `provider_reference` / `notification_key` same-minute same-amount → 2 distinct txs; post-restore catch-up → 0 new txs. |
-| **3. Notification Updates & Re-posts (`Section 8.1`, `14.3`)** | Bank updates pending alert to settled alert, or re-posts summary/progress bar with identical or mutated `key`/`id`/`tag` | Device Capture + Provider Fixture Tests (`TEST-004`) | Real-device log of `notification_key`, `notification_id`, `notification_tag`, `posted_at` across updates; replay sequence against `DeduplicationEngine` verifying single final transaction. |
+| **3. Notification Updates & Re-posts (`Section 8.1`, `14.3`)** | Bank updates pending alert to settled alert, Live Update / `ProgressStyle` ticks, or re-posted summaries with mutated `key`/`id`/`tag` | Device Capture + Provider Fixture Tests (`TEST-004`) | Real-device log of `notification_key`, `notification_id`, `notification_tag`, `posted_at` across updates on Android 16; verify frequent updates never trigger ANRs or duplicate transactions. |
 | **4. Process Death & Event Recovery (`ING-12`)** | App killed while event is in `RECEIVED` or `PROCESSING`; recurring crash loop hides accepted event | Coroutine/Room Integration + `adb shell am kill` Device Test | Seed DB with `RECEIVED`, stale `PROCESSING` (`>60s`), and `FAILED` (`attempt_count = 2` vs `3`) rows → trigger startup recovery → assert completion or escalation to `NEEDS_REVIEW(PIPELINE_ERROR)`. |
 | **5. Needs Review & Accounting Invariants (`REV-01..05`, `Section 4.6`)** | Incomplete item leaks into dashboard totals; derived fee changes balance twice; edit breaks transfer pair; refund counted as income | Pure-Kotlin Domain + Room Tx Integration (`TEST-005`) | Verify `NEEDS_REVIEW` creates 0 `Transaction` rows; test all 16 rows of Section 4.6 table; test blocked edit invalidating `TransferMatch`; test `original_json` immutability across edits. |
-| **6. Encryption & Key Failure (`ADR-005`, `TEST-004`)** | Plaintext SQLite file on disk; 16KB crash on Android 15+; Keystore invalidation silently wipes DB with new empty DB | Instrumented Android Tests (`TEST-004`) | Verify raw `.db` file header lacks `"SQLite format 3"`; verify reboot reopen; delete wrapped DEK / corrupt key / mismatch key → assert `LOCKED_KEY_MISSING_OR_INVALID`, assert original `.db` bytes untouched. |
-| **7. Permission & Service Lifecycle (`ING-01..14`, `14.3`)** | Access revoked & restored; `onListenerDisconnected`; device reboot; OEM battery saver killing service | Physical Device Lifecycle Checklist (`TEST-003`) | Toggle Notification Access off/on → verify `ATTENTION` → `ACTIVE` + `CaptureGap`; kill process & exceed `3h` simulated clock → `HEARTBEAT_STALE`; reboot device → listener auto-rebinds & `activeNotifications` scanned. |
-| **8. Android 15+ Hidden Content (`ING-06`, `Section 5`)** | Android 15 redacts notification containing OTP-like reference code → parser crashes or guesses amount | Instrumented / Physical Android 15+ Device Test (`Section 14.3`) | Feed redacted/empty-content financial notification (`isContentRedacted = true`) → assert zero crash, zero guessed fields, routes cleanly to `NEEDS_REVIEW` (`UNKNOWN_FORMAT` / `MISSING_AMOUNT`). |
+| **6. Encryption, Locked-Screen Ingestion & Key Failure (`ADR-005`, `TEST-004`)** | Plaintext SQLite file; SQLCipher `4.20.0`/`4.17.0` `arm64-v8a` load fault; Keystore fails on locked AFU screen (`setUnlockedDeviceRequired` misconfig); key loss silently wipes DB | Instrumented + Physical Device Tests (`TEST-004`) | Verify raw `.db` header lacks `"SQLite format 3"`; verify **AFU locked-screen capture** cold-start/rebind unwraps KEK & persists to SQLCipher; verify **reboot + post-unlock reopen**; delete/corrupt wrapped DEK & Keystore alias → assert `LOCKED_KEY_MISSING_OR_INVALID` & original `.db` bytes untouched. |
+| **7. Permission & Service Lifecycle (`ING-01..14`, `14.3`)** | Access revoked & restored; `onListenerDisconnected`; device reboot; Light/Deep Doze (`wait_for_unlock=true`) & vivo/iQOO background restrictions | Physical Device Lifecycle Checklist (`TEST-003`) | See dedicated **Physical-Device Test Plan (`iQOO Z10R`)** below; measure **default battery optimization settings BEFORE any whitelisting**. |
+| **8. Android 15+/16 Hidden Content & Notification Behavior (`ING-06`, `Section 5`)** | Android 15/16 OTP redaction or lock-screen masking strips text; Android 16 `ProgressStyle`/Live Updates or Notification Cooldown disrupts capture | Physical `iQOO Z10R` (API 36) + Instrumented Tests (`Section 14.3`) | Feed redacted/empty-content financial notification (`isContentRedacted = true`) → assert zero crash, zero guessed fields, routes cleanly to `NEEDS_REVIEW`; verify `ProgressStyle` & cooldown bursts on Android 16. |
 | **9. Retention, Backup & Deletion (`DATA-05..10`)** | Expired `payload_json` kept forever; backup leaks payloads/NeedsReview; wrong passphrase overwrites DB; wipe leaves residue | Instrumented Integration (`SEC-002`, `TEST-006`) | Verify `IGNORED` purged immediately, `PROCESSED` purged after window, `NEEDS_REVIEW` purged at 30d; inspect decrypted backup JSON for zero payloads/NeedsReview; wrong passphrase/corrupt/newer-version restore leaves DB untouched. |
+
+### Physical-Device Testing Strategy (`vivo / iQOO Z10R`, Model `I2505`, Android 16 / API 36)
+- **Confirmed Test Hardware:** Manufacturer `vivo`, Brand `iQOO`, Device `iQOO Z10R` (`I2505`), Android `16` (`API 36`), Build `PD2512LF_EX_A_16.1.20.0.W20`, Security Patch `2026-10-01`, CPU ABI `arm64-v8a`, via ADB on Fedora Linux.
+- **Idle Diagnostics Baseline (`dumpsys deviceidle`):** Light Doze enabled, Deep Doze enabled, `wait_for_unlock=true`, Force idle disabled, confirmed prior transitions into `light-idle` and `deep-idle`.
+- **Critical Diagnostic Guardrails:**
+  1. The `ACTIVE` state observed during ADB bench inspection **must NOT be interpreted as proof of background reliability**.
+  2. **Do NOT automatically whitelist the application or disable battery optimization as a workaround before baseline testing.** Default Android 16 + vivo/iQOO battery optimization behavior must be measured first; `ING-10` exemption flows are verified separately afterwards.
+  3. **Additional Device Compatibility Unverified:** Passing tests on `iQOO Z10R` (Android 16) does **not** verify behavior on other OEM skins or Android versions (API 26–35, Android 17). Compatibility across additional devices remains explicitly **UNVERIFIED**.
+
+**7 Mandatory Physical-Device Test Scenarios (`TEST-003`):**
+1. **Notification delivery while screen is off and locked (AFU):** Unlock once post-boot, turn screen off & lock, trigger test notifications immediately and after 15+ minutes → confirm listener delivery, KEK unwrap, and SQLCipher DB persistence without opening the UI.
+2. **`NotificationListenerService` connection persistence:** Keep app closed/swiped from recents across screen-off cycles and normal daily usage → track `onListenerConnected`/`onListenerDisconnected` transitions and `CaptureGap` precision.
+3. **Listener recovery after process termination:** Kill app process (`adb shell am kill` / OS kill) → verify `ING-12` unfinished event sweep, `requestRebind()`, and `activeNotifications` catch-up scan on rebind/launch.
+4. **Reboot and post-unlock recovery:** Power-cycle device → unlock once (BFU → AFU) → verify system automatically rebinds `NotificationListenerService`, encrypted SQLCipher DB reopens cleanly, and queued notifications still in shade are captured idempotently.
+5. **Extended idle and Doze behavior:** Allow device to enter both Light Doze and Deep Doze unplugged/stationary (and test `dumpsys deviceidle step`), explicitly observing delays caused by `wait_for_unlock=true` before unlock vs after unlock, and calibrating `ING-14` `HEARTBEAT_STALE`.
+6. **OEM-specific (`vivo` / `iQOO`) background restrictions:** Observe whether OEM power/process management terminates the listener without delivering `onListenerDisconnected()`, verifying whether `ING-14` heartbeat detects silent gaps.
+7. **Battery optimization baseline vs `ING-10` exempt behavior:** Compare capture latency/drop rate under **default battery settings** first, then document exact user steps required under vivo/iQOO settings (`ING-10`) only after baseline evidence is recorded.
+8. **Android 16 (API 36) notification behavior checks:** Verify lock-screen privacy masking/OTP redaction (`ING-06`), `Notification.ProgressStyle` / Live Updates handling, and Notification Cooldown under bursts.
 
 ### Architecture Decision → Verification Mapping
 - **ADR-001 (Boundaries):** JUnit bytecode/import scan verifying `app.domain` has zero Android/Room/provider imports; `:integration:providers` compiles as pure `kotlin-jvm`.
 - **ADR-002 (`allowBackup="false"`):** Merged `AndroidManifest.xml` inspection + fresh-install restore suite (`TEST-006`).
-- **ADR-003 (Ingestion & G1):** Physical device lifecycle checklist (`TEST-003`) + 7–14 day Appendix C Gate G1 measurement (`TEST-007`).
-- **ADR-004 (Normalization & Accounting):** `PAR-12` locale parser suite (`TEST-001`) + 16-row classification & fee invariant suite (`TEST-005`).
-- **ADR-005 (SQLCipher & Key Failure):** Disk-bytes check + key-loss non-destructive locked-state instrumentation test (`TEST-004`) + 16KB page-size emulator/device launch check.
+- **ADR-003 (Ingestion, `iQOO Z10R` & G1):** Physical device 7-scenario lifecycle checklist (`TEST-003`) + Android 16 checks + 7–14 day Appendix C Gate G1 measurement (`TEST-007`).
+- **ADR-004 (Normalization & IDR Exponent `2`):** `PAR-12` locale + 100x scaling parser suite (`TEST-001`) + 16-row classification & fee invariant suite (`TEST-005`).
+- **ADR-005 (SQLCipher `4.20.0`/`4.17.0` & Key Failure):** Disk-bytes check, AFU locked-screen capture, reboot reopen, `LOCKED_KEY_MISSING_OR_INVALID` test (`TEST-004`), and `arm64-v8a` verification on `iQOO Z10R`.
 - **ADR-006 (Backup Container):** Argon2id/AES-GCM round-trip + tampered-AAD + atomic rollback instrumentation tests (`TEST-006`).
 
 ---
 
 ## 6. Owner Decisions & Unknowns Register
 
-> Planning and architectural documentation are unblocked, **but the implementation milestones below require explicit Owner resolutions** (never assumed silently).
+> Planning docs now incorporate the `iQOO Z10R` hardware confirmation and refined technical baselines, **while items marked Pending below remain explicitly unapproved until Owner confirmation**.
 
-| # | Decision / Unknown | Blocking Gate | Recommended Option & Trade-Offs | Owner Decision Needed |
+| # | Decision / Unknown | Status & Gate | Proposed / Confirmed Baseline & Trade-Offs | Owner Action Needed |
 | :-: | :--- | :--- | :--- | :--- |
-| **O1** | **First two actual financial apps** | **M3a** (need real package IDs before parser work) | Select the 2 highest-volume daily banks/e-wallets installed on the test device that reliably emit push notifications. *Trade-off:* Choosing low-volume apps delays reaching the 30-tx Gate G1 minimum. | `[TBD by Owner]` |
-| **O2** | **`minSdk`, `targetSdk`, `compileSdk`, and physical test devices** | **M0** (sets Gradle plugins & `ADR-003`) | Proposed: `minSdk = 26`, `targetSdk = 35` or `36` (confirm `compileSdk = 36` vs `37` depending on stable AGP/Android SDK). List exact Device Model + OEM Skin + Android API. *Trade-off:* Lower `minSdk` (<26) complicates notification channels/rebind; API 35+ enforces 16KB alignment and OTP redaction testing. | `[TBD by Owner]` |
-| **O3** | **Final Gate G1 measurement thresholds** | **Before G1 Capture Starts** (`ADR-003`) | Proposed (PRD 17): 7–14 days, ≥30 tx/provider, Coverage ≥90%, Completeness ≥95%, 0 unexplained wrong amounts/directions. *Trade-off:* Stricter thresholds reduce false-Go risk; must be fixed *before* seeing capture numbers. | `[TBD by Owner]` |
-| **O4** | **Database encryption library & key lifecycle policy** | **M1** (`SEC-001`, `ADR-005`) | Proposed: `net.zetetic:sqlcipher-android:4.6.1+` (replaces EOL `4.5.4` in `38001da`), Keystore AES-GCM KEK (`unlockedDeviceRequired = false` to allow background capture while screen locked) + wrapped DEK in `AtomicFile`/DataStore (or Tink `datastore-tink`). *Trade-off:* Background capture while screen locked requires keeping DEK unwrappable without biometric prompt. | `[TBD by Owner]` |
-| **O5** | **IDR currency storage exponent** | **M1** (`DB-002`, `ADR-004`) | **Option A (Recommended): Exponent `2`** (1 IDR = 100 sen) — lossless for `Rp 1.250.000,50` (`PAR-12`) and ISO 4217 aligned; UI hides `,00`. **Option B: Exponent `0`** — simpler integer Rupiah, but drops/rejects fractional sen. | `[TBD by Owner]` |
-| **O6** | **Retention & lifecycle operational defaults** | **M2 / M5** (`ADR-003`, `SEC-002`) | Proposed: Verification window `7 days` (`0–30d` configurable), Needs Review payload cap `30d`, debug logs `7d`, sample collection `14d`, `ING-12` max retries `3` / grace `60s`, `ING-14` heartbeat `15m` / stale `3h`, backup reminder `14d` or `100 tx`. | `[TBD by Owner]` |
-| **O7** | **Provider-specific update, key/ID/tag & language behavior** | **M3a → M3b** | Cannot be predicted safely without real-device evidence (`PRD Section 11`). M3a records exact `key`/`id`/`tag` mutation, staging (pending vs settled), timezone, and mixed-language patterns per chosen provider. | Measured in **M3a** |
-| **O8** | **Whether multiple accounts share one notification source** | **Gate G1** (`ACC-05`, `PAR-02`) | Schema keeps `account_sources.account_hint` in M1 regardless. At Gate G1, confirm if either app holds ≥2 accounts with distinguishable hints; otherwise defer multi-account UI & `REV-07`. | Confirmed at **Gate G1** |
-| **O9** | **Whether credit card support (`ACC-10`) is needed** | **Gate G1** (`ACC-10`) | Now `SHOULD` in PRD 1.4. Confirm at Gate G1 whether owner actively uses a credit card with notification alerts; otherwise defer signed-ledger CC UI. | Confirmed at **Gate G1** |
-| **O10** | **One payment announced by two apps** | **Gate G1** (`Section 11`) | E.g., e-wallet payment funded by linked bank debit sends two alerts. M3a measures if this occurs; default MVP treats them as separate (user voids extra or pairs transfer) unless M3a proves deterministic suppression rule is safe. | Confirmed at **Gate G1** |
-| **O11** | **Backup KDF & container specifics** | **M5 (`SEC-004`)** (`EXP-001`, `ADR-006`) | Recommended: Argon2id (`bcprov` pure-Java, 64 MiB / 32 MiB) + AES-256-GCM with AAD header; Fallback: PBKDF2-HMAC-SHA256 (600k iterations, zero extra library). Confirm CSV export (`DATA-11`, `SHOULD`). | Confirmed before **EXP-001** |
-| **O12** | **Default category taxonomy & product name / visual identity** | **M3c / M4** (`DOM-005`) | Confirm final short modern app name (currently placeholder `W-Track`) and starter category list (`Food`, `Transport`, `Bills`, `Shopping`, `Income`, plus system `Uncategorized`, `Fees`, `Cash withdrawal`). | Confirmed before **M3c/M4** |
+| **O1** | **Initial PoC financial applications (`Bank Jago`, `DANA`, `BCA`)** | **Targets CONFIRMED; Device Package IDs & Formats Pending Verification** (Non-blocking for **M0/M1**; Verified in **M3a**) | **Confirmed Incremental Priority (`docs/PROVIDERS.md`):** `1. Bank Jago` → `2. DANA` → `3. BCA`. **Google Play Reference Candidates (Unverified on `iQOO Z10R`):** `com.jago.digitalBanking` (Bank Jago), `id.dana` (DANA), and `com.bca` (`BCA mobile`) / `com.bca.mybca.omni.android` (`myBCA`). *Rule:* Does **not** block M0 or M1; exact package IDs and notification templates are inspected empirically on `iQOO Z10R` before building parsers. | **Verify installed package IDs (`adb shell pm list packages`) on `iQOO Z10R` and confirm `BCA mobile` vs `myBCA` usage in M3a.** |
+| **O2** | **Primary physical test device & M0 Android SDK (`26 / 36 / 37`)** | **CONFIRMED for M0** (`CORE-001`) | **Confirmed Device:** `vivo / iQOO Z10R (I2505)`, Android `16` (`API 36`), Build `PD2512LF_EX_A_16.1.20.0.W20`, patch `2026-10-01`, `arm64-v8a` (other devices/OEMs explicitly **UNVERIFIED**). **M0 SDK Baseline:** `minSdk = 26`, `targetSdk = 36`, `compileSdk = 37` (Android 17 stable GA, zero beta/preview dependencies) with Gradle `9.9.1`, AGP `9.5.1`, Kotlin `2.2.21`, KSP `2.2.21-2.0.4`, Hilt `2.60.1`, Compose BOM `2026.09.00`. | **Resolved for M0 (`ADR-003` updated).** |
+| **O3** | **Database encryption (`ADR-005`) & locked-screen Keystore policy** | **PENDING FINAL ACCEPTANCE** (Blocking **M1**) | Evaluated **`net.zetetic:sqlcipher-android:4.20.0`** (latest stable 4.x; **no SQLCipher 5 beta**, **no EOL `4.5.4`**; `4.17.0` fallback if strict `compileSdk = 36`). Keystore AES-GCM KEK with `setUserAuthenticationRequired(false)` and **`setUnlockedDeviceRequired(false)`** so AFU locked-screen capture works. *Trade-off:* Enables background locked-screen persistence (AFU) without prompting biometrics, trading per-unlock Keystore enforcement for reliable capture (mitigated by FBE, `allowBackup="false"`, retention purges). | **Final Owner acceptance of `ADR-005` (`4.20.0` vs `4.17.0` + AFU Keystore policy) before M1.** |
+| **O4** | **Gate G1 baseline thresholds** | **Recommended Baseline** (Formal lock in `ADR-003` **before capture starts**) | Coverage `>= 90%`, Completeness `>= 95%`, `0` unexplained wrong amounts/directions, minimum `7` consecutive days (preferably `14`), minimum `30` statement transactions per provider. | **Formal sign-off before M3a measurement window opens.** |
+| **O5** | **IDR currency storage exponent** | **Recommended `2` (ISO 4217)** (Confirm before **M1** `DB-002`) | Exponent `2` (`1 IDR = 100 sen`, `Rp50.000` = `5_000_000L`, `Rp1.250.000,50` = `125_000_050L`), UI hides `,00` when zero. *Trade-off:* Lossless for decimal notifications/fees; requires strict `CurrencySpec` conversion discipline to avoid 100x scaling mistakes. | **Confirm exponent `2` before M1.** |
+| **O6** | **Retention & lifecycle operational defaults** | **Proposed** (`M2 / M5`) | Verification window `7 days` (`0–30d` configurable), Needs Review payload cap `30d`, debug logs `7d`, sample collection `14d`, `ING-12` max retries `3` / grace `60s`, `ING-14` heartbeat `15m` / stale `3h`, backup reminder `14d` or `100 tx`. | **Confirm or tune during M2/M5.** |
+| **O7** | **Provider-specific update, `key`/`id`/`tag` & Android 16 behavior** | **Measured in M3a** | M3a records exact `key`/`id`/`tag` mutation, staging, timezone, mixed-language templates, and Android 16 redaction/cooldown behavior on `iQOO Z10R`. | **Measured empirically in M3a.** |
+| **O8** | **Whether multiple accounts share one notification source** | **Confirmed at Gate G1** (`ACC-05`, `PAR-02`) | Schema keeps `account_sources.account_hint` in M1 regardless. Confirm/drop multi-account UI & `REV-07` from M3a evidence. | **Decide at Gate G1.** |
+| **O9** | **Whether credit card support (`ACC-10`) is needed** | **Confirmed at Gate G1** (`ACC-10`, `SHOULD`) | Confirm/drop signed-ledger credit card UI & payment transfer pairing from owner's real provider usage. | **Decide at Gate G1.** |
+| **O10** | **One payment announced by two apps** | **Confirmed at Gate G1** (`Section 11`) | M3a measures dual-notifier overlap; default MVP records separate transactions unless M3a justifies a deterministic rule. | **Decide at Gate G1.** |
+| **O11** | **Backup KDF & container specifics** | **Deferred until before `EXP-001` (M5)** (`ADR-006`) | Recommended: Argon2id (`bcprov` pure-Java, 64 MiB / 32 MiB) + AES-256-GCM with AAD header; Fallback: PBKDF2-HMAC-SHA256 (600k iterations). Confirm CSV export (`DATA-11`, `SHOULD`). | **Confirm before `EXP-001` (M5).** |
+| **O12** | **Default category taxonomy & product name / visual identity** | **Confirm before M3c / M4** (`DOM-005`) | Confirm final app name (placeholder `W-Track`) and starter categories (`Uncategorized`, `Fees`, `Cash withdrawal`, plus daily categories). | **Confirm before M3c / M4.** |
 
 ---
 
@@ -675,12 +693,14 @@ Every high-risk requirement and architectural decision maps directly to automate
 | Risk | Why It Threatens Gate G1 | Mitigation Plan |
 | :--- | :--- | :--- |
 | **1. Provider sends silent, incomplete, or delayed notifications** | Some Indonesian/regional banking apps only send promos via push or omit direction/amount/account, driving Coverage `< 90%` or Completeness `< 95%`. | Gate G1 exists specifically to catch this early (M3a) before spending 40+ days on M3b–M5; allows clean **Re-scope** or provider swap. |
-| **2. Android 15+ OTP / sensitive content redaction triggers on transaction alerts** | If a provider includes 6-digit auth codes, virtual account numbers, or reference tokens inside the same push body, Android 15+ may redact the text to *"Sensitive notification content hidden"*. | Test explicitly on owner's Android 15+ device in M3a; detect redaction cleanly (`ING-06`) and measure redaction rate in Appendix C. |
-| **3. OEM aggressive background killing (MIUI/HyperOS, ColorOS, Funtouch, One UI)** | OEM battery managers kill `NotificationListenerService` silently without calling `onListenerDisconnected()`, dropping notifications while the phone sleeps. | Include `ING-10` battery/autostart setup early during PoC dogfooding; run `ING-12` recovery + `ING-14` heartbeat diagnostics during M3a so silent drops are surfaced rather than miscounted as provider omissions. |
-| **4. Sideloaded APK restricted settings block** | Android 13+ blocks toggling Notification Access on sideloaded debug builds until user unlocks "Allow restricted settings" in App Info. | Document and surface exact PoC manual setup step in M2 so dogfooding doesn't stall on permissions. |
-| **5. Provider updates/re-posts mutate `key`/`id`/`posted_at` unpredictably** | Grouped summary notifications or live-updating status pushes cause either missed updates or duplicate transactions during the 7–14 day window. | Record `notification_key`, `notification_id`, `notification_tag`, `isGroupSummary`, and `posted_at` on every single PoC event (`Section 8.1`) to establish empirical dedup rules before M3b. |
+| **2. Android 15+/16 OTP redaction & lock-screen masking on transaction alerts** | If a provider includes 6-digit auth codes, virtual account numbers, or tokens inside a push body, Android 16 on `iQOO Z10R` may redact content before delivering to non-privileged listeners. | Test explicitly on `iQOO Z10R` (API 36) in M3a; detect redaction cleanly (`ING-06`) and measure redaction rate in Appendix C. |
+| **3. `vivo` / `iQOO` default background restrictions + Deep Doze (`wait_for_unlock=true`)** | Confirmed ADB diagnostics show Light/Deep Doze active and `wait_for_unlock=true`. Under default battery settings (without whitelisting), the OS/OEM may delay idle exit or kill `NotificationListenerService` silently without calling `onListenerDisconnected()`. | Test default battery settings first (**no premature auto-whitelisting**); measure locked-screen delivery delays, `ING-12` recovery, and `ING-14` `HEARTBEAT_STALE` accuracy before applying `ING-10` guidance. |
+| **4. Sideloaded APK restricted settings block** | Android 13–16 blocks toggling Notification Access on sideloaded debug builds until user unlocks "Allow restricted settings" in App Info. | Document and surface exact PoC manual setup step in M2 so dogfooding doesn't stall on permissions. |
+| **5. Provider updates/re-posts mutate `key`/`id`/`posted_at` unpredictably** | Grouped summaries, Android 16 Live Updates (`ProgressStyle`), or notification cooldown bursts cause missed updates or duplicates. | Record `notification_key`, `notification_id`, `notification_tag`, `isGroupSummary`, and `posted_at` on every PoC event (`Section 8.1`) to establish empirical dedup rules before M3b. |
 | **6. Low transaction volume (< 30 tx/provider in 14 days)** | Insufficient sample size skews Gate G1 percentages. | Plan 14-day window across active payday/bill cycles and allow extending window until ≥ 30 statement transactions accumulate per provider. |
-| **7. Thousand-fold locale parsing bugs during PoC parser testing** | Mixing `Rp50.000` with `IDR 50,000.00` produces silent 1000x errors that fail Gate G1 correctness (`0` tolerance). | Strict unit test gate (`TEST-001`) + mandatory `AMBIGUOUS_FIELD` fallback before enabling PoC parser live. |
+| **7. Thousand-fold locale or 100x IDR exponent scaling bugs** | Mixing `Rp50.000` with `IDR 50,000.00` (1,000x) or confusing major Rupiah with `IDR` exponent `2` minor `sen` (100x) fails Gate G1 correctness (`0` tolerance). | Strict unit test gate (`TEST-001`) verifying both `PAR-12` ambiguity guard and IDR exponent `2` conversion before enabling PoC parser live. |
+| **8. Multi-device generalizability blind spot** | `iQOO Z10R` (Android 16) pass results do not prove reliability on Samsung, Xiaomi, Oppo, or Android 8–15 devices. | Keep non-`iQOO Z10R` device compatibility explicitly flagged **UNVERIFIED** until additional physical test devices are tested post-PoC. |
+| **9. Target-provider structural unknowns (`Bank Jago`, `DANA`, `BCA`)** | `BCA mobile` (`com.bca`) vs `myBCA` (`com.bca.mybca.omni.android`) overlap/differences, Bank Jago multi-pocket hints (`ACC-05`), and DANA payments funded by Bank Jago/BCA emitting **dual notifications** (`Section 11`) can distort coverage or double-count totals if guessed beforehand. | Discover installed packages via ADB, capture real `iQOO Z10R` fixtures per [PROVIDERS.md](file:///home/adomancer/Documents/project/W-Track/docs/PROVIDERS.md) before coding parsers, and establish explicit Gate G1 rules from observed evidence. |
 
 ---
 

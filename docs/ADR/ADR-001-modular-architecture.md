@@ -41,7 +41,7 @@ We need an architecture that:
 1. **Three Gradle Modules + `build-logic` Convention Plugins:**
    - `:app` (Android application module)
    - `:integration:api` (pure Kotlin JVM library defining the parser contract)
-   - `:integration:providers` (pure Kotlin JVM library containing isolated, versioned provider parser implementations and anonymized test fixtures; remains a single module until **3 or more** providers exist, per PRD Section 12)
+   - `:integration:providers` (pure Kotlin JVM library containing isolated, versioned provider parser implementations and anonymized test fixtures; holds initial PoC subpackages `jago`, `dana`, and `bca` during M3a/Gate G1, with per-provider Gradle module extraction evaluated only post-Gate G1 per PRD Section 12)
    - `build-logic` (composite build providing shared Kotlin/Android Gradle convention plugins, as established in `38001da`).
 2. **Package-Based Layering Inside `:app`:**
    - `wtrack.app.feature` — Jetpack Compose screens, UI state holders, `ViewModel`s, and navigation.
