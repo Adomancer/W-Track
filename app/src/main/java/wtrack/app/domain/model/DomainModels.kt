@@ -211,6 +211,9 @@ data class AppSettings(
     val txCountSinceLastBackup: Int = 0,
     val backupReminderDismissedAt: Long = 0L,
     val onboardingCompleted: Boolean = false,
+    val scheduledBackupFolderUri: String? = null,
+    val scheduledBackupEnabled: Boolean = false,
+    val scheduledBackupIntervalDays: Int = 7,
 )
 
 sealed interface DatabaseHealthState {

@@ -26,6 +26,7 @@ import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CategoryRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
+import wtrack.app.domain.repository.ReparseProposal
 import wtrack.app.domain.repository.RuleRepository
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.time.Clock
@@ -52,6 +53,7 @@ data class SettingsUiState(
     val providerCatalog: List<ProviderCatalogEntry> = emptyList(),
     val gateG1Report: GateG1Report? = null,
     val retainedSampleCount: Int = 0,
+    val reparseProposals: List<ReparseProposal> = emptyList(),
     val isBusy: Boolean = false,
     val actionMessage: String? = null,
 )
@@ -71,6 +73,7 @@ class SettingsViewModel @Inject constructor(
 
     private val logsFlow = MutableStateFlow(backupPort.readDiagnosticLogLines(200))
     private val gateReportFlow = MutableStateFlow<GateG1Report?>(null)
+    private val reparseProposalsFlow = MutableStateFlow<List<ReparseProposal>>(emptyList())
     private val sampleCountFlow = MutableStateFlow(0)
     private val isBusyFlow = MutableStateFlow(false)
     private val actionMessage = MutableStateFlow<String?>(null)
@@ -90,14 +93,21 @@ class SettingsViewModel @Inject constructor(
         SettingsSnapshot(settings, categories, rules, health, gaps)
     }
 
+    private val reportAndProposalsFlow = combine(
+        gateReportFlow,
+        reparseProposalsFlow,
+    ) { report, proposals ->
+        report to proposals
+    }
+
     private val auxiliarySignals = combine(
         needsReviewRepository.pendingCount,
         postRestorePrompt,
         logsFlow,
-        gateReportFlow,
+        reportAndProposalsFlow,
         sampleCountFlow,
-    ) { pendingReviewCount, restorePrompt, logs, report, retainedSampleCount ->
-        AuxSnapshot(pendingReviewCount, restorePrompt, logs, report, retainedSampleCount)
+    ) { pendingReviewCount, restorePrompt, logs, (report, proposals), retainedSampleCount ->
+        AuxSnapshot(pendingReviewCount, restorePrompt, logs, report, proposals, retainedSampleCount)
     }
 
     val uiState: StateFlow<SettingsUiState> = combine(
@@ -118,6 +128,7 @@ class SettingsViewModel @Inject constructor(
             providerCatalog = backupPort.providerCatalogEntries(),
             gateG1Report = aux.report,
             retainedSampleCount = aux.retainedSampleCount,
+            reparseProposals = aux.reparseProposals,
             isBusy = busy,
             actionMessage = message,
         )
@@ -150,6 +161,17 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setBackupReminderThresholds(days, txCount)
             actionMessage.value = "Backup reminder thresholds updated."
+        }
+    }
+
+    fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int) {
+        viewModelScope.launch {
+            settingsRepository.setScheduledBackupConfig(folderUri, enabled, intervalDays)
+            actionMessage.value = if (folderUri.isNullOrBlank()) {
+                "Scheduled backup folder cleared."
+            } else {
+                "Scheduled backup settings updated."
+            }
         }
     }
 
@@ -286,6 +308,54 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun scanReparseProposals() {
+        viewModelScope.launch {
+            isBusyFlow.value = true
+            runCatching {
+                withContext(dispatcherProvider.io) {
+                    backupPort.findReparseProposals()
+                }
+            }.onSuccess { proposals ->
+                reparseProposalsFlow.value = proposals
+                actionMessage.value = if (proposals.isEmpty()) {
+                    "No parser update proposals for retained events."
+                } else {
+                    "Found ${proposals.size} parser update proposal(s) (PAR-11)."
+                }
+            }.onFailure { err ->
+                actionMessage.value = err.message ?: "Scan for re-parse proposals failed."
+            }
+            isBusyFlow.value = false
+        }
+    }
+
+    fun applyReparseProposal(proposal: ReparseProposal) {
+        viewModelScope.launch {
+            isBusyFlow.value = true
+            runCatching {
+                withContext(dispatcherProvider.io) {
+                    backupPort.applyReparseProposal(proposal)
+                }
+            }.onSuccess { applied ->
+                if (applied) {
+                    reparseProposalsFlow.value = reparseProposalsFlow.value.filterNot { it.eventId == proposal.eventId }
+                    logsFlow.value = backupPort.readDiagnosticLogLines(200)
+                    actionMessage.value = "Applied parser v${proposal.newParserVersion} update to transaction #${proposal.transactionId}."
+                } else {
+                    reparseProposalsFlow.value = reparseProposalsFlow.value.filterNot { it.eventId == proposal.eventId }
+                    actionMessage.value = "Proposal skipped (already applied or transaction edited by user)."
+                }
+            }.onFailure { err ->
+                actionMessage.value = err.message ?: "Could not apply re-parse proposal."
+            }
+            isBusyFlow.value = false
+        }
+    }
+
+    fun dismissReparseProposal(eventId: Long) {
+        reparseProposalsFlow.value = reparseProposalsFlow.value.filterNot { it.eventId == eventId }
+    }
+
     fun clearDiagnosticLogs() {
         backupPort.clearDiagnosticLogs()
         logsFlow.value = emptyList()
@@ -394,6 +464,7 @@ class SettingsViewModel @Inject constructor(
         val restorePrompt: Boolean,
         val logs: List<String>,
         val report: GateG1Report?,
+        val reparseProposals: List<ReparseProposal>,
         val retainedSampleCount: Int,
     )
 }

@@ -71,6 +71,9 @@ data class AppSettingsDto(
     val backupReminderDays: Int,
     val backupReminderTxCount: Int,
     val onboardingCompleted: Boolean,
+    val scheduledBackupFolderUri: String? = null,
+    val scheduledBackupEnabled: Boolean = false,
+    val scheduledBackupIntervalDays: Int = 7,
 )
 
 @Serializable
@@ -280,6 +283,9 @@ class BackupService(
                     backupReminderDays = settings.backupReminderDays,
                     backupReminderTxCount = settings.backupReminderTxCount,
                     onboardingCompleted = settings.onboardingCompleted,
+                    scheduledBackupFolderUri = settings.scheduledBackupFolderUri,
+                    scheduledBackupEnabled = settings.scheduledBackupEnabled,
+                    scheduledBackupIntervalDays = settings.scheduledBackupIntervalDays,
                 ),
                 transactionSources = allSources.map {
                     TransactionSourceDto(it.id, it.packageName, it.displayName, it.isAllowlisted, it.parserVersion, it.createdAt, it.updatedAt)
@@ -532,6 +538,10 @@ class BackupService(
                 txCountSinceLastBackup = 0,
                 backupReminderDismissedAt = 0L,
                 onboardingCompleted = true,
+                scheduledBackupFolderUri = snapshot.appSettings.scheduledBackupFolderUri,
+                scheduledBackupEnabled = snapshot.appSettings.scheduledBackupEnabled &&
+                    !snapshot.appSettings.scheduledBackupFolderUri.isNullOrBlank(),
+                scheduledBackupIntervalDays = snapshot.appSettings.scheduledBackupIntervalDays,
             ),
         )
         allowlistCache.refreshSnapshotNow()

@@ -48,6 +48,7 @@ import wtrack.app.domain.repository.CreateManualTransactionRequest
 import wtrack.app.domain.repository.LinkTransferRequest
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
+import wtrack.app.domain.repository.ReparseProposal
 import wtrack.app.domain.repository.RestoreResult
 import wtrack.app.domain.repository.RuleRepository
 import wtrack.app.domain.repository.SampleExportResult
@@ -336,6 +337,14 @@ class FakeSettingsRepository(initial: AppSettings = AppSettings(onboardingComple
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         settingsFlow.value = settingsFlow.value.copy(onboardingCompleted = completed)
     }
+    override suspend fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int) {
+        val cleaned = folderUri?.trim()?.takeIf { it.isNotEmpty() }
+        settingsFlow.value = settingsFlow.value.copy(
+            scheduledBackupFolderUri = cleaned,
+            scheduledBackupEnabled = enabled && cleaned != null,
+            scheduledBackupIntervalDays = intervalDays.coerceIn(1, 90),
+        )
+    }
 }
 
 class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {
@@ -361,6 +370,14 @@ class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {
     ) = SampleExportResult(0, 0)
     override suspend fun purgeRetainedM3aSamplesNow(): Int = 0
     override suspend fun reparseRetainedM3aSamples(): Int = 0
+    var proposals = mutableListOf<ReparseProposal>()
+    val appliedProposalIds = mutableListOf<Long>()
+    override suspend fun findReparseProposals(): List<ReparseProposal> = proposals.toList()
+    override suspend fun applyReparseProposal(proposal: ReparseProposal): Boolean {
+        appliedProposalIds += proposal.eventId
+        proposals.removeAll { it.eventId == proposal.eventId }
+        return true
+    }
     var selfCheckResult = CaptureSelfCheckResult(
         permissionGranted = true,
         listenerConnected = true,

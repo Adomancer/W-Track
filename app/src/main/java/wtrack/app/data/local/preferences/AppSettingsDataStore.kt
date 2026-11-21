@@ -75,6 +75,19 @@ class AppSettingsDataStore internal constructor(
         dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = completed }
     }
 
+    suspend fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int) {
+        dataStore.edit { prefs ->
+            val cleaned = folderUri?.trim()?.takeIf { it.isNotEmpty() }
+            if (cleaned == null) {
+                prefs.remove(KEY_SCHEDULED_BACKUP_FOLDER_URI)
+            } else {
+                prefs[KEY_SCHEDULED_BACKUP_FOLDER_URI] = cleaned
+            }
+            prefs[KEY_SCHEDULED_BACKUP_ENABLED] = enabled && cleaned != null
+            prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] = intervalDays.coerceIn(1, 90)
+        }
+    }
+
     suspend fun replaceAll(restored: AppSettings) {
         dataStore.edit { prefs ->
             prefs[KEY_THEME_MODE] = restored.themeMode.name
@@ -88,6 +101,14 @@ class AppSettingsDataStore internal constructor(
             prefs[KEY_TX_COUNT_SINCE_BACKUP] = restored.txCountSinceLastBackup
             prefs[KEY_BACKUP_REMINDER_DISMISSED_AT] = restored.backupReminderDismissedAt
             prefs[KEY_ONBOARDING_COMPLETED] = restored.onboardingCompleted
+            val cleanedFolder = restored.scheduledBackupFolderUri?.trim()?.takeIf { it.isNotEmpty() }
+            if (cleanedFolder == null) {
+                prefs.remove(KEY_SCHEDULED_BACKUP_FOLDER_URI)
+            } else {
+                prefs[KEY_SCHEDULED_BACKUP_FOLDER_URI] = cleanedFolder
+            }
+            prefs[KEY_SCHEDULED_BACKUP_ENABLED] = restored.scheduledBackupEnabled && cleanedFolder != null
+            prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] = restored.scheduledBackupIntervalDays.coerceIn(1, 90)
         }
     }
 
@@ -109,6 +130,10 @@ class AppSettingsDataStore internal constructor(
         txCountSinceLastBackup = prefs[KEY_TX_COUNT_SINCE_BACKUP] ?: 0,
         backupReminderDismissedAt = prefs[KEY_BACKUP_REMINDER_DISMISSED_AT] ?: 0L,
         onboardingCompleted = prefs[KEY_ONBOARDING_COMPLETED] ?: false,
+        scheduledBackupFolderUri = prefs[KEY_SCHEDULED_BACKUP_FOLDER_URI],
+        scheduledBackupEnabled = (prefs[KEY_SCHEDULED_BACKUP_ENABLED] ?: false) &&
+            !prefs[KEY_SCHEDULED_BACKUP_FOLDER_URI].isNullOrBlank(),
+        scheduledBackupIntervalDays = (prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] ?: 7).coerceIn(1, 90),
     )
 
     private companion object {
@@ -123,5 +148,8 @@ class AppSettingsDataStore internal constructor(
         val KEY_TX_COUNT_SINCE_BACKUP = intPreferencesKey("tx_count_since_last_backup")
         val KEY_BACKUP_REMINDER_DISMISSED_AT = longPreferencesKey("backup_reminder_dismissed_at")
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val KEY_SCHEDULED_BACKUP_FOLDER_URI = stringPreferencesKey("scheduled_backup_folder_uri")
+        val KEY_SCHEDULED_BACKUP_ENABLED = booleanPreferencesKey("scheduled_backup_enabled")
+        val KEY_SCHEDULED_BACKUP_INTERVAL_DAYS = intPreferencesKey("scheduled_backup_interval_days")
     }
 }

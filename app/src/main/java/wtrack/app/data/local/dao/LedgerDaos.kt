@@ -113,6 +113,15 @@ interface NotificationEventDao {
     )
     suspend fun purgeRetainedSamplesNow(nowEpochMillis: Long): Int
 
+    @Query(
+        """
+        SELECT * FROM notification_events
+        WHERE processing_status = 'PROCESSED' AND payload_json IS NOT NULL
+        ORDER BY posted_at DESC, id DESC
+        """,
+    )
+    suspend fun getRetainedProcessedEventsOnce(): List<NotificationEventEntity>
+
     @Query("DELETE FROM notification_events")
     suspend fun deleteAll()
 }

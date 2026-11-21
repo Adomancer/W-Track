@@ -173,6 +173,42 @@ fun InsightsScreen(
             }
 
             item {
+                Text("Top Merchants & Trends (DASH-08)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            if (state.summary.merchantTrends.isEmpty()) {
+                item { Text("No merchant trends in this period.", style = MaterialTheme.typography.bodySmall) }
+            } else {
+                items(state.summary.merchantTrends, key = { "merchant-${it.merchantLabel}" }) { trend ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(trend.merchantLabel, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Text(
+                                    text = "${trend.transactionCount} transaction(s)" +
+                                        if (state.summary.previousMonthExpenseMinor != null || trend.previousSpendMinor != 0L) {
+                                            " • vs prev: ${formatCurrency(trend.deltaMinor, state.baseCurrency, signed = true)}"
+                                        } else {
+                                            ""
+                                        },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = formatCurrency(trend.currentSpendMinor, state.baseCurrency),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

@@ -420,6 +420,50 @@ fun DiagnosticsScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Parser Update Re-Parse Proposals (PAR-11)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "Checks retained notifications (within verification window) against newer parser versions without touching user-edited transactions or user-set categories.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        OutlinedButton(
+                            onClick = viewModel::scanReparseProposals,
+                            enabled = !state.isBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Scan Retained Events for Parser Updates") }
+                        state.reparseProposals.forEach { prop ->
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Column(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "${prop.sourceId} • Tx #${prop.transactionId} (v${prop.oldParserVersion} → v${prop.newParserVersion})",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Text(
+                                        text = "Amount: ${prop.currentAmountMinor} → ${prop.proposedAmountMinor} ${prop.currency}\n" +
+                                            "Dir/Type: ${prop.currentDirection}/${prop.currentType} → ${prop.proposedDirection}/${prop.proposedType}\n" +
+                                            "Desc: ${prop.currentDescription ?: "-"} → ${prop.proposedDescription ?: "-"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { viewModel.applyReparseProposal(prop) },
+                                            enabled = !state.isBusy,
+                                        ) { Text("Apply Update") }
+                                        TextButton(
+                                            onClick = { viewModel.dismissReparseProposal(prop.eventId) },
+                                            enabled = !state.isBusy,
+                                        ) { Text("Dismiss") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Gate G1 Evaluator (Appendix C)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             OutlinedTextField(value = jagoDays, onValueChange = { jagoDays = it }, label = { Text("Days") }, singleLine = true, modifier = Modifier.weight(1f))

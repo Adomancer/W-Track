@@ -661,6 +661,8 @@ class SettingsRepositoryImpl(
         settingsStore.setBackupReminderThresholds(days, txCount)
 
     override suspend fun setOnboardingCompleted(completed: Boolean) = settingsStore.setOnboardingCompleted(completed)
+    override suspend fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int) =
+        settingsStore.setScheduledBackupConfig(folderUri, enabled, intervalDays)
 }
 
 class DatabaseHealthRepositoryImpl(

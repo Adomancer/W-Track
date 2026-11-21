@@ -146,6 +146,52 @@ class AggregateClassificationTableTest {
         assertThat(summary.derivedFees).hasSize(1)
     }
 
+    @Test
+    fun computesMerchantSpendingTrendsWithRefundNettingAndExclusions() {
+        val prevStart = 1_000_000L
+        val currStart = 2_000_000L
+        val currEnd = 3_000_000L
+
+        val txs = listOf(
+            // Previous month: Kopi Kenangan 40k, Grab 25k
+            tx(id = 1L, accountId = 1L, amount = 4_000_000L, dir = Direction.OUTFLOW, type = DomainTransactionType.PURCHASE, catId = 4L, merchantName = "Kopi Kenangan", at = 1_100_000L),
+            tx(id = 2L, accountId = 1L, amount = 2_500_000L, dir = Direction.OUTFLOW, type = DomainTransactionType.PURCHASE, catId = 4L, merchantName = "Grab", at = 1_200_000L),
+            // Current month: Kopi Kenangan 60k - 10k linked refund = 50k net (+10k vs prev), Indomaret 30k (+30k), Voided Kopi 999k excluded
+            tx(id = 3L, accountId = 1L, amount = 6_000_000L, dir = Direction.OUTFLOW, type = DomainTransactionType.PURCHASE, catId = 4L, merchantName = "Kopi Kenangan", at = 2_100_000L),
+            tx(id = 4L, accountId = 1L, amount = 1_000_000L, dir = Direction.INFLOW, type = DomainTransactionType.REFUND, catId = null, relatedTxId = 3L, merchantName = "Refund", at = 2_200_000L),
+            tx(id = 5L, accountId = 1L, amount = 3_000_000L, dir = Direction.OUTFLOW, type = DomainTransactionType.PURCHASE, catId = 5L, merchantName = "Indomaret", at = 2_300_000L),
+            tx(id = 6L, accountId = 1L, amount = 99_900_000L, dir = Direction.OUTFLOW, type = DomainTransactionType.PURCHASE, catId = 4L, merchantName = "Kopi Kenangan", status = TransactionStatus.VOIDED, at = 2_400_000L),
+            // Paired internal transfer should be excluded from merchant trends
+            tx(id = 7L, accountId = 1L, amount = 5_000_000L, dir = Direction.OUTFLOW, type = DomainTransactionType.TRANSFER, catId = null, merchantName = "Wallet Topup", at = 2_500_000L),
+            tx(id = 8L, accountId = 2L, amount = 5_000_000L, dir = Direction.INFLOW, type = DomainTransactionType.TRANSFER, catId = null, merchantName = "Wallet Topup", at = 2_500_001L),
+        )
+        val pairs = listOf(
+            TransferPair(10L, 7L, 8L, TransferOrigin.MANUAL, null, TransferStatus.CONFIRMED, 0L, 2_500_000L),
+        )
+
+        val summary = calculator.summarizePeriod(
+            transactions = txs,
+            transferPairs = pairs,
+            categories = categories,
+            baseCurrency = "IDR",
+            periodStartEpochMillis = currStart,
+            periodEndEpochMillis = currEnd,
+            previousMonthRange = prevStart to currStart,
+        )
+
+        assertThat(summary.merchantTrends.map { it.merchantLabel }).containsExactly("Kopi Kenangan", "Indomaret").inOrder()
+        val kopi = summary.merchantTrends[0]
+        assertThat(kopi.currentSpendMinor).isEqualTo(5_000_000L)
+        assertThat(kopi.previousSpendMinor).isEqualTo(4_000_000L)
+        assertThat(kopi.deltaMinor).isEqualTo(1_000_000L)
+        assertThat(kopi.transactionCount).isEqualTo(2)
+
+        val indomaret = summary.merchantTrends[1]
+        assertThat(indomaret.currentSpendMinor).isEqualTo(3_000_000L)
+        assertThat(indomaret.previousSpendMinor).isEqualTo(0L)
+        assertThat(indomaret.deltaMinor).isEqualTo(3_000_000L)
+    }
+
     private fun tx(
         id: Long,
         accountId: Long,
@@ -156,6 +202,7 @@ class AggregateClassificationTableTest {
         catId: Long?,
         relatedTxId: Long? = null,
         status: TransactionStatus = TransactionStatus.CONFIRMED,
+        merchantName: String? = null,
         at: Long,
     ): Transaction = Transaction(
         id = id,
@@ -167,6 +214,7 @@ class AggregateClassificationTableTest {
         direction = dir,
         transactionType = type,
         merchantId = null,
+        merchantName = merchantName,
         description = null,
         occurredAt = at,
         categoryId = catId,

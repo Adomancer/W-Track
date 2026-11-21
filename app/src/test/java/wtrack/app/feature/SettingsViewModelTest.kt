@@ -5,11 +5,14 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
+import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.ThemeMode
+import wtrack.app.domain.repository.ReparseProposal
 import wtrack.app.domain.usecase.GateG1Evaluator
 import wtrack.app.domain.usecase.GateVerdict
 import wtrack.app.domain.usecase.ProviderMeasurementInput
 import wtrack.app.feature.settings.SettingsViewModel
+import wtrack.integration.Direction
 
 class SettingsViewModelTest {
 
@@ -41,6 +44,42 @@ class SettingsViewModelTest {
             val withThresholds = awaitItem()
             assertThat(withThresholds.settings.backupReminderDays).isEqualTo(30)
             assertThat(withThresholds.settings.backupReminderTxCount).isEqualTo(250)
+
+            vm.setScheduledBackupConfig("content://tree/backups", enabled = true, intervalDays = 14)
+            val withFolder = awaitItem()
+            assertThat(withFolder.settings.scheduledBackupFolderUri).isEqualTo("content://tree/backups")
+            assertThat(withFolder.settings.scheduledBackupEnabled).isTrue()
+            assertThat(withFolder.settings.scheduledBackupIntervalDays).isEqualTo(14)
+
+            val proposal = ReparseProposal(
+                eventId = 10L,
+                transactionId = 20L,
+                sourceId = "com.jago.digitalBanking",
+                oldParserVersion = 1,
+                newParserVersion = 2,
+                currency = "IDR",
+                currentAmountMinor = 5_000_000L,
+                proposedAmountMinor = 5_500_000L,
+                currentDirection = Direction.OUTFLOW,
+                proposedDirection = Direction.OUTFLOW,
+                currentType = DomainTransactionType.PURCHASE,
+                proposedType = DomainTransactionType.PURCHASE,
+                currentDescription = "Old",
+                proposedDescription = "New",
+            )
+            backupPort.proposals.add(proposal)
+            vm.scanReparseProposals()
+            var withProposal = awaitItem()
+            while (withProposal.reparseProposals.isEmpty()) {
+                withProposal = awaitItem()
+            }
+            assertThat(withProposal.reparseProposals).containsExactly(proposal)
+            vm.applyReparseProposal(proposal)
+            var afterApply = awaitItem()
+            while (afterApply.reparseProposals.isNotEmpty()) {
+                afterApply = awaitItem()
+            }
+            assertThat(backupPort.appliedProposalIds).containsExactly(10L)
 
             vm.evaluateGateG1(
                 listOf(

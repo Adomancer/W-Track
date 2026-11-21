@@ -2,13 +2,19 @@ package wtrack.app.data.backup
 
 import java.io.InputStream
 import java.io.OutputStream
+import androidx.room.withTransaction
 import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.AllowlistCache
 import wtrack.app.data.ingestion.CaptureStatusTracker
 import wtrack.app.data.ingestion.IngestionPipeline
+import wtrack.app.data.local.entity.TransactionEntity
+import wtrack.app.data.local.mapper.LocalJson
+import wtrack.app.domain.exception.TransferPairEditBlockedException
 import wtrack.app.domain.model.DatabaseHealthState
+import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.NotificationEventStatus
+import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.domain.parser.ParserRegistry
 import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.BackupAndDiagnosticsPort
@@ -17,10 +23,13 @@ import wtrack.app.domain.repository.CaptureSelfCheckResult
 import wtrack.app.domain.repository.CategoryRepository
 import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
+import wtrack.app.domain.repository.ReparseProposal
 import wtrack.app.domain.repository.RestoreResult
 import wtrack.app.domain.repository.SampleExportResult
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.time.Clock
+import wtrack.app.domain.usecase.TransactionValidator
+import wtrack.app.domain.usecase.ValidationOutcome
 import wtrack.integration.Direction
 import wtrack.integration.NotificationEvent
 import wtrack.integration.ParseResult
@@ -138,6 +147,152 @@ class WtrackBackupAndDiagnosticsPort(
             }
         }
         return reparsed
+    }
+
+    override suspend fun findReparseProposals(): List<ReparseProposal> {
+        if (holder.healthState.value !is DatabaseHealthState.Ready) return emptyList()
+        val db = holder.requireDatabase()
+        val events = db.notificationEventDao().getRetainedProcessedEventsOnce()
+        if (events.isEmpty()) return emptyList()
+        val validator = TransactionValidator()
+        val proposals = mutableListOf<ReparseProposal>()
+        for (entity in events) {
+            val payload = LocalJson.decodePayload(entity.payloadJson) ?: continue
+            val tx = db.transactionDao().findByEventId(entity.id) ?: continue
+            if (tx.status != TransactionStatus.CONFIRMED.name) continue
+            val oldVersion = tx.parserVersion ?: continue
+            if (isUserEditedTransaction(tx)) continue
+
+            val envelope = NotificationEvent(
+                sourceId = entity.sourceId,
+                packageName = entity.packageName,
+                title = payload.title,
+                text = payload.text,
+                bigText = payload.bigText,
+                subText = payload.subText,
+                channelId = payload.channelId,
+                isGroupSummary = payload.isGroupSummary,
+                isContentRedacted = payload.isContentRedacted,
+                postedAtEpochMillis = entity.postedAt,
+                notificationKey = entity.notificationKey,
+                notificationId = entity.notificationId,
+                notificationTag = entity.notificationTag,
+                sourceEventReference = null,
+            )
+            if (envelope.isContentRedacted) continue
+            val parser = parserRegistry.resolve(envelope) ?: continue
+            if (parser.version <= oldVersion) continue
+
+            val parsedResult = parser.parse(envelope) as? ParseResult.Success ?: continue
+            val validated = validator.validate(parsedResult.transaction, entity.postedAt) as? ValidationOutcome.Valid
+                ?: continue
+            if (!validated.currency.equals(tx.currency, ignoreCase = true)) continue
+
+            val proposedDesc = parsedResult.transaction.description?.trim()
+            val hasDiff = validated.amountMinor != tx.amountMinor ||
+                validated.direction.name != tx.direction ||
+                validated.transactionType.name != tx.transactionType ||
+                proposedDesc != tx.description?.trim()
+
+            if (hasDiff) {
+                proposals += ReparseProposal(
+                    eventId = entity.id,
+                    transactionId = tx.id,
+                    sourceId = entity.sourceId,
+                    oldParserVersion = oldVersion,
+                    newParserVersion = parser.version,
+                    currency = tx.currency,
+                    currentAmountMinor = tx.amountMinor,
+                    proposedAmountMinor = validated.amountMinor,
+                    currentDirection = Direction.valueOf(tx.direction),
+                    proposedDirection = validated.direction,
+                    currentType = DomainTransactionType.valueOf(tx.transactionType),
+                    proposedType = validated.transactionType,
+                    currentDescription = tx.description,
+                    proposedDescription = proposedDesc,
+                )
+            }
+        }
+        return proposals
+    }
+
+    override suspend fun applyReparseProposal(proposal: ReparseProposal): Boolean {
+        if (holder.healthState.value !is DatabaseHealthState.Ready) return false
+        val db = holder.requireDatabase()
+        val now = clock.nowEpochMillis()
+        return db.withTransaction {
+            val tx = db.transactionDao().getById(proposal.transactionId) ?: return@withTransaction false
+            if (tx.eventId != proposal.eventId || tx.status != TransactionStatus.CONFIRMED.name) {
+                return@withTransaction false
+            }
+            val currentVersion = tx.parserVersion ?: 0
+            if (proposal.newParserVersion <= currentVersion) return@withTransaction false
+            if (isUserEditedTransaction(tx)) return@withTransaction false
+
+            val confirmedPair = db.transferMatchDao().findConfirmedForTransaction(tx.id)
+            var recomputedFeeMinor: Long? = null
+            if (confirmedPair != null) {
+                val isOutgoingLeg = confirmedPair.outgoingTransactionId == tx.id
+                val counterpartId = if (isOutgoingLeg) {
+                    confirmedPair.incomingTransactionId
+                } else {
+                    confirmedPair.outgoingTransactionId
+                }
+                val counterpart = db.transactionDao().getById(counterpartId)
+                    ?: throw TransferPairEditBlockedException("Counterpart transfer leg missing; unlink pair first.")
+                val expectedDir = if (isOutgoingLeg) Direction.OUTFLOW else Direction.INFLOW
+                val newOutAmount = if (isOutgoingLeg) proposal.proposedAmountMinor else counterpart.amountMinor
+                val newInAmount = if (isOutgoingLeg) counterpart.amountMinor else proposal.proposedAmountMinor
+                val invalidPair = proposal.proposedDirection != expectedDir ||
+                    !proposal.currency.equals(counterpart.currency, ignoreCase = true) ||
+                    newOutAmount < newInAmount ||
+                    proposal.proposedType == DomainTransactionType.ADJUSTMENT ||
+                    proposal.proposedType == DomainTransactionType.REFUND
+                if (invalidPair) {
+                    throw TransferPairEditBlockedException(
+                        "Applying this re-parse proposal would break a confirmed transfer pair. Unlink the transfer pair first (TRF-04).",
+                    )
+                }
+                recomputedFeeMinor = newOutAmount - newInAmount
+            }
+
+            // Preserve originalJson (TX-03) and never overwrite user-assigned categoryId/categorySource.
+            db.transactionDao().update(
+                tx.copy(
+                    amountMinor = proposal.proposedAmountMinor,
+                    direction = proposal.proposedDirection.name,
+                    transactionType = proposal.proposedType.name,
+                    description = proposal.proposedDescription?.trim(),
+                    parserVersion = proposal.newParserVersion,
+                    updatedAt = now,
+                ),
+            )
+            if (confirmedPair != null && recomputedFeeMinor != null && recomputedFeeMinor != confirmedPair.feeMinor) {
+                db.transferMatchDao().updateFee(confirmedPair.id, recomputedFeeMinor)
+            }
+            db.transactionSourceDao().updateParserVersion(proposal.sourceId, proposal.newParserVersion, now)
+            logger.logEvent(
+                "REPARSE",
+                "PROPOSAL_APPLIED",
+                mapOf(
+                    "txId" to tx.id.toString(),
+                    "oldVer" to currentVersion.toString(),
+                    "newVer" to proposal.newParserVersion.toString(),
+                ),
+            )
+            true
+        }
+    }
+
+    private fun isUserEditedTransaction(tx: TransactionEntity): Boolean {
+        val original = LocalJson.decodeOriginalSnapshot(tx.originalJson) ?: return true
+        return tx.amountMinor != original.amountMinor ||
+            !tx.currency.equals(original.currency, ignoreCase = true) ||
+            tx.direction != original.direction.name ||
+            tx.transactionType != original.transactionType.name ||
+            tx.accountId != original.accountId ||
+            tx.occurredAt != original.occurredAt ||
+            tx.description?.trim() != original.description?.trim()
     }
 
     override suspend fun runCaptureSelfCheck(): CaptureSelfCheckResult {

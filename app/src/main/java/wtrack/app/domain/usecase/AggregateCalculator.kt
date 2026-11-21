@@ -17,6 +17,14 @@ data class CategorySpendBreakdown(
     val transactionCount: Int,
 )
 
+data class MerchantSpendTrend(
+    val merchantLabel: String,
+    val currentSpendMinor: Long,
+    val previousSpendMinor: Long,
+    val deltaMinor: Long,
+    val transactionCount: Int,
+)
+
 data class PeriodAggregateSummary(
     val baseCurrency: String,
     val totalIncomeMinor: Long,
@@ -29,6 +37,7 @@ data class PeriodAggregateSummary(
     val previousMonthExpenseMinor: Long? = null,
     val expenseDeltaVsPreviousMonthMinor: Long? = null,
     val expenseDeltaPercent: Double? = null,
+    val merchantTrends: List<MerchantSpendTrend> = emptyList(),
 )
 
 /**
@@ -77,10 +86,20 @@ class AggregateCalculator {
         } else {
             null
         }
+        val prevMerchantByKey = previous.merchantTrends.associateBy { it.merchantLabel.lowercase() }
+        val mergedTrends = current.merchantTrends.map { cur ->
+            val prevSpend = prevMerchantByKey[cur.merchantLabel.lowercase()]?.currentSpendMinor ?: 0L
+            cur.copy(
+                previousSpendMinor = prevSpend,
+                deltaMinor = cur.currentSpendMinor - prevSpend,
+            )
+        }.sortedByDescending { it.currentSpendMinor }.take(10)
+
         return current.copy(
             previousMonthExpenseMinor = previous.totalExpenseMinor,
             expenseDeltaVsPreviousMonthMinor = delta,
             expenseDeltaPercent = pct,
+            merchantTrends = mergedTrends,
         )
     }
 
@@ -120,19 +139,32 @@ class AggregateCalculator {
 
         val categorySpendAccum = linkedMapOf<Long?, Long>()
         val categoryTxCountAccum = linkedMapOf<Long?, Int>()
+        val merchantLabelsByKey = linkedMapOf<String, String>()
+        val merchantSpendAccum = linkedMapOf<String, Long>()
+        val merchantTxCountAccum = linkedMapOf<String, Int>()
 
-        fun addExpense(categoryId: Long?, amount: Long) {
+        fun recordMerchantDelta(label: String?, deltaMinor: Long) {
+            val cleaned = label?.trim()?.takeIf { it.isNotEmpty() } ?: return
+            val key = cleaned.lowercase()
+            merchantLabelsByKey.putIfAbsent(key, cleaned)
+            merchantSpendAccum[key] = (merchantSpendAccum[key] ?: 0L) + deltaMinor
+            merchantTxCountAccum[key] = (merchantTxCountAccum[key] ?: 0) + 1
+        }
+
+        fun addExpense(categoryId: Long?, amount: Long, merchantLabel: String? = null) {
             val resolvedCat = resolveBucketCategoryId(categoryId, uncategorizedId)
             expenseMinor += amount
             categorySpendAccum[resolvedCat] = (categorySpendAccum[resolvedCat] ?: 0L) + amount
             categoryTxCountAccum[resolvedCat] = (categoryTxCountAccum[resolvedCat] ?: 0) + 1
+            recordMerchantDelta(merchantLabel, amount)
         }
 
-        fun reduceExpense(categoryId: Long?, refundAmount: Long) {
+        fun reduceExpense(categoryId: Long?, refundAmount: Long, merchantLabel: String? = null) {
             val resolvedCat = resolveBucketCategoryId(categoryId, uncategorizedId)
             expenseMinor -= refundAmount
             categorySpendAccum[resolvedCat] = (categorySpendAccum[resolvedCat] ?: 0L) - refundAmount
             categoryTxCountAccum[resolvedCat] = (categoryTxCountAccum[resolvedCat] ?: 0) + 1
+            recordMerchantDelta(merchantLabel, -refundAmount)
         }
 
         for (tx in allTransactions) {
@@ -159,11 +191,13 @@ class AggregateCalculator {
                 continue
             }
 
+            val txMerchantLabel = resolveMerchantLabel(tx)
+
             when (tx.transactionType) {
                 // Row 1 & INFLOW fallback
                 DomainTransactionType.PURCHASE -> {
                     if (tx.direction == Direction.OUTFLOW) {
-                        addExpense(tx.categoryId, tx.amountMinor)
+                        addExpense(tx.categoryId, tx.amountMinor, txMerchantLabel)
                     } else {
                         incomeMinor += tx.amountMinor
                     }
@@ -172,7 +206,7 @@ class AggregateCalculator {
                 // Row 2
                 DomainTransactionType.FEE -> {
                     if (tx.direction == Direction.OUTFLOW) {
-                        addExpense(tx.categoryId ?: feesCategoryId, tx.amountMinor)
+                        addExpense(tx.categoryId ?: feesCategoryId, tx.amountMinor, txMerchantLabel)
                     } else {
                         incomeMinor += tx.amountMinor
                     }
@@ -181,7 +215,7 @@ class AggregateCalculator {
                 // Rows 3 & 4 (unpaired transfer)
                 DomainTransactionType.TRANSFER -> {
                     if (tx.direction == Direction.OUTFLOW) {
-                        addExpense(tx.categoryId, tx.amountMinor)
+                        addExpense(tx.categoryId, tx.amountMinor, txMerchantLabel)
                     } else {
                         incomeMinor += tx.amountMinor
                     }
@@ -190,7 +224,7 @@ class AggregateCalculator {
                 // Rows 7 & 8 (unpaired cash)
                 DomainTransactionType.CASH -> {
                     if (tx.direction == Direction.OUTFLOW) {
-                        addExpense(tx.categoryId ?: cashWithdrawalCategoryId, tx.amountMinor)
+                        addExpense(tx.categoryId ?: cashWithdrawalCategoryId, tx.amountMinor, txMerchantLabel)
                     } else {
                         incomeMinor += tx.amountMinor
                     }
@@ -203,7 +237,8 @@ class AggregateCalculator {
                             ?.let { txById[it] }
                             ?.takeIf { it.status == TransactionStatus.CONFIRMED }
                         val targetCategory = linkedOriginal?.categoryId ?: tx.categoryId
-                        reduceExpense(targetCategory, tx.amountMinor)
+                        val targetMerchant = linkedOriginal?.let(::resolveMerchantLabel) ?: txMerchantLabel
+                        reduceExpense(targetCategory, tx.amountMinor, targetMerchant)
                     }
                     // OUTFLOW + REFUND (Row 11) never enters confirmed totals in MVP.
                 }
@@ -213,7 +248,7 @@ class AggregateCalculator {
                     if (tx.direction == Direction.INFLOW) {
                         incomeMinor += tx.amountMinor
                     } else {
-                        addExpense(tx.categoryId, tx.amountMinor)
+                        addExpense(tx.categoryId, tx.amountMinor, txMerchantLabel)
                     }
                 }
 
@@ -256,6 +291,19 @@ class AggregateCalculator {
             }
             .sortedByDescending { abs(it.netSpendMinor) }
 
+        val merchantTrends = merchantSpendAccum.entries
+            .map { (key, netMinor) ->
+                MerchantSpendTrend(
+                    merchantLabel = merchantLabelsByKey[key] ?: key,
+                    currentSpendMinor = netMinor,
+                    previousSpendMinor = 0L,
+                    deltaMinor = netMinor,
+                    transactionCount = merchantTxCountAccum[key] ?: 0,
+                )
+            }
+            .sortedByDescending { it.currentSpendMinor }
+            .take(10)
+
         return PeriodAggregateSummary(
             baseCurrency = normalizedBase,
             totalIncomeMinor = incomeMinor,
@@ -265,8 +313,13 @@ class AggregateCalculator {
             excludedNonBaseCurrencyCount = excludedForeignCount,
             categoryBreakdowns = breakdowns,
             derivedFees = derivedFees.sortedByDescending { it.occurredAt },
+            merchantTrends = merchantTrends,
         )
     }
+
+    private fun resolveMerchantLabel(tx: Transaction): String? =
+        tx.merchantName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: tx.description?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun resolveBucketCategoryId(categoryId: Long?, uncategorizedId: Long?): Long? =
         categoryId ?: uncategorizedId

@@ -176,6 +176,8 @@ class RetentionAndWipeTest {
             ) = SampleExportResult(0, 0)
             override suspend fun purgeRetainedM3aSamplesNow() = 0
             override suspend fun reparseRetainedM3aSamples() = 0
+            override suspend fun findReparseProposals() = emptyList<wtrack.app.domain.repository.ReparseProposal>()
+            override suspend fun applyReparseProposal(proposal: wtrack.app.domain.repository.ReparseProposal) = false
             override suspend fun runCaptureSelfCheck() = wtrack.app.domain.repository.CaptureSelfCheckResult(
                 permissionGranted = true,
                 listenerConnected = true,

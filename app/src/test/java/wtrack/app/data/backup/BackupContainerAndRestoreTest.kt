@@ -25,8 +25,10 @@ import wtrack.app.data.local.entity.TransactionTagEntity
 import wtrack.app.data.local.entity.TransferMatchEntity
 import wtrack.app.data.local.mapper.LocalJson
 import wtrack.app.domain.exception.BackupRestoreException
+import wtrack.app.domain.model.AppSettings
 import wtrack.app.domain.model.NotificationEventStatus
 import wtrack.app.domain.model.ThemeMode
+import wtrack.app.domain.repository.BackupReminderEvaluator
 import wtrack.integration.Direction
 import wtrack.integration.ParseResult
 import wtrack.integration.ParsedTransaction
@@ -216,5 +218,68 @@ class BackupContainerAndRestoreTest {
         val replayResult = restoredPipeline.ingest(processedEnv)
         assertThat(replayResult).isNull()
         assertThat(restoreDb.transactionDao().getAllOnce()).hasSize(4)
+    }
+
+    @Test
+    fun scheduledBackupConfigPersistsTriggersReminderAndMaintainsBackwardCompatibility() = runTest {
+        sourceHarness.db()
+        val folderUri = "content://com.android.externalstorage.documents/tree/primary%3ABackups"
+        sourceHarness.settingsStore.setScheduledBackupConfig(folderUri, enabled = true, intervalDays = 7)
+        val currentSettings = sourceHarness.settingsStore.current()
+        assertThat(currentSettings.scheduledBackupFolderUri).isEqualTo(folderUri)
+        assertThat(currentSettings.scheduledBackupEnabled).isTrue()
+        assertThat(currentSettings.scheduledBackupIntervalDays).isEqualTo(7)
+
+        // BackupReminderEvaluator triggers when scheduled folder is enabled and overdue
+        val dueSettings = AppSettings(
+            onboardingCompleted = true,
+            lastBackupAt = 1_000_000L,
+            scheduledBackupFolderUri = folderUri,
+            scheduledBackupEnabled = true,
+            scheduledBackupIntervalDays = 7,
+        )
+        assertThat(BackupReminderEvaluator.shouldShowReminder(dueSettings, 1_000_000L + 3L * 86_400_000L)).isFalse()
+        assertThat(BackupReminderEvaluator.shouldShowReminder(dueSettings, 1_000_000L + 8L * 86_400_000L)).isTrue()
+
+        // Backward-compatibility check: older v1 backup JSON missing scheduledBackup* fields must restore cleanly
+        val legacySnapshotJson = """
+            {
+              "backupSchemaVersion": 1,
+              "roomSchemaVersion": 1,
+              "createdAtEpochMillisUtc": 1700000000000,
+              "appSettings": {
+                "themeMode": "SYSTEM",
+                "baseCurrency": "IDR",
+                "verificationWindowDays": 7,
+                "heartbeatStaleHours": 3,
+                "backupReminderDays": 14,
+                "backupReminderTxCount": 100,
+                "onboardingCompleted": true
+              },
+              "transactionSources": [],
+              "accounts": [],
+              "accountSources": [],
+              "categories": [],
+              "merchants": [],
+              "transactionRules": [],
+              "transactions": [],
+              "tags": [],
+              "transactionTags": [],
+              "transferMatches": [],
+              "captureGaps": [],
+              "budgets": [],
+              "eventIdentities": []
+            }
+        """.trimIndent()
+        val encryptedLegacy = BackupCryptoContainer.encrypt(legacySnapshotJson, "legacy-passphrase", fastArgonConfig)
+        val targetBackupService = BackupService(
+            restoreHarness.holder, restoreHarness.settingsStore, restoreHarness.allowlistCache,
+            restoreHarness.captureStatusTracker, restoreHarness.clock, restoreHarness.logger, fastArgonConfig,
+        )
+        targetBackupService.restoreEncryptedBackup("legacy-passphrase", ByteArrayInputStream(encryptedLegacy))
+        val restored = restoreHarness.settingsStore.current()
+        assertThat(restored.scheduledBackupEnabled).isFalse()
+        assertThat(restored.scheduledBackupFolderUri).isNull()
+        assertThat(restored.scheduledBackupIntervalDays).isEqualTo(7)
     }
 }

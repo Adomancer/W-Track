@@ -3,6 +3,8 @@ package wtrack.app.domain.repository
 import java.io.InputStream
 import java.io.OutputStream
 import wtrack.app.domain.model.AppSettings
+import wtrack.app.domain.model.DomainTransactionType
+import wtrack.integration.Direction
 
 data class BackupVerificationResult(
     val transactionCount: Int,
@@ -44,6 +46,23 @@ data class CaptureSelfCheckResult(
     val summary: String,
 )
 
+data class ReparseProposal(
+    val eventId: Long,
+    val transactionId: Long,
+    val sourceId: String,
+    val oldParserVersion: Int,
+    val newParserVersion: Int,
+    val currency: String,
+    val currentAmountMinor: Long,
+    val proposedAmountMinor: Long,
+    val currentDirection: Direction,
+    val proposedDirection: Direction,
+    val currentType: DomainTransactionType,
+    val proposedType: DomainTransactionType,
+    val currentDescription: String?,
+    val proposedDescription: String?,
+)
+
 /**
  * Pure-Kotlin domain port bridging encrypted backup/restore, CSV export, wipe, diagnostic logs,
  * and provider catalog inspection to presentation ViewModels without leaking data/crypto internals.
@@ -68,6 +87,8 @@ interface BackupAndDiagnosticsPort {
     ): SampleExportResult
     suspend fun purgeRetainedM3aSamplesNow(): Int
     suspend fun reparseRetainedM3aSamples(): Int
+    suspend fun findReparseProposals(): List<ReparseProposal>
+    suspend fun applyReparseProposal(proposal: ReparseProposal): Boolean
     suspend fun runCaptureSelfCheck(): CaptureSelfCheckResult
 }
 
@@ -85,6 +106,10 @@ object BackupReminderEvaluator {
         val overdueByTx = settings.txCountSinceLastBackup >= settings.backupReminderTxCount
         val overdueByDays = settings.lastBackupAt > 0L &&
             (nowEpochMillis - settings.lastBackupAt) >= settings.backupReminderDays * MILLIS_PER_DAY
-        return overdueByTx || overdueByDays
+        val overdueByScheduledFolder = settings.scheduledBackupEnabled &&
+            !settings.scheduledBackupFolderUri.isNullOrBlank() &&
+            (settings.lastBackupAt == 0L ||
+                (nowEpochMillis - settings.lastBackupAt) >= settings.scheduledBackupIntervalDays * MILLIS_PER_DAY)
+        return overdueByTx || overdueByDays || overdueByScheduledFolder
     }
 }

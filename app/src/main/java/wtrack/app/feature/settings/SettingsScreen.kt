@@ -2,6 +2,7 @@ package wtrack.app.feature.settings
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,9 +24,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +58,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
 
     var pendingExportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingScheduledFolderUri by remember { mutableStateOf<String?>(null) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var backupPassphrase by remember { mutableStateOf("") }
     var backupPassphraseConfirm by remember { mutableStateOf("") }
@@ -62,6 +66,24 @@ fun SettingsScreen(
     var showWipeStep1 by remember { mutableStateOf(false) }
     var showWipeStep2 by remember { mutableStateOf(false) }
     var wipeConfirmInput by remember { mutableStateOf("") }
+
+    val openBackupFolderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            viewModel.setScheduledBackupConfig(
+                folderUri = uri.toString(),
+                enabled = true,
+                intervalDays = state.settings.scheduledBackupIntervalDays,
+            )
+        }
+    }
 
     val exportBackupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -261,6 +283,71 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Create Encrypted Backup") }
 
+                    HorizontalDivider()
+                    Text("Scheduled Backup Folder (SAF • DATA-14)", style = MaterialTheme.typography.labelLarge)
+                    val savedFolderUri = state.settings.scheduledBackupFolderUri
+                    if (savedFolderUri == null) {
+                        Text(
+                            text = "No SAF folder selected. Choose a synced or local folder so reminders can target it directly without storing your passphrase.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            onClick = { openBackupFolderLauncher.launch(null) },
+                            enabled = !state.isBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Choose SAF Backup Folder") }
+                    } else {
+                        val folderLabel = Uri.parse(savedFolderUri).lastPathSegment ?: savedFolderUri
+                        Text("Saved folder: $folderLabel", style = MaterialTheme.typography.bodySmall)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("Scheduled reminder enabled", style = MaterialTheme.typography.bodySmall)
+                            Switch(
+                                checked = state.settings.scheduledBackupEnabled,
+                                onCheckedChange = { enabled ->
+                                    viewModel.setScheduledBackupConfig(savedFolderUri, enabled, state.settings.scheduledBackupIntervalDays)
+                                },
+                            )
+                        }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(3, 7, 14).forEach { days ->
+                                FilterChip(
+                                    selected = state.settings.scheduledBackupIntervalDays == days,
+                                    onClick = {
+                                        viewModel.setScheduledBackupConfig(savedFolderUri, state.settings.scheduledBackupEnabled, days)
+                                    },
+                                    label = { Text("${days}d") },
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                pendingScheduledFolderUri = savedFolderUri
+                                backupPassphrase = ""
+                                backupPassphraseConfirm = ""
+                            },
+                            enabled = !state.isBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Back Up to Saved Folder") }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { openBackupFolderLauncher.launch(null) },
+                                enabled = !state.isBusy,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Change Folder") }
+                            OutlinedButton(
+                                onClick = { viewModel.setScheduledBackupConfig(null, false, state.settings.scheduledBackupIntervalDays) },
+                                enabled = !state.isBusy,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Clear Folder") }
+                        }
+                    }
+                    HorizontalDivider()
+
                     OutlinedButton(
                         onClick = { restoreBackupLauncher.launch(arrayOf("*/*")) },
                         enabled = !state.isBusy,
@@ -284,11 +371,15 @@ fun SettingsScreen(
         }
     }
 
-    if (pendingExportUri != null) {
-        val uri = pendingExportUri!!
+    if (pendingExportUri != null || pendingScheduledFolderUri != null) {
+        val uri = pendingExportUri
+        val folderUriStr = pendingScheduledFolderUri
         AlertDialog(
-            onDismissRequest = { pendingExportUri = null },
-            title = { Text("Encrypt Backup File") },
+            onDismissRequest = {
+                pendingExportUri = null
+                pendingScheduledFolderUri = null
+            },
+            title = { Text(if (folderUriStr != null) "Encrypt Backup to Saved Folder" else "Encrypt Backup File") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -324,15 +415,46 @@ fun SettingsScreen(
                     onClick = {
                         val pw = backupPassphrase
                         pendingExportUri = null
-                        viewModel.exportEncryptedBackup(
-                            passphrase = pw,
-                            streamOpener = { context.contentResolver.openOutputStream(uri) },
-                            verifyStreamOpener = { context.contentResolver.openInputStream(uri) },
-                        )
+                        pendingScheduledFolderUri = null
+                        if (uri != null) {
+                            viewModel.exportEncryptedBackup(
+                                passphrase = pw,
+                                streamOpener = { context.contentResolver.openOutputStream(uri) },
+                                verifyStreamOpener = { context.contentResolver.openInputStream(uri) },
+                            )
+                        } else if (folderUriStr != null) {
+                            var createdDocUri: Uri? = null
+                            viewModel.exportEncryptedBackup(
+                                passphrase = pw,
+                                streamOpener = {
+                                    val treeUri = Uri.parse(folderUriStr)
+                                    val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(
+                                        treeUri,
+                                        DocumentsContract.getTreeDocumentId(treeUri),
+                                    )
+                                    val fileName = "wtrack-backup-${System.currentTimeMillis()}.wtrackbackup"
+                                    createdDocUri = DocumentsContract.createDocument(
+                                        context.contentResolver,
+                                        parentDocUri,
+                                        "application/octet-stream",
+                                        fileName,
+                                    )
+                                    createdDocUri?.let { context.contentResolver.openOutputStream(it) }
+                                },
+                                verifyStreamOpener = {
+                                    createdDocUri?.let { context.contentResolver.openInputStream(it) }
+                                },
+                            )
+                        }
                     },
                 ) { Text("Encrypt & Verify") }
             },
-            dismissButton = { TextButton(onClick = { pendingExportUri = null }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingExportUri = null
+                    pendingScheduledFolderUri = null
+                }) { Text("Cancel") }
+            },
         )
     }
 
