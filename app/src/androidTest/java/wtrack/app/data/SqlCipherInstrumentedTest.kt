@@ -1,62 +1,52 @@
 package wtrack.app.data
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import android.os.Build
+import android.security.keystore.KeyInfo
+import android.security.keystore.KeyProperties
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import java.io.File
 import java.nio.charset.StandardCharsets
+import java.security.KeyStore
+import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import wtrack.app.data.crypto.AndroidKeyStoreWrappingCipher
-import wtrack.app.data.crypto.DatabaseKeyManager
-import wtrack.app.data.crypto.WrappedKeyStore
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.local.entity.AccountEntity
 import wtrack.app.domain.model.DatabaseHealthState
 import wtrack.app.domain.model.LockedReason
-import kotlinx.coroutines.test.runTest
 
 /**
  * Instrumented verification for real SQLCipher native loading (`4.20.0`), ciphertext header
- * validation, reboot/reopen persistence, and key-loss non-destructive locked state (TEST-004).
- *
- * Run on physical `iQOO Z10R` (`arm64-v8a`, Android 16) during the physical-device test phase.
+ * validation, StrongBox/TEE Keystore audit, reboot/reopen persistence, non-destructive
+ * key-loss locked states, and explicit wipe reinitialization (`TEST-004`, `ADR-005`).
  */
 @RunWith(AndroidJUnit4::class)
 class SqlCipherInstrumentedTest {
-    private lateinit var context: Context
-    private val testDbName = "wtrack_instrumented_test.db"
-    private lateinit var keyFile: File
-    private val testAlias = "wtrack_test_kek_v1"
+    private lateinit var harness: InstrumentedTestHarness
 
     @Before
     fun setUp() {
-        context = ApplicationProvider.getApplicationContext()
-        keyFile = File(context.filesDir, "keystore/test_db_key.bin")
-        cleanupFiles()
+        harness = InstrumentedTestHarness()
     }
 
     @After
     fun tearDown() {
-        cleanupFiles()
+        harness.tearDown()
     }
 
     @Test
-    fun encryptedDatabaseLacksPlaintextSqliteHeaderAndReopensCleanly() = runTest {
-        val keyManager = DatabaseKeyManager(
-            dbFile = context.getDatabasePath(testDbName),
-            wrappedKeyStore = WrappedKeyStore(keyFile),
-            wrappingCipher = AndroidKeyStoreWrappingCipher(),
-            keyAlias = testAlias,
-        )
-        val holder1 = WtrackDatabaseHolder(context, keyManager, databaseName = testDbName)
-        assertThat(holder1.healthState.value).isEqualTo(DatabaseHealthState.Ready)
+    fun encryptedDatabaseLacksPlaintextHeaderAuditsKeystoreAndPreservesBytesOnKeyFailure() = runBlocking {
+        withTimeout(60_000L) {
+        assertThat(harness.holder.healthState.value).isEqualTo(DatabaseHealthState.Ready)
 
-        val now = System.currentTimeMillis()
-        val id = holder1.requireDatabase().accountDao().insert(
+        val now = harness.clock.now
+        val id = harness.db().accountDao().insert(
             AccountEntity(
                 name = "Encrypted Account",
                 provider = "Test",
@@ -69,39 +59,81 @@ class SqlCipherInstrumentedTest {
                 updatedAt = now,
             ),
         )
-        holder1.requireDatabase().close()
+        harness.db().close()
 
-        val dbFile = context.getDatabasePath(testDbName)
+        // 1. Audit Keystore hardware security level (StrongBox vs TEE) and AFU policy.
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val secretKey = (ks.getEntry(harness.keyAlias, null) as KeyStore.SecretKeyEntry).secretKey
+        val factory = SecretKeyFactory.getInstance(secretKey.algorithm, "AndroidKeyStore")
+        val keyInfo = factory.getKeySpec(secretKey, KeyInfo::class.java) as KeyInfo
+        assertThat(keyInfo.isUserAuthenticationRequired).isFalse()
+        val levelLabel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            when (keyInfo.securityLevel) {
+                KeyProperties.SECURITY_LEVEL_STRONGBOX -> "STRONGBOX"
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TEE"
+                KeyProperties.SECURITY_LEVEL_SOFTWARE -> "SOFTWARE"
+                KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE -> "UNKNOWN_SECURE"
+                else -> "UNKNOWN(${keyInfo.securityLevel})"
+            }
+        } else {
+            "API_PRE_31"
+        }
+        Log.i(
+            "WTrackCryptoAudit",
+            "alias=${harness.keyAlias} securityLevel=$levelLabel userAuth=${keyInfo.isUserAuthenticationRequired}",
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            assertThat(keyInfo.securityLevel).isNotEqualTo(KeyProperties.SECURITY_LEVEL_SOFTWARE)
+        }
+
+        // 2. Verify SQLCipher ciphertext header does not start with plaintext SQLite header.
+        val dbFile = harness.context.getDatabasePath(harness.dbName)
         assertThat(dbFile.exists()).isTrue()
-        val header = ByteArray(16)
-        dbFile.inputStream().use { it.read(header) }
-        val headerString = String(header, StandardCharsets.US_ASCII)
+        val rawDbBytesSnapshot = dbFile.readBytes()
+        val headerString = String(rawDbBytesSnapshot.copyOfRange(0, 16), StandardCharsets.US_ASCII)
         assertThat(headerString).doesNotContain("SQLite format 3")
 
-        // Simulate app restart / post-reboot reopen.
-        val holder2 = WtrackDatabaseHolder(context, keyManager, databaseName = testDbName)
-        assertThat(holder2.healthState.value).isEqualTo(DatabaseHealthState.Ready)
-        val loaded = holder2.requireDatabase().accountDao().getById(id)
+        // 3. Simulate app restart / post-unlock reopen.
+        val holderReopened = WtrackDatabaseHolder(
+            context = harness.context,
+            keyManager = harness.keyManager,
+            databaseName = harness.dbName,
+        )
+        assertThat(holderReopened.healthState.value).isEqualTo(DatabaseHealthState.Ready)
+        val loaded = holderReopened.requireDatabase().accountDao().getById(id)
         assertThat(loaded?.name).isEqualTo("Encrypted Account")
-        holder2.requireDatabase().close()
+        holderReopened.requireDatabase().close()
 
-        // Simulate key loss: delete wrapped key file and reopen -> must enter Locked state.
-        keyFile.delete()
-        val holderLocked = WtrackDatabaseHolder(context, keyManager, databaseName = testDbName)
-        assertThat(holderLocked.healthState.value).isInstanceOf(DatabaseHealthState.Locked::class.java)
-        val locked = holderLocked.healthState.value as DatabaseHealthState.Locked
-        assertThat(locked.reason).isEqualTo(LockedReason.KEY_MISSING)
-        assertThat(dbFile.exists()).isTrue()
-    }
+        val validWrappedBytes = harness.keyFile.readBytes()
 
-    private fun cleanupFiles() {
-        val dbFile = context.getDatabasePath(testDbName)
-        listOf(
-            dbFile,
-            File("${dbFile.path}-wal"),
-            File("${dbFile.path}-shm"),
-            keyFile,
-        ).forEach { if (it.exists()) it.delete() }
-        runCatching { AndroidKeyStoreWrappingCipher().deleteKey(testAlias) }
+        // 4a. Key failure: corrupted wrapped key -> KEY_INVALIDATED_OR_CORRUPT, raw DB untouched.
+        harness.keyFile.writeBytes(byteArrayOf(1, 2, 3, 4, 5))
+        val holderCorruptKey = WtrackDatabaseHolder(harness.context, harness.keyManager, databaseName = harness.dbName)
+        val corruptState = holderCorruptKey.healthState.value as DatabaseHealthState.Locked
+        assertThat(corruptState.reason).isEqualTo(LockedReason.KEY_INVALIDATED_OR_CORRUPT)
+        assertThat(dbFile.readBytes()).isEqualTo(rawDbBytesSnapshot)
+
+        // 4b. Key failure: missing wrapped key -> KEY_MISSING, raw DB untouched.
+        harness.keyFile.delete()
+        val holderMissingKey = WtrackDatabaseHolder(harness.context, harness.keyManager, databaseName = harness.dbName)
+        val missingState = holderMissingKey.healthState.value as DatabaseHealthState.Locked
+        assertThat(missingState.reason).isEqualTo(LockedReason.KEY_MISSING)
+        assertThat(dbFile.readBytes()).isEqualTo(rawDbBytesSnapshot)
+
+        // 4c. Key failure: wrapped key present, Keystore alias deleted -> KEY_INVALIDATED_OR_CORRUPT, DB untouched.
+        harness.keyFile.writeBytes(validWrappedBytes)
+        harness.wrappingCipher.deleteKey(harness.keyAlias)
+        val holderMissingAlias = WtrackDatabaseHolder(harness.context, harness.keyManager, databaseName = harness.dbName)
+        val missingAliasState = holderMissingAlias.healthState.value as DatabaseHealthState.Locked
+        assertThat(missingAliasState.reason).isEqualTo(LockedReason.KEY_INVALIDATED_OR_CORRUPT)
+        assertThat(dbFile.readBytes()).isEqualTo(rawDbBytesSnapshot)
+
+        // 5. Explicit wipe recovery transitions cleanly to Ready with seeded system categories.
+        holderMissingAlias.wipeAllDataAndReinitialize()
+        assertThat(holderMissingAlias.healthState.value).isEqualTo(DatabaseHealthState.Ready)
+        assertThat(holderMissingAlias.requireDatabase().accountDao().getAllOnce()).isEmpty()
+        assertThat(holderMissingAlias.requireDatabase().categoryDao().getAllOnce()).isNotEmpty()
+        holderMissingAlias.requireDatabase().close()
+        }
     }
 }
