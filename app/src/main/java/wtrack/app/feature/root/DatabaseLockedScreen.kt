@@ -3,6 +3,7 @@ package wtrack.app.feature.root
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,21 +12,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +43,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import java.io.InputStream
 import wtrack.app.domain.model.LockedReason
+import wtrack.app.feature.common.ActionFeedbackBanner
+import wtrack.app.feature.common.WtrackBrandMark
+import wtrack.app.feature.common.WtrackCard
 
 @Composable
 fun DatabaseLockedScreen(
@@ -63,7 +68,9 @@ fun DatabaseLockedScreen(
         }
     }
 
-    Scaffold { innerPadding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -72,11 +79,16 @@ fun DatabaseLockedScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                WtrackBrandMark(size = 34.dp, cornerRadius = 10.dp)
                 Icon(
                     imageVector = Icons.Outlined.Lock,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp),
                 )
                 Text(
                     text = "Encrypted Database Locked",
@@ -85,11 +97,15 @@ fun DatabaseLockedScreen(
                 )
             }
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            WtrackCard(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     val reasonTitle = when (state.reason) {
                         LockedReason.KEY_MISSING -> "Wrapped Key Missing"
                         LockedReason.KEY_INVALIDATED_OR_CORRUPT -> "Keystore Key Invalidated or Corrupt"
@@ -106,25 +122,25 @@ fun DatabaseLockedScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
-                    Text(
-                        text = "Your encrypted local database file has been preserved untouched. W-Track will never silently delete your ledger.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text(
+                            text = "Your encrypted local database file has been preserved untouched. W-Track will never silently delete your ledger.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
                 }
             }
 
             if (state.actionMessage != null) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(text = state.actionMessage, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = onClearMessage) { Text("Dismiss") }
-                    }
-                }
+                ActionFeedbackBanner(
+                    message = state.actionMessage,
+                    onDismiss = onClearMessage,
+                )
             }
 
             if (state.isBusy) {
@@ -134,18 +150,25 @@ fun DatabaseLockedScreen(
             Button(
                 onClick = { restoreLauncher.launch(arrayOf("*/*")) },
                 enabled = !state.isBusy,
-                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
             ) {
                 Text("Restore from Encrypted Backup (.wtrackbackup)")
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
             OutlinedButton(
                 onClick = { showWipeStep1 = true },
                 enabled = !state.isBusy,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
             ) {
                 Text("Erase Local Data & Start Fresh")
             }
@@ -164,6 +187,7 @@ fun DatabaseLockedScreen(
                     label = { Text("Passphrase") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
@@ -212,6 +236,7 @@ fun DatabaseLockedScreen(
                         value = wipeConfirmInput,
                         onValueChange = { wipeConfirmInput = it },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

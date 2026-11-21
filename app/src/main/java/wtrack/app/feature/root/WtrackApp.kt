@@ -9,22 +9,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.RateReview
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -54,6 +53,7 @@ import wtrack.app.feature.accounts.AccountsViewModel
 import wtrack.app.feature.activity.ActivityScreen
 import wtrack.app.feature.activity.ActivityViewModel
 import wtrack.app.feature.activity.TransactionDetailScreen
+import wtrack.app.feature.common.WtrackCard
 import wtrack.app.feature.dashboard.DashboardScreen
 import wtrack.app.feature.dashboard.DashboardViewModel
 import wtrack.app.feature.insights.InsightsScreen
@@ -67,12 +67,12 @@ import wtrack.app.feature.settings.SettingsScreen
 import wtrack.app.feature.settings.SettingsViewModel
 
 private sealed class WtrackRoute(val route: String, val label: String, val icon: ImageVector? = null) {
-    data object Dashboard : WtrackRoute("dashboard", "Dashboard", Icons.Outlined.Dashboard)
+    data object Dashboard : WtrackRoute("dashboard", "Home", Icons.Outlined.Home)
     data object Activity : WtrackRoute("activity", "Activity", Icons.AutoMirrored.Outlined.ReceiptLong)
     data object Accounts : WtrackRoute("accounts", "Accounts", Icons.Outlined.AccountBalanceWallet)
-    data object Review : WtrackRoute("review", "Review", Icons.Outlined.RateReview)
-    data object Settings : WtrackRoute("settings", "Settings", Icons.Outlined.Settings)
-    data object Insights : WtrackRoute("insights", "Insights")
+    data object Insights : WtrackRoute("insights", "Insights", Icons.Outlined.BarChart)
+    data object Review : WtrackRoute("review", "Review")
+    data object Settings : WtrackRoute("settings", "Settings")
     data object Rules : WtrackRoute("rules", "Rules")
     data object Categories : WtrackRoute("categories", "Categories")
     data object Diagnostics : WtrackRoute("diagnostics", "Diagnostics")
@@ -83,8 +83,7 @@ private val topLevelTabs = listOf(
     WtrackRoute.Dashboard,
     WtrackRoute.Activity,
     WtrackRoute.Accounts,
-    WtrackRoute.Review,
-    WtrackRoute.Settings,
+    WtrackRoute.Insights,
 )
 
 @Composable
@@ -108,7 +107,7 @@ fun WtrackApp(rootViewModel: MainRootViewModel = hiltViewModel()) {
         when (val state = rootState) {
             is RootUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -172,46 +171,75 @@ private fun WtrackMainScaffold(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    topLevelTabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = currentRoute == tab.route,
-                            onClick = { navigateSingleTop(tab.route) },
-                            icon = {
-                                val icon = tab.icon!!
-                                if (tab == WtrackRoute.Review && pendingReviewCount > 0) {
-                                    BadgedBox(badge = { Badge { Text(pendingReviewCount.toString()) } }) {
-                                        Icon(icon, contentDescription = tab.label)
-                                    }
-                                } else {
-                                    Icon(icon, contentDescription = tab.label)
-                                }
-                            },
-                            label = { Text(tab.label) },
-                        )
+                Column {
+                    HorizontalDivider(color = WtrackTheme.colors.divider)
+                    NavigationBar(
+                        containerColor = WtrackTheme.colors.navBarSurface,
+                        tonalElevation = 0.dp,
+                    ) {
+                        topLevelTabs.forEach { tab ->
+                            val selected = currentRoute == tab.route
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { navigateSingleTop(tab.route) },
+                                icon = {
+                                    Icon(
+                                        imageVector = tab.icon!!,
+                                        contentDescription = tab.label,
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = tab.label,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    unselectedIconColor = WtrackTheme.colors.mutedText,
+                                    unselectedTextColor = WtrackTheme.colors.mutedText,
+                                ),
+                            )
+                        }
                     }
                 }
             }
         },
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
             if (showPostRestorePermissionPrompt) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                WtrackCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
                 ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Text(
                             text = "Backup restored — grant Notification Access to resume capture (ING-02).",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                            }) { Text("Grant Notification Access") }
+                            Button(
+                                onClick = {
+                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                            ) { Text("Grant Notification Access") }
                             TextButton(onClick = onDismissPostRestorePrompt) { Text("Dismiss") }
                         }
                     }
@@ -222,64 +250,69 @@ private fun WtrackMainScaffold(
                 startDestination = WtrackRoute.Dashboard.route,
                 modifier = Modifier.weight(1f),
             ) {
-            composable(WtrackRoute.Dashboard.route) {
-                DashboardScreen(
-                    viewModel = dashboardVm,
-                    onOpenReview = { navigateSingleTop(WtrackRoute.Review.route) },
-                    onOpenInsights = { navController.navigate(WtrackRoute.Insights.route) },
-                    onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
-                    onOpenAccounts = { navigateSingleTop(WtrackRoute.Accounts.route) },
-                    onOpenTransaction = { txId -> navController.navigate("transaction_detail/$txId") },
-                    onOpenSettingsBackup = { navigateSingleTop(WtrackRoute.Settings.route) },
-                )
+                composable(WtrackRoute.Dashboard.route) {
+                    DashboardScreen(
+                        viewModel = dashboardVm,
+                        onOpenReview = { navController.navigate(WtrackRoute.Review.route) },
+                        onOpenInsights = { navigateSingleTop(WtrackRoute.Insights.route) },
+                        onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
+                        onOpenAccounts = { navigateSingleTop(WtrackRoute.Accounts.route) },
+                        onOpenActivity = { navigateSingleTop(WtrackRoute.Activity.route) },
+                        onOpenTransaction = { txId -> navController.navigate("transaction_detail/$txId") },
+                        onOpenSettings = { navController.navigate(WtrackRoute.Settings.route) },
+                    )
+                }
+                composable(WtrackRoute.Activity.route) {
+                    ActivityScreen(
+                        viewModel = activityVm,
+                        onOpenTransaction = { txId -> navController.navigate("transaction_detail/$txId") },
+                    )
+                }
+                composable(WtrackRoute.Accounts.route) {
+                    AccountsScreen(
+                        viewModel = accountsVm,
+                        onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
+                    )
+                }
+                composable(WtrackRoute.Insights.route) {
+                    InsightsScreen(viewModel = insightsVm)
+                }
+                composable(WtrackRoute.Review.route) {
+                    ReviewScreen(
+                        viewModel = reviewVm,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(WtrackRoute.Settings.route) {
+                    SettingsScreen(
+                        viewModel = settingsVm,
+                        onBack = { navController.popBackStack() },
+                        onOpenRules = { navController.navigate(WtrackRoute.Rules.route) },
+                        onOpenCategories = { navController.navigate(WtrackRoute.Categories.route) },
+                        onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
+                    )
+                }
+                composable(WtrackRoute.Rules.route) {
+                    RulesScreen(viewModel = settingsVm, onBack = { navController.popBackStack() })
+                }
+                composable(WtrackRoute.Categories.route) {
+                    CategoriesScreen(viewModel = settingsVm, onBack = { navController.popBackStack() })
+                }
+                composable(WtrackRoute.Diagnostics.route) {
+                    DiagnosticsScreen(viewModel = settingsVm, onBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = WtrackRoute.TransactionDetail.route,
+                    arguments = listOf(navArgument("txId") { type = NavType.LongType }),
+                ) { entry ->
+                    val txId = entry.arguments?.getLong("txId") ?: -1L
+                    TransactionDetailScreen(
+                        transactionId = txId,
+                        viewModel = activityVm,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
             }
-            composable(WtrackRoute.Activity.route) {
-                ActivityScreen(
-                    viewModel = activityVm,
-                    onOpenTransaction = { txId -> navController.navigate("transaction_detail/$txId") },
-                )
-            }
-            composable(WtrackRoute.Accounts.route) {
-                AccountsScreen(
-                    viewModel = accountsVm,
-                    onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
-                )
-            }
-            composable(WtrackRoute.Review.route) {
-                ReviewScreen(viewModel = reviewVm)
-            }
-            composable(WtrackRoute.Settings.route) {
-                SettingsScreen(
-                    viewModel = settingsVm,
-                    onOpenRules = { navController.navigate(WtrackRoute.Rules.route) },
-                    onOpenCategories = { navController.navigate(WtrackRoute.Categories.route) },
-                    onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
-                )
-            }
-            composable(WtrackRoute.Insights.route) {
-                InsightsScreen(viewModel = insightsVm, onBack = { navController.popBackStack() })
-            }
-            composable(WtrackRoute.Rules.route) {
-                RulesScreen(viewModel = settingsVm, onBack = { navController.popBackStack() })
-            }
-            composable(WtrackRoute.Categories.route) {
-                CategoriesScreen(viewModel = settingsVm, onBack = { navController.popBackStack() })
-            }
-            composable(WtrackRoute.Diagnostics.route) {
-                DiagnosticsScreen(viewModel = settingsVm, onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = WtrackRoute.TransactionDetail.route,
-                arguments = listOf(navArgument("txId") { type = NavType.LongType }),
-            ) { entry ->
-                val txId = entry.arguments?.getLong("txId") ?: -1L
-                TransactionDetailScreen(
-                    transactionId = txId,
-                    viewModel = activityVm,
-                    onBack = { navController.popBackStack() },
-                )
-            }
-        }
         }
     }
 }

@@ -18,6 +18,7 @@ import wtrack.app.domain.model.Category
 import wtrack.app.domain.model.Transaction
 import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.domain.model.TransferPair
+import wtrack.app.domain.model.TransferStatus
 import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.BackupReminderEvaluator
 import wtrack.app.domain.repository.CaptureStatusRepository
@@ -34,6 +35,7 @@ import wtrack.app.feature.common.UiDateHelper
 data class DashboardUiState(
     val isLoading: Boolean = true,
     val monthLabel: String = "",
+    val shortMonthLabel: String = "",
     val canAdvanceMonth: Boolean = false,
     val baseCurrency: String = "IDR",
     val summary: PeriodAggregateSummary = PeriodAggregateSummary(
@@ -48,6 +50,7 @@ data class DashboardUiState(
     ),
     val activeAccounts: List<Account> = emptyList(),
     val recentTransactions: List<Transaction> = emptyList(),
+    val pairedTxIds: Set<Long> = emptySet(),
     val accountNames: Map<Long, String> = emptyMap(),
     val categoryNames: Map<Long, String> = emptyMap(),
     val pendingReviewCount: Int = 0,
@@ -115,15 +118,22 @@ class DashboardViewModel @Inject constructor(
             .sortedByDescending { it.occurredAt }
             .take(8)
             .toList()
+        val pairedTxIds = ledger.pairs
+            .asSequence()
+            .filter { it.status == TransferStatus.CONFIRMED }
+            .flatMap { sequenceOf(it.outgoingTransactionId, it.incomingTransactionId) }
+            .toSet()
 
         DashboardUiState(
             isLoading = false,
             monthLabel = window.label,
+            shortMonthLabel = window.shortLabel,
             canAdvanceMonth = offset < 0,
             baseCurrency = status.settings.baseCurrency,
             summary = summary,
             activeAccounts = ledger.accounts.filter { it.isActive },
             recentTransactions = recent,
+            pairedTxIds = pairedTxIds,
             accountNames = ledger.accounts.associate { it.id to it.name },
             categoryNames = ledger.categories.associate { it.id to it.name },
             pendingReviewCount = status.pendingReviewCount,

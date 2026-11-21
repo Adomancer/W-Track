@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,18 +17,26 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.Rule
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,19 +52,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.ThemeMode
+import wtrack.app.feature.common.ActionFeedbackBanner
 import wtrack.app.feature.common.CaptureStatusPill
+import wtrack.app.feature.common.SegmentedOptionRow
+import wtrack.app.feature.common.WtrackCard
+import wtrack.app.feature.common.WtrackTopBar
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    onBack: (() -> Unit)? = null,
     onOpenRules: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenDiagnostics: () -> Unit,
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
+    val ext = WtrackTheme.colors
 
     var pendingExportUri by remember { mutableStateOf<Uri?>(null) }
     var pendingScheduledFolderUri by remember { mutableStateOf<String?>(null) }
@@ -110,262 +126,478 @@ fun SettingsScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (state.actionMessage != null) {
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        WtrackTopBar(title = "Settings", onBack = onBack)
+
+        if (state.isBusy) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (state.actionMessage != null) {
+                item(key = "msg") {
+                    ActionFeedbackBanner(
+                        message = state.actionMessage!!,
+                        onDismiss = viewModel::clearMessage,
+                    )
+                }
+            }
+
+            if (state.showPostRestorePermissionPrompt) {
+                item(key = "post-restore") {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "Backup restored — re-grant Notification Access so W-Track can resume capturing notifications (ING-02).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                ) { Text("Grant Notification Access") }
+                                TextButton(onClick = viewModel::dismissPostRestorePrompt) { Text("Dismiss") }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // CAPTURE & AUTOMATION
+            item(key = "sec-capture") {
+                SettingsGroupLabel("CAPTURE & AUTOMATION")
+            }
+            item(key = "capture-card") {
+                WtrackCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenDiagnostics)
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(state.actionMessage!!, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = viewModel::clearMessage) { Text("OK") }
-                    }
-                }
-            }
-        }
-
-        if (state.showPostRestorePermissionPrompt) {
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Backup restored — re-grant Notification Access so W-Track can resume capturing notifications (ING-02).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                            }) { Text("Grant Notification Access") }
-                            TextButton(onClick = viewModel::dismissPostRestorePrompt) { Text("Dismiss") }
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(10.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Shield,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .padding(7.dp)
+                                        .size(18.dp),
+                                )
+                            }
+                            Column {
+                                Text("Capture Diagnostics & Gate G1", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = "Listener status, gap log, OriginOS tips & logs",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ext.mutedText,
+                                )
+                            }
                         }
-                    }
-                }
-            }
-        }
-
-        if (state.isBusy) {
-            item { CircularProgressIndicator() }
-        }
-
-        // Capture & Tools
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenDiagnostics),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text("Capture Diagnostics & Gate G1", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Listener status, gap log, OriginOS tips & logs", style = MaterialTheme.typography.bodySmall)
-                    }
-                    CaptureStatusPill(state.captureSummary.appStatus)
-                }
-            }
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onOpenRules, modifier = Modifier.weight(1f)) {
-                    Text("Rules (${state.rules.size})")
-                }
-                OutlinedButton(onClick = onOpenCategories, modifier = Modifier.weight(1f)) {
-                    Text("Categories (${state.categories.size})")
-                }
-            }
-        }
-
-        // Appearance & Currency
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Appearance & Currency", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemeMode.entries.forEach { mode ->
-                            FilterChip(
-                                selected = state.settings.themeMode == mode,
-                                onClick = { viewModel.setThemeMode(mode) },
-                                label = { Text(mode.name) },
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CaptureStatusPill(state.captureSummary.appStatus)
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = ext.mutedText,
                             )
                         }
                     }
-                    Text("Base Currency (single-currency aggregates)", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("IDR", "USD", "SGD", "MYR", "EUR", "JPY").forEach { cur ->
-                            FilterChip(
-                                selected = state.settings.baseCurrency == cur,
-                                onClick = { viewModel.setBaseCurrency(cur) },
-                                label = { Text(cur) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
 
-        // Retention & Heartbeat
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Retention & Monitoring", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Verification window for raw notification text", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(0, 7, 14, 30).forEach { days ->
-                            FilterChip(
-                                selected = state.settings.verificationWindowDays == days,
-                                onClick = { viewModel.setVerificationWindowDays(days) },
-                                label = { Text(if (days == 0) "0d (Immediate purge)" else "${days}d") },
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ext.divider)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenRules)
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.Rule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text("Categorization Rules", style = MaterialTheme.typography.titleSmall)
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("${state.rules.size}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = ext.mutedText,
                             )
                         }
                     }
-                    Text("Heartbeat stale gap threshold", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1, 3, 6, 12).forEach { hours ->
-                            FilterChip(
-                                selected = state.settings.heartbeatStaleHours == hours,
-                                onClick = { viewModel.setHeartbeatStaleHours(hours) },
-                                label = { Text("${hours}h") },
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ext.divider)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenCategories)
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Category,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text("Categories", style = MaterialTheme.typography.titleSmall)
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("${state.categories.size}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = ext.mutedText,
                             )
                         }
                     }
                 }
             }
-        }
 
-        // Encrypted Backup, CSV Export & Wipe
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Backup & Data Safety", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        text = "Backups are passphrase-encrypted with Argon2id + AES-256-GCM and omit raw notification payloads and unresolved Needs Review drafts.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    if (state.pendingReviewCount > 0) {
-                        Text(
-                            text = "Pending Needs Review items (${state.pendingReviewCount}) will NOT be included in the backup. Resolve them first if you want them backed up.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    Text("Backup reminder interval (days)", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(7, 14, 30).forEach { days ->
-                            FilterChip(
-                                selected = state.settings.backupReminderDays == days,
-                                onClick = { viewModel.setBackupReminderThresholds(days, state.settings.backupReminderTxCount) },
-                                label = { Text("${days}d") },
-                            )
-                        }
-                    }
-                    Text("Backup reminder transaction threshold", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(50, 100, 250).forEach { txCount ->
-                            FilterChip(
-                                selected = state.settings.backupReminderTxCount == txCount,
-                                onClick = { viewModel.setBackupReminderThresholds(state.settings.backupReminderDays, txCount) },
-                                label = { Text("$txCount tx") },
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = { exportBackupLauncher.launch("wtrack-backup.wtrackbackup") },
-                        enabled = !state.isBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Create Encrypted Backup") }
-
-                    HorizontalDivider()
-                    Text("Scheduled Backup Folder (SAF • DATA-14)", style = MaterialTheme.typography.labelLarge)
-                    val savedFolderUri = state.settings.scheduledBackupFolderUri
-                    if (savedFolderUri == null) {
-                        Text(
-                            text = "No SAF folder selected. Choose a synced or local folder so reminders can target it directly without storing your passphrase.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        OutlinedButton(
-                            onClick = { openBackupFolderLauncher.launch(null) },
-                            enabled = !state.isBusy,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Choose SAF Backup Folder") }
-                    } else {
-                        val folderLabel = Uri.parse(savedFolderUri).lastPathSegment ?: savedFolderUri
-                        Text("Saved folder: $folderLabel", style = MaterialTheme.typography.bodySmall)
+            // APPEARANCE & CURRENCY
+            item(key = "sec-appearance") {
+                SettingsGroupLabel("APPEARANCE & CURRENCY")
+            }
+            item(key = "appearance-card") {
+                WtrackCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Scheduled reminder enabled", style = MaterialTheme.typography.bodySmall)
-                            Switch(
-                                checked = state.settings.scheduledBackupEnabled,
-                                onCheckedChange = { enabled ->
-                                    viewModel.setScheduledBackupConfig(savedFolderUri, enabled, state.settings.scheduledBackupIntervalDays)
-                                },
+                            Text("Theme", style = MaterialTheme.typography.titleSmall)
+                            val modes = ThemeMode.entries
+                            SegmentedOptionRow(
+                                options = modes.map { it.name.lowercase().replaceFirstChar(Char::uppercase) },
+                                selectedIndex = modes.indexOf(state.settings.themeMode).coerceAtLeast(0),
+                                onSelect = { idx -> viewModel.setThemeMode(modes[idx]) },
                             )
                         }
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(3, 7, 14).forEach { days ->
+                        HorizontalDivider(color = ext.divider)
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Base Currency (single-currency aggregates)", style = MaterialTheme.typography.labelLarge)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                listOf("IDR", "USD", "SGD", "MYR", "EUR", "JPY").forEach { cur ->
+                                    FilterChip(
+                                        selected = state.settings.baseCurrency == cur,
+                                        onClick = { viewModel.setBaseCurrency(cur) },
+                                        label = { Text(cur) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // PRIVACY & MONITORING
+            item(key = "sec-retention") {
+                SettingsGroupLabel("RETENTION & MONITORING")
+            }
+            item(key = "retention-card") {
+                WtrackCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text("Verification window for raw notification text", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            listOf(0, 7, 14, 30).forEach { days ->
                                 FilterChip(
-                                    selected = state.settings.scheduledBackupIntervalDays == days,
-                                    onClick = {
-                                        viewModel.setScheduledBackupConfig(savedFolderUri, state.settings.scheduledBackupEnabled, days)
-                                    },
+                                    selected = state.settings.verificationWindowDays == days,
+                                    onClick = { viewModel.setVerificationWindowDays(days) },
+                                    label = { Text(if (days == 0) "0d (Immediate)" else "${days}d") },
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = ext.divider)
+                        Text("Heartbeat stale gap threshold", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            listOf(1, 3, 6, 12).forEach { hours ->
+                                FilterChip(
+                                    selected = state.settings.heartbeatStaleHours == hours,
+                                    onClick = { viewModel.setHeartbeatStaleHours(hours) },
+                                    label = { Text("${hours}h") },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ENCRYPTED BACKUP & DATA SAFETY
+            item(key = "sec-backup") {
+                SettingsGroupLabel("BACKUP & DATA SAFETY")
+            }
+            item(key = "backup-card") {
+                WtrackCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text("Encrypted Backups", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = "Backups are passphrase-encrypted with Argon2id + AES-256-GCM and omit raw notification payloads and unresolved Needs Review drafts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ext.mutedText,
+                        )
+                        if (state.pendingReviewCount > 0) {
+                            Surface(
+                                color = ext.warningContainer,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ext.warningBorder),
+                            ) {
+                                Text(
+                                    text = "Pending Needs Review items (${state.pendingReviewCount}) will NOT be included in the backup. Resolve them first if you want them backed up.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ext.onWarningContainer,
+                                    modifier = Modifier.padding(10.dp),
+                                )
+                            }
+                        }
+
+                        Text("Backup reminder interval (days)", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            listOf(7, 14, 30).forEach { days ->
+                                FilterChip(
+                                    selected = state.settings.backupReminderDays == days,
+                                    onClick = { viewModel.setBackupReminderThresholds(days, state.settings.backupReminderTxCount) },
                                     label = { Text("${days}d") },
                                 )
                             }
                         }
+
+                        Text("Backup reminder transaction threshold", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            listOf(50, 100, 250).forEach { txCount ->
+                                FilterChip(
+                                    selected = state.settings.backupReminderTxCount == txCount,
+                                    onClick = { viewModel.setBackupReminderThresholds(state.settings.backupReminderDays, txCount) },
+                                    label = { Text("$txCount tx") },
+                                )
+                            }
+                        }
+
                         Button(
-                            onClick = {
-                                pendingScheduledFolderUri = savedFolderUri
-                                backupPassphrase = ""
-                                backupPassphraseConfirm = ""
-                            },
+                            onClick = { exportBackupLauncher.launch("wtrack-backup.wtrackbackup") },
                             enabled = !state.isBusy,
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Back Up to Saved Folder") }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ) { Text("Create Encrypted Backup") }
+
+                        HorizontalDivider(color = ext.divider)
+
+                        Text("Scheduled Backup Folder (SAF • DATA-14)", style = MaterialTheme.typography.labelLarge)
+                        val savedFolderUri = state.settings.scheduledBackupFolderUri
+                        if (savedFolderUri == null) {
+                            Text(
+                                text = "No SAF folder selected. Choose a synced or local folder so reminders can target it directly without storing your passphrase.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ext.mutedText,
+                            )
                             OutlinedButton(
                                 onClick = { openBackupFolderLauncher.launch(null) },
                                 enabled = !state.isBusy,
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Change Folder") }
-                            OutlinedButton(
-                                onClick = { viewModel.setScheduledBackupConfig(null, false, state.settings.scheduledBackupIntervalDays) },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Choose SAF Backup Folder") }
+                        } else {
+                            val folderLabel = Uri.parse(savedFolderUri).lastPathSegment ?: savedFolderUri
+                            Text("Saved folder: $folderLabel", style = MaterialTheme.typography.labelMedium)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("Scheduled reminder enabled", style = MaterialTheme.typography.bodySmall)
+                                Switch(
+                                    checked = state.settings.scheduledBackupEnabled,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.setScheduledBackupConfig(
+                                            savedFolderUri,
+                                            enabled,
+                                            state.settings.scheduledBackupIntervalDays,
+                                        )
+                                    },
+                                )
+                            }
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(3, 7, 14).forEach { days ->
+                                    FilterChip(
+                                        selected = state.settings.scheduledBackupIntervalDays == days,
+                                        onClick = {
+                                            viewModel.setScheduledBackupConfig(
+                                                savedFolderUri,
+                                                state.settings.scheduledBackupEnabled,
+                                                days,
+                                            )
+                                        },
+                                        label = { Text("${days}d") },
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = {
+                                    pendingScheduledFolderUri = savedFolderUri
+                                    backupPassphrase = ""
+                                    backupPassphraseConfirm = ""
+                                },
                                 enabled = !state.isBusy,
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Clear Folder") }
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Back Up to Saved Folder") }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { openBackupFolderLauncher.launch(null) },
+                                    enabled = !state.isBusy,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f),
+                                ) { Text("Change Folder") }
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.setScheduledBackupConfig(
+                                            null,
+                                            false,
+                                            state.settings.scheduledBackupIntervalDays,
+                                        )
+                                    },
+                                    enabled = !state.isBusy,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f),
+                                ) { Text("Clear Folder") }
+                            }
                         }
+
+                        HorizontalDivider(color = ext.divider)
+
+                        OutlinedButton(
+                            onClick = { restoreBackupLauncher.launch(arrayOf("*/*")) },
+                            enabled = !state.isBusy,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Restore Encrypted Backup") }
+
+                        OutlinedButton(
+                            onClick = { showCsvWarning = true },
+                            enabled = !state.isBusy,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Export Unencrypted CSV") }
                     }
-                    HorizontalDivider()
+                }
+            }
 
-                    OutlinedButton(
-                        onClick = { restoreBackupLauncher.launch(arrayOf("*/*")) },
-                        enabled = !state.isBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Restore Encrypted Backup") }
-
-                    OutlinedButton(
-                        onClick = { showCsvWarning = true },
-                        enabled = !state.isBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Export Unencrypted CSV") }
-
-                    OutlinedButton(
-                        onClick = { showWipeStep1 = true },
-                        enabled = !state.isBusy,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Erase All Stored Data") }
+            // DANGER ZONE
+            item(key = "sec-danger") {
+                SettingsGroupLabel("DANGER ZONE", color = MaterialTheme.colorScheme.error)
+            }
+            item(key = "danger-card") {
+                WtrackCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.WarningAmber,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text("Erase Local Data", style = MaterialTheme.typography.titleSmall)
+                        }
+                        Text(
+                            text = "Permanently deletes your SQLCipher database, wrapped keys, logs, and settings from this device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ext.mutedText,
+                        )
+                        OutlinedButton(
+                            onClick = { showWipeStep1 = true },
+                            enabled = !state.isBusy,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Erase All Stored Data") }
+                    }
                 }
             }
         }
@@ -397,6 +629,7 @@ fun SettingsScreen(
                         label = { Text("Passphrase (min 8 chars)") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -405,6 +638,7 @@ fun SettingsScreen(
                         label = { Text("Confirm passphrase") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -470,6 +704,7 @@ fun SettingsScreen(
                     label = { Text("Passphrase") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
@@ -525,7 +760,13 @@ fun SettingsScreen(
             onDismissRequest = { showWipeStep2 = false },
             title = { Text("Type WIPE to Confirm") },
             text = {
-                OutlinedTextField(value = wipeConfirmInput, onValueChange = { wipeConfirmInput = it }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = wipeConfirmInput,
+                    onValueChange = { wipeConfirmInput = it },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             },
             confirmButton = {
                 Button(
@@ -540,4 +781,18 @@ fun SettingsScreen(
             dismissButton = { TextButton(onClick = { showWipeStep2 = false }) { Text("Cancel") } },
         )
     }
+}
+
+@Composable
+private fun SettingsGroupLabel(
+    text: String,
+    color: androidx.compose.ui.graphics.Color = WtrackTheme.colors.mutedText,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+    )
 }
