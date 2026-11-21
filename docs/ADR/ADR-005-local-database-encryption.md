@@ -6,12 +6,16 @@
 
 ## 1. Status
 
-**Proposed — Implemented in M1 (`sqlcipher-android:4.20.0` + `compileSdk = 37`); Remains Proposed Pending Physical-Device Security Validation on `iQOO Z10R`**
+**Accepted — Implemented in M1–M5 (`sqlcipher-android:4.20.0` + `compileSdk = 37` GA / `targetSdk = 36`) and Hardware-Verified on `iQOO Z10R (I2505, Android 16)`**
 
 PRD Sections 5, 9.2, 17.1, and 19 require resolving database encryption and key lifecycle **before** storing real data, including during the ingestion proof of concept (no plaintext-to-encrypted migration is permitted).
 
-- **M1–M5 Implementation Status:** `net.zetetic:sqlcipher-android:4.20.0`, `androidx.sqlite:sqlite:2.7.0`, `AndroidKeyStoreWrappingCipher` (`setUserAuthenticationRequired(false)`, `setUnlockedDeviceRequired(false)`), `WrappedKeyStore`, `DatabaseKeyManager`, `WtrackDatabaseHolder`, `DatabaseLockedScreen` (with encrypted backup restore & double-confirmed wipe), `WipeAllDataUseCase`, and lock-aware `RetentionPurgeWorker` are implemented with `compileSdk = 37` GA / `targetSdk = 36`.
-- **Remaining Validation Gate:** On-device verification of `SqlCipherInstrumentedTest` (`arm64-v8a` native load, non-plaintext header check, reboot reopen, AFU locked-screen capture, and `LOCKED_KEY_MISSING_OR_INVALID` state) on the physical `iQOO Z10R` is pending before marking `ADR-005` `Accepted` for production. **SQLCipher 5 beta** and legacy **`android-database-sqlcipher:4.5.4`** remain prohibited.
+- **M1–M5 Implementation Status:** `net.zetetic:sqlcipher-android:4.20.0`, `androidx.sqlite:sqlite:2.7.0`, `AndroidKeyStoreWrappingCipher` (`setUserAuthenticationRequired(false)`, `setUnlockedDeviceRequired(false)`), `WrappedKeyStore`, `DatabaseKeyManager`, `WtrackDatabaseHolder`, `DatabaseLockedScreen` (with encrypted backup restore & double-confirmed wipe), `WipeAllDataUseCase`, and lock-aware `RetentionPurgeWorker` are implemented with `compileSdk = 37` GA / `targetSdk = 36` (Option 1 adopted).
+- **Physical-Device Verification (`iQOO Z10R`, `I2505`, Android 16, `arm64-v8a`):**
+  - `SqlCipherInstrumentedTest` passed via `am instrument`: confirmed `arm64-v8a` native `libsqlcipher.so` load, SQLCipher `.db` file header lacking `"SQLite format 3"`, Keystore hardware audit (`WTrackCryptoAudit: securityLevel=TEE userAuth=false`), reopen persistence, non-destructive byte-preserving `LOCKED_KEY_MISSING_OR_INVALID` across corrupted wrapped key / missing wrapped key / deleted Keystore alias, and explicit wipe reinitialization.
+  - `ComposeThemeAndLockedUiInstrumentedTest` verified `DatabaseLockedScreen` recovery controls render cleanly on device.
+  - `dumpsys package wtrack.app` and merged R8 release manifest confirmed `ALLOW_BACKUP` is absent (`android:allowBackup="false"`).
+  - Real device reboot & screen-off AFU live notification scenarios remain tracked in `docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md`. **SQLCipher 5 beta** and legacy **`android-database-sqlcipher:4.5.4`** remain prohibited.
 
 ---
 
@@ -48,8 +52,8 @@ Simultaneously, two concrete engineering constraints shape ADR-005:
 | **`net.zetetic:sqlcipher-android:5.0.0-beta*`** | **Beta / Pre-release** | Breaking SQLCipher 5 format (AES-256-GCM + 8KB default page size; non-backward-compatible with v4) | Unstable codec/VFS churn between beta drops. | **PROHIBITED** for production / PoC |
 | **`net.zetetic:android-database-sqlcipher:4.5.4`** *(in `38001da`)* | **EOL / Deprecated** | Legacy 4KB-only native `.so` alignment | Breaks on 16KB page-size devices; incompatible with modern `androidx.sqlite` (`2.6+`/`2.7`). | **PROHIBITED** |
 
-#### Resolving `sqlcipher-android:4.20.0` vs. `compileSdk = 36` (`[OWNER CONFIRMATION REQUIRED]`)
-- **Option 1 (Recommended — Decouple `compileSdk = 37` [GA June 2026], keep `targetSdk = 36`, `minSdk = 26`):** `compileSdk` controls only compile-time AAR stubs; keeping `targetSdk = 36` ensures **zero Android 17 runtime changes or beta targeting**, aligns execution with the Android 16 (`iQOO Z10R`) device, and lets `:app` adopt **`net.zetetic:sqlcipher-android:4.20.0`** + `androidx.sqlite:sqlite:2.7.0` + `Room 2.8.5` cleanly without AAR metadata suppression.
+#### Resolving `sqlcipher-android:4.20.0` vs. `compileSdk = 36` (**Option 1 Adopted**)
+- **Option 1 (Adopted — Decouple `compileSdk = 37` [GA], keep `targetSdk = 36`, `minSdk = 26`):** `compileSdk` controls only compile-time AAR stubs; keeping `targetSdk = 36` ensures **zero Android 17 runtime changes or beta targeting**, aligns execution with the Android 16 (`iQOO Z10R`) device, and lets `:app` adopt **`net.zetetic:sqlcipher-android:4.20.0`** + `androidx.sqlite:sqlite:2.7.0` + `Room 2.8.5` cleanly without AAR metadata suppression.
 - **Option 2 (Strict `compileSdk = 36`, `targetSdk = 36`, `minSdk = 26`):** Verify `sqlcipher-android:4.20.0` AAR `minCompileSdk` at M0 Gradle sync; if AGP rejects `4.20.0` under `compileSdk = 36`, use **`net.zetetic:sqlcipher-android:4.17.0`** + `androidx.sqlite:sqlite:2.6.2` + `Room 2.8.4`/`2.8.5` + `core-ktx:1.18.0` (never use `android.suppressUnsupportedCompileSdk`).
 
 *Integration pattern (identical for `4.17.0` and `4.20.0`):* Load `System.loadLibrary("sqlcipher")` early, wrap a 32-byte random DEK via `net.zetetic.database.sqlcipher.SupportOpenHelperFactory(dekBytes)` in `Room.databaseBuilder(...)`, and rely on the single SQLCipher layer for both transactions and `payload_json` (`PRD Section 9.2`).

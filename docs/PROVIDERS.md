@@ -2,13 +2,13 @@
 
 **Document Status:** Provider Discovery Registry (PRD v1.4 — Section 11 & Gate G1 Input)  
 **Primary Physical Test Device:** `vivo / iQOO Z10R` (`I2505`, Android 16 / API 36, Build `PD2512LF_EX_A_16.1.20.0.W20`, `arm64-v8a`)  
-**Last Updated:** 2026-11-21
+**Last Updated:** 2026-11-22
 
 ---
 
 ## 1. Initial PoC Provider Targets & Incremental Priority
 
-> **M3a Tooling Readiness (Unit-Verified):** `LocaleNumberParser` (`PAR-12`), `ProviderDateTimeParser`, `SensitiveContentGuard`, `FixtureAnonymizer`, `ProviderCatalog` (`:integration:providers`), and `GateG1Evaluator` (`:app`) are implemented and tested against synthetic fixtures. `ProviderParsers.registered()` intentionally remains `emptySet()` with zero fabricated templates until on-device `iQOO Z10R` verification completes.
+> **M3a Tooling Readiness (Unit & Hardware-Verified):** `LocaleNumberParser` (`PAR-12`), `ProviderDateTimeParser`, `SensitiveContentGuard`, `FixtureAnonymizer`, `ProviderCatalog` (`:integration:providers`), and `GateG1Evaluator` (`:app`) are implemented and tested. `ProviderParsers.registered()` now exposes `JagoTransactionParser` (`v2`), `DanaTransactionParser` (`v1`), and `BcaTransactionParser` (`v1`), verified both against anonymized unit fixtures and under SQLCipher on `iQOO Z10R` (`IngestionAndLedgerInstrumentedTest`).
 
 The owner has identified **three initial financial application targets** for PoC validation:
 
@@ -31,7 +31,7 @@ Verified directly against installed packages on the physical `vivo / iQOO Z10R` 
 
 | Priority | Provider | Google Play Reference Candidate(s) | `iQOO Z10R` ADB Verification | Parser Subpackage (`:integration:providers`) |
 | :-: | :--- | :--- | :--- | :--- |
-| **1** | **Bank Jago** | `com.jago.digitalBanking` *(PT Bank Jago Tbk)* | **Verified:** `com.jago.digitalBanking` (`v8.99.1`, `versionCode=11100`, **`POST_NOTIFICATIONS: granted=false`** — enable in App Info) | `wtrack.integration.providers.jago` |
+| **1** | **Bank Jago** | `com.jago.digitalBanking` *(PT Bank Jago Tbk)* | **Verified:** `com.jago.digitalBanking` (`v8.99.1`, `versionCode=11100`, `POST_NOTIFICATIONS: granted=true` enabled by owner) | `wtrack.integration.providers.jago` |
 | **2** | **DANA** | `id.dana` *(PT Espay Debit Indonesia Koe)* | **Verified:** `id.dana` (`v2.152.0`, `versionCode=21520016`, `POST_NOTIFICATIONS: granted=true`) | `wtrack.integration.providers.dana` |
 | **3** | **BCA** | **BCA mobile:** `com.bca`<br>**myBCA:** `com.bca.mybca.omni.android`<br>*(PT Bank Central Asia Tbk)* | **Both Verified Installed:** `com.bca` (`v4.9.5`, `versionCode=1297`, `POST_NOTIFICATIONS: granted=true`) & `com.bca.mybca.omni.android` (`v2.23.0`, `versionCode=299`, `POST_NOTIFICATIONS: granted=true`) | `wtrack.integration.providers.bca` |
 
@@ -145,6 +145,6 @@ Target thresholds (recommended baseline in `ADR-003`, formally locked before mea
 
 | Provider | Verified Package ID | Days | A: Tx in Statement | B: Tx Notifications Captured | C: Usable (Amount, Direction, Time) | D: Statement Tx with Usable Notification | Coverage (`D/A`) | Completeness (`C/B`) | Wrong Amount / Direction | Duplicates / Updates / Dual-Notifiers Observed | Notes |
 | :--- | :--- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--- | :--- |
-| **1. Bank Jago** | `[TBD]` | — | — | — | — | — | — | — | — | — | — |
-| **2. DANA** | `[TBD]` | — | — | — | — | — | — | — | — | — | — |
-| **3. BCA** | `[TBD]` | — | — | — | — | — | — | — | — | — | — |
+| **1. Bank Jago** | `com.jago.digitalBanking` | — | — | — | — | — | — | — | — | — | Active daily-driver Gate G1 window (`7–14d`, `>= 30 tx`) in progress |
+| **2. DANA** | `id.dana` | — | — | — | — | — | — | — | — | — | Active daily-driver Gate G1 window (`7–14d`, `>= 30 tx`) in progress |
+| **3. BCA** | `com.bca.mybca.omni.android` (`myBCA`) / `com.bca` (`BCA mobile`) | — | — | — | — | — | — | — | — | — | Active daily-driver Gate G1 window (`7–14d`, `>= 30 tx`) in progress |

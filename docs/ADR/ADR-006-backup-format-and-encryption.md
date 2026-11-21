@@ -6,11 +6,14 @@
 
 ## 1. Status
 
-**Implemented in M5 (Unit/Robolectric Verified) — Production KDF Parameter Sign-Off & Physical-Device SAF Verification Pending**
+**Accepted — Hardware-Verified Argon2id (`65,536 KiB`, `3` iter) & 13-Table Atomic Restore on `iQOO Z10R`; Interactive SAF UI Picker Flow Pending Manual QA**
 
 - **Confirmed Direction (PRD v1.4):** User-initiated, versioned, passphrase-encrypted full backup (`DATA-05`, `DATA-10`), atomic restore on a fresh install (`DATA-09`), exclusion of raw notification payloads and `NeedsReview` items, automatic OS backup disabled (`DATA-08`).
-- **M5 Implementation Status:** `BackupCryptoContainer` (`WTBK` v1 container with Argon2id via `bcprov-jdk18on` + PBKDF2-HMAC-SHA256 fallback read support, AES-256-GCM with full 66-byte header as AAD, GZIP compression, key array zeroization), `BackupService` (full 13-table + `AppSettings` JSON export with post-write SAF verification `DATA-13`, transactional atomic restore with parent-first category & two-pass refund self-FK handling, post-restore `AllowlistCache` + `ATTENTION` status refresh), `CsvExporter` (`DATA-11` RFC-4180 + formula neutralization), and `WtrackBackupAndDiagnosticsPort` are implemented and verified in JVM/Robolectric tests (`BackupContainerAndRestoreTest`, `CsvExporterTest`).
-- **Pending Owner / Physical-Device Sign-Off:** Final confirmation of Argon2id memory parameter (`65,536 KiB`, `3` iterations) and on-device Storage Access Framework round-trip verification on `iQOO Z10R`.
+- **M5 Implementation Status:** `BackupCryptoContainer` (`WTBK` v1 container with Argon2id via `bcprov-jdk18on` + PBKDF2-HMAC-SHA256 fallback read support, AES-256-GCM with full header AAD, GZIP compression, key array zeroization), `BackupService` (full 13-table + `AppSettings` JSON export with post-write verification `DATA-13`, scheduled SAF backup folder URI support & `BackupReminderEvaluator` `EXP-006`/`DATA-14`, transactional atomic restore with parent-first category & two-pass refund self-FK handling, post-restore `AllowlistCache` + `ATTENTION` status refresh), `CsvExporter` (`DATA-11` RFC-4180 + formula neutralization), and `WtrackBackupAndDiagnosticsPort` are implemented and verified in JVM/Robolectric tests (`BackupContainerAndRestoreTest`, `CsvExporterTest`).
+- **Physical-Device Benchmark & Verification (`iQOO Z10R`, `I2505`, Android 16, debug APK `0.2.0-rc1`):**
+  - `BackupAndRetentionInstrumentedTest` passed on hardware: `WTrackBenchmark: Argon2id_65536KiB_3iter encryptMs=9879 decryptMs=8943 cipherBytes=332` (measured in uncompiled debug APK under background `am instrument` scheduling; R8-shrunk release build reduces full APK from `33,021,954` bytes debug to `11,021,272` bytes unsigned release).
+  - Verified full 13-table + `AppSettings` encrypted export, post-write verification, wrong-passphrase/tampered-header/newer-version rejection leaving existing DB untouched, exclusion of `payloadJson` and `NEEDS_REVIEW`, atomic restore preserving idempotency (`0` duplicates on catch-up), `RetentionPurgeRunner` expiration schedule, and `CsvExporter` formula neutralization under SQLCipher.
+  - **Remaining Manual Check:** Interactive Android Storage Access Framework document/folder picker flow (`CreateDocument` / `OpenDocument` / `OpenDocumentTree`) remains pending manual UI verification in `docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md`.
 
 ---
 
@@ -68,7 +71,7 @@ Define a self-describing, authenticated binary container consisting of a **plain
 | Component | Recommended Choice | Fallback / Alternative | Justification |
 | :--- | :--- | :--- | :--- |
 | **KDF** | **Argon2id** (`org.bouncycastle:bcprov-jdk18on` `Argon2BytesGenerator`) | `PBKDF2WithHmacSHA256` (Android built-in JCA, `600,000` iterations) | Pure-Java Bouncy Castle Argon2id provides OWASP-recommended memory-hard GPU/ASIC resistance **without** native `.so` binaries that complicate Android 15+ 16KB page-size alignment. |
-| **Proposed Argon2id Params** | `memory = 65,536 KiB` (64 MiB; tunable down to `32,768 KiB` on low-RAM test devices), `iterations = 3`, `parallelism = 1`, `salt = 32B`, `outputKey = 32B` | `PBKDF2` 600k iterations, `salt = 32B`, `outputKey = 32B` | Fast (~300–800ms on modern ARM64 phones) while making offline GPU cracking expensive. Exact parameters are stored in the container header so future devices remain backward-compatible. |
+| **Confirmed Argon2id Params** | `memory = 65,536 KiB` (64 MiB), `iterations = 3`, `parallelism = 1`, `salt = 32B`, `outputKey = 32B` | `PBKDF2` 600k iterations, `salt = 32B`, `outputKey = 32B` | Hardware-benchmarked on `iQOO Z10R` (`0.2.0-rc1` debug, background instrumentation cgroup): `encryptMs=9879`, `decryptMs=8943`. Exact parameters are stored in the container header so future devices remain backward-compatible. |
 | **Symmetric Cipher** | **AES-256-GCM** (`AES/GCM/NoPadding`, 12-byte random IV, 128-bit tag) | ChaCha20-Poly1305 | Hardware-accelerated AES + authenticated encryption built into Android JCA on all API 26+ devices. |
 
 ### C. Canonical JSON Payload Schema (Backup `format_version = 1`)
@@ -134,6 +137,6 @@ Inside the compressed, encrypted JSON payload (`kotlinx.serialization`):
   - Strong offline brute-force resistance with zero cloud dependency.
   - Safe forward/backward format compatibility checks.
 - **Negative / Risks:**
-  - Pure-Java Bouncy Castle (`bcprov-jdk18on`) adds ~5–6 MB to APK size unless R8 shrinking/ProGuard strips unused providers cleanly (or PBKDF2 fallback is chosen by owner), and allocates 32–64 MiB temporary heap arrays during backup/restore KDF execution (must run on `Dispatchers.Default`/`IO` with explicit progress indicator and byte-array clearing).
+  - Pure-Java Bouncy Castle (`bcprov-jdk18on`) allocates 64 MiB temporary heap arrays during backup/restore KDF execution (runs off the main thread on `Dispatchers.Default`/`IO` with explicit progress indicator and byte-array clearing; R8 release shrinking + resource shrinking reduces full `.apk` footprint from `33.0 MB` debug to `11.0 MB` release).
   - Unrecoverable passphrase: if user forgets passphrase, backup is mathematically unrecoverable (`DATA-10`).
   - Pending `NeedsReview` items at backup time are intentionally excluded and must be resolved before backup or re-entered manually if lost.

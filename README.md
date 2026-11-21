@@ -4,9 +4,9 @@
 
 W-Track automatically collects transaction notifications from explicitly allowlisted Indonesian banking and e-wallet apps, normalizes them into a single local ledger, highlights uncertain alerts in **Needs Review**, and helps you track balances, transfers, categories, and cash flow without uploading your financial data or storing banking credentials.
 
-- **Status:** MVP Implemented (`M0`–`M5`) — Active Gate G1 Daily-Driver Validation on `iQOO Z10R (Android 16)`
-- **Version:** `0.1.0-poc` | **SDK:** `minSdk 26` · `targetSdk 36` · `compileSdk 37`
-- **Core Stack:** Kotlin `2.2.21` · Jetpack Compose (Material 3) · Hilt `2.60.1` · Room `2.8.5` · SQLCipher `4.20.0`
+- **Status:** All PRD v1.4 Features Implemented (`M0`–`M5`) & Hardware Instrumented Suite Verified — Active Gate G1 Daily-Driver Soak on `iQOO Z10R (Android 16)`
+- **Version:** `0.2.0-rc1` (`versionCode 2`) | **SDK:** `minSdk 26` · `targetSdk 36` · `compileSdk 37`
+- **Core Stack:** Kotlin `2.2.21` · Jetpack Compose (Material 3) · Hilt `2.60.1` · Room `2.8.5` · SQLCipher `4.20.0` · R8 Shrinking Enabled
 
 ---
 
@@ -24,12 +24,12 @@ W-Track automatically collects transaction notifications from explicitly allowli
 
 | Milestone | Scope & Implemented Features | Verification Status |
 | :--- | :--- | :--- |
-| **M0: Foundation** | 3-module Gradle setup (`:app`, `:integration:api`, `:integration:providers`) + `build-logic` conventions, Hilt DI, Material 3 Light/Dark theme, pure-Kotlin boundary tests. | Complete (Unit tests passing) |
-| **M1: Encrypted Data Foundation** | Room Schema v1 + SQLCipher `4.20.0` + `DatabaseKeyManager` (KEK/DEK lifecycle + `LOCKED_KEY_MISSING_OR_INVALID` lock screen safety). | **Hardware-verified** on `iQOO Z10R` (`SqlCipherInstrumentedTest` passing; encrypted `wtrack.db` header verified) |
-| **M2: Notification Ingestion** | Provider-agnostic `WtrackNotificationListenerService`, synchronous allowlist filter, `activeNotifications` catch-up, 3-tier deduplication, `ING-12`/`13`/`14` recovery & heartbeat, M3a sample capture protection, anonymized JSON export, purge, and re-parse. | Complete & live on daily driver |
-| **M3: Providers & Domain Engines** | Production parsers for Bank Jago (`v2`), myBCA (`v1`), and DANA (`v1`); 16-row Section 4.6 aggregate engine; balance correction & checkpoints; manual transfer pairing with derived fees; auto-categorization rules with backfill; `GateG1Evaluator`. | Complete & tested against anonymized captures |
-| **M4: Material 3 UI** | Onboarding + Notification Access & battery guidance, Dashboard, Accounts (grouped IDR/USD/JPY input & balance correction), Activity (filtering, edit, void, transfer linking), Needs Review, Rules, Insights, and Settings. | Complete & running on device |
-| **M5: Reliability & Safety** | Encrypted `.wtrackbackup` (`WTBK` v1 Argon2id / PBKDF2 fallback + AES-256-GCM AAD) export/verify/atomic restore, CSV export with unencrypted warning, `RetentionPurgeWorker`, and complete data wipe. | Implemented & unit/Robolectric-tested |
+| **M0: Foundation** | 3-module Gradle setup (`:app`, `:integration:api`, `:integration:providers`) + `build-logic` conventions (`isMinifyEnabled` + `isShrinkResources` + optional `keystore.properties` release signing), Hilt DI, Material 3 Light/Dark/System themes, pure-Kotlin boundary tests. | **Complete & R8-verified** (`33.0 MB` debug → `11.0 MB` release APK) |
+| **M1: Encrypted Data Foundation** | Room Schema v1 + SQLCipher `4.20.0` + `DatabaseKeyManager` (KEK/DEK lifecycle + `LOCKED_KEY_MISSING_OR_INVALID` lock screen recovery). | **Hardware-verified** on `iQOO Z10R` (`SqlCipherInstrumentedTest`: TEE Keystore audit, header & key-loss byte preservation) |
+| **M2: Notification Ingestion** | Provider-agnostic `WtrackNotificationListenerService`, synchronous allowlist filter, `activeNotifications` catch-up, 3-tier deduplication, `ING-08`/`ING-10` capture self-check & App Info guidance, `ING-12`/`13`/`14` recovery & heartbeat, M3a sample capture protection, anonymized JSON export, purge, and `PAR-11` guarded re-parse proposals. | **Hardware-verified** on `iQOO Z10R` (`IngestionAndLedgerInstrumentedTest`) & live on daily driver |
+| **M3: Providers & Domain Engines** | Production parsers for Bank Jago (`v2`), myBCA (`v1`), and DANA (`v1`); 16-row Section 4.6 aggregate engine + `DASH-08` merchant trends; balance correction & checkpoints; manual transfer pairing with derived fees; auto-categorization rules with backfill; `TX-06` tags & filtering; `GateG1Evaluator`. | **Hardware-verified** against anonymized captures & `iQOO Z10R` SQLCipher ledger invariants |
+| **M4: Material 3 UI** | Onboarding + Capture Self-Check + Notification Access/battery/restricted-settings guidance, Dashboard, Accounts (grouped IDR/USD/JPY input & balance correction), Activity (tag filtering, edit, void, transfer linking), Needs Review, Rules, Insights (merchant trends), Settings (`DATA-12` reminder threshold chips & `DATA-14` SAF backup folder config), and `DatabaseLockedScreen`. | **Theme & Lock UI verified** on `iQOO Z10R` (`ComposeThemeAndLockedUiInstrumentedTest`) |
+| **M5: Reliability & Safety** | Encrypted `.wtrackbackup` (`WTBK` v1 Argon2id `65,536 KiB` / `3` iter + PBKDF2 fallback + AES-256-GCM AAD) export/verify/atomic restore, scheduled backup reminder evaluator (`EXP-006`/`DATA-14`), CSV export with unencrypted warning & formula neutralization, `RetentionPurgeWorker`, and complete data wipe. | **Hardware-verified** on `iQOO Z10R` (`BackupAndRetentionInstrumentedTest`: `encryptMs=9879`, `decryptMs=8943`, 13-table atomic restore, retention & CSV safety) |
 
 ---
 
@@ -55,11 +55,11 @@ W-Track automatically collects transaction notifications from explicitly allowli
 - Capture and add anonymized templates for **QRIS merchant payments**, **outgoing DANA transfers**, **refunds & reversals**, **failed attempts**, and **transfer admin fees**.
 - Observe and handle **dual-notifier overlap** (e.g., a DANA QRIS purchase funded by Bank Jago or myBCA debit firing notifications from both apps).
 
-### 3. On-Device Hardware & OEM Reliability Checklist
-Full execution tracking lives in [docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md](docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md), including:
-- **SQLCipher & Keystore edge cases:** StrongBox vs TEE audit, `LOCKED_KEY_MISSING_OR_INVALID` recovery, and BFU/AFU reboot reopen tests.
-- **OriginOS / Android 16 lifecycle:** Locked-screen AFU ingestion, `am kill` listener recovery, default battery/Doze delay baseline vs `ING-10` exemption, permission revocation (`ACCESS_REVOKED`) gap recording, Android 16 OTP redaction, and rapid burst cooldown.
-- **Backup, Purge & Release QA:** On-device `.wtrackbackup` round-trip restore verification, `RetentionPurgeWorker` schedule check, Light/Dark theme audit, and release APK verification.
+### 3. Remaining Manual & Real-OS Hardware Checks
+Full execution tracking lives in [docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md](docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md). Automated `SqlCipherInstrumentedTest`, `BackupAndRetentionInstrumentedTest`, `IngestionAndLedgerInstrumentedTest`, and `ComposeThemeAndLockedUiInstrumentedTest` suites (`7/7`) and R8 release builds are verified on `iQOO Z10R`; remaining manual/OS observations are:
+- **Physical reboot & locked-screen AFU delivery:** Confirm BFU → AFU transition after real device reboot and live screen-off notification ingestion without unlocking UI.
+- **OriginOS / Android 16 live Doze & `am kill` observation:** Real listener survival/recovery across overnight idle (`wait_for_unlock=true`), battery optimization toggle (`ING-10`), permission revocation (`ACCESS_REVOKED`), live OTP redaction, and Android 16 `ProgressStyle`/Cooldown notifications.
+- **Interactive SAF & Release QA:** Manual UI tap-through of Android SAF `.wtrackbackup` / CSV pickers, double-confirmed wipe dialog, Light/Dark theme switch, and signed release install (once local `keystore.properties` is provisioned).
 
 ### 4. Post-MVP Direction
 - Additional Indonesian banks & e-wallets isolated cleanly inside `:integration:providers`.
@@ -89,22 +89,20 @@ W-Track/
 
 ## Build & Test
 
-Run unit and Robolectric tests:
+Run unit, Robolectric, lint, and R8 release build checks:
 
 ```bash
-./gradlew test testDebugUnitTest
+./gradlew test testDebugUnitTest lintDebug assembleRelease
 ```
 
-Build the debug APK:
+Run isolated hardware instrumented tests safely without uninstalling existing daily-driver app data (`connectedDebugAndroidTest` uninstalls `wtrack.app` on teardown — avoid it on phones with live data):
 
 ```bash
-./gradlew assembleDebug
-```
-
-Run instrumented Android tests (e.g., SQLCipher verification on a connected device):
-
-```bash
-./gradlew connectedDebugAndroidTest
+./gradlew assembleDebug assembleDebugAndroidTest
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e debug false wtrack.app.test/androidx.test.runner.AndroidJUnitRunner
+adb uninstall wtrack.app.test
 ```
 
 ---

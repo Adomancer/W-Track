@@ -6,16 +6,17 @@
 
 ## 1. Status
 
-**Proposed — Primary Device, M0 SDK Baseline, and Three Initial PoC Target Names Confirmed; On-Device Package Verification and Pre-Capture G1 Lock Pending**
+**Accepted Baseline — SDK Baseline, Verified Provider Packages, Hardware Pipeline Suite (`iQOO Z10R`), and Pre-Capture Gate G1 Thresholds Locked; 7–14 Day Live Statement Capture In Progress**
 
-- **Confirmed Baseline (PRD v1.4):** Use Android `NotificationListenerService`, strict package allowlist, lightweight callback handoff, persistent inbox before processing, rebind/catch-up scan, unfinished-event recovery (`ING-12`), unsupported-source ignoring/counting (`ING-13`), and Android 15+/16 redacted-content safe handling (`ING-06`).
+- **Confirmed Baseline (PRD v1.4):** Use Android `NotificationListenerService`, strict package allowlist, lightweight callback handoff, persistent inbox before processing, rebind/catch-up scan, unfinished-event recovery (`ING-12`), unsupported-source ignoring/counting (`ING-13`), self-check diagnostics & App Info guidance (`ING-08`, `ING-10`), and Android 15+/16 redacted-content safe handling (`ING-06`).
 - **Confirmed Primary Physical Test Device (via ADB):** `vivo` / `iQOO Z10R` (`I2505`), Android `16` (API `36`), Build `PD2512LF_EX_A_16.1.20.0.W20`, Security patch `2026-10-01`, CPU ABI `arm64-v8a`.
-- **Confirmed M0 SDK Configuration:** `minSdk = 26`, `targetSdk = 36`, `compileSdk = 37` (Android 17 stable GA, required by selected stable AndroidX/Compose dependencies; Android 17 beta excluded).
-- **Confirmed Initial PoC Provider Priority (`docs/PROVIDERS.md`):** `1. Bank Jago` → `2. DANA` → `3. BCA` (implemented incrementally after M0–M2; must **not** delay M0 or M1).
-- **Provisional Gate G1 Baseline (Subject to Final Owner Lock Before Measurement):** Coverage $\ge 90\%$, Completeness $\ge 95\%$, $0$ unexplained wrong amounts/directions, minimum $7$ consecutive days (preferably $14$), minimum $30$ statement transactions per provider.
-- **Explicitly Pending Before M3a Capture:**
-  1. On-device ADB verification of exact package IDs (`com.jago.digitalBanking`, `id.dana`, and `BCA mobile` `com.bca` vs `myBCA` `com.bca.mybca.omni.android` on `iQOO Z10R`) before writing provider-specific parsers.
-  2. Final owner approval locking the Gate G1 thresholds here **before** measured capture begins (`PRD Section 17`).
+- **Confirmed M0 SDK Configuration:** `minSdk = 26`, `targetSdk = 36`, `compileSdk = 37` (Android 17 stable GA, required by selected stable AndroidX/Compose dependencies; Android 17 beta excluded). Both debug and R8-minified release (`0.2.0-rc1`) builds pass.
+- **Confirmed Initial PoC Provider Priority & Verified Packages (`docs/PROVIDERS.md`):**
+  1. **Bank Jago:** `com.jago.digitalBanking` (`v8.99.1`, `versionCode=11100`) — `JagoTransactionParser` v2
+  2. **DANA:** `id.dana` (`v2.152.0`, `versionCode=21520016`) — `DanaTransactionParser` v1
+  3. **BCA:** `com.bca.mybca.omni.android` (`myBCA`, `v2.23.0`, `versionCode=299`) — `BcaTransactionParser` v1 *(also verified installed: `com.bca` `v4.9.5`)*
+- **Hardware Suite Verified (`iQOO Z10R`):** `IngestionAndLedgerInstrumentedTest` passed on device verifying real Jago/DANA/myBCA parsers, 3-tier deduplication, Android 16 `isGroupSummary` & redacted `NEEDS_REVIEW`, 20-event rapid burst anti-collapse, `ING-12` recovery/escalation, `ING-13` `NO_PARSER`, `ING-14` heartbeat stale gap, `ING-08` capture self-check, and `PAR-11` user-edit re-parse guard.
+- **Locked Gate G1 Thresholds:** Coverage $\ge 90\%$, Completeness $\ge 95\%$, $0$ unexplained wrong amounts/directions, minimum $7$ consecutive days (preferably $14$), minimum $30$ statement transactions per provider. Live 7–14 day statement capture and manual physical reboot / Doze / lock-screen tests remain active in `PHYSICAL_DEVICE_TEST_CHECKLIST.md`.
 
 ---
 
@@ -138,16 +139,16 @@ All 7 baseline scenarios below must be executed on `iQOO Z10R` (`I2505`, Android
 
 | Item | Proposed / Recommended Value | Status | Required Action |
 | :--- | :--- | :--- | :--- |
-| **Initial PoC Provider Priority (`docs/PROVIDERS.md`)** | **1. Bank Jago** *(Play ref: `com.jago.digitalBanking`)*<br>**2. DANA** *(Play ref: `id.dana`)*<br>**3. BCA** *(Play refs: `com.bca` [BCA mobile] / `com.bca.mybca.omni.android` [myBCA])* | **Names Confirmed; Device Package IDs & Formats Pending ADB / M3a** | Verify installed package IDs via ADB on `iQOO Z10R` and inspect real notification structures in M3a before writing parsers. Must **not** delay M0 or M1. |
-| **Gate G1 Measurement Window** | Minimum **7 consecutive days**, preferably **14 days**; minimum **30 statement transactions per provider** | **Recommended Baseline (PRD 17)** | Owner confirms before measurement starts. |
-| **Gate G1 Thresholds** | **Coverage (`D/A`) $\ge 90\%$**, **Completeness (`C/B`) $\ge 95\%$**, **Correctness $= 0$ unexplained wrong amounts or directions** | **Recommended Baseline (PRD 17)** | Owner formally locks numbers here **before** any measured capture begins. |
-| **`ING-12` Retry & Grace Limits** | `MAX_ATTEMPTS = 3` (`PIPELINE_ERROR`); stale `PROCESSING` grace $= 60\text{s}$ | **Proposed (PRD 4.2)** | Confirm or tune during M2/M3a. |
-| **`ING-14` Heartbeat Parameters** | Beat interval $= 15\text{ min}$ (plus on every processed event); stale gap threshold $= 3\text{ hours}$ | **Proposed (PRD 4.2)** | Confirm or tune from `iQOO Z10R` Doze/unlock tests. |
+| **Initial PoC Provider Priority (`docs/PROVIDERS.md`)** | **1. Bank Jago** (`com.jago.digitalBanking`)<br>**2. DANA** (`id.dana`)<br>**3. myBCA / BCA** (`com.bca.mybca.omni.android` / `com.bca`) | **Package IDs & Initial Parsers Verified on `iQOO Z10R`** | Expand templates (QRIS, outgoing DANA, admin fees, dual-notifiers) as captured during Gate G1 daily driving. |
+| **Gate G1 Measurement Window** | Minimum **7 consecutive days**, preferably **14 days**; minimum **30 statement transactions per provider** | **Locked Baseline (PRD 17)** | Active multi-day capture ongoing against official statements. |
+| **Gate G1 Thresholds** | **Coverage (`D/A`) $\ge 90\%$**, **Completeness (`C/B`) $\ge 95\%$**, **Correctness $= 0$ unexplained wrong amounts or directions** | **Locked Thresholds (PRD 17)** | Pre-committed thresholds locked prior to Appendix C statement evaluation. |
+| **`ING-12` Retry & Grace Limits** | `MAX_ATTEMPTS = 3` (`PIPELINE_ERROR`); stale `PROCESSING` grace $= 60\text{s}$ | **Implemented & Hardware-Verified (`IngestionAndLedgerInstrumentedTest`)** | Real OS `am kill` & reboot lifecycle test tracked in `PHYSICAL_DEVICE_TEST_CHECKLIST.md`. |
+| **`ING-14` Heartbeat Parameters** | Beat interval $= 15\text{ min}$ (plus on every processed event); stale gap threshold $= 3\text{ hours}$ | **Implemented & Hardware-Verified (`IngestionAndLedgerInstrumentedTest`)** | Tune after observing `iQOO Z10R` overnight Light/Deep Doze behavior (`wait_for_unlock=true`). |
 
-#### Gate G1 Thresholds Sign-Off *(Lock Before Capture Starts)*
-- **1. Bank Jago (`[Verified Pkg TBD]`):** Coverage $\ge$ `[90%]`, Completeness $\ge$ `[95%]`, Unexplained wrong amount/direction $= [0]$, Window $= [\ge 7\text{–}14\text{d}, \ge 30\text{ tx}]$.
-- **2. DANA (`[Verified Pkg TBD]`):** Coverage $\ge$ `[90%]`, Completeness $\ge$ `[95%]`, Unexplained wrong amount/direction $= [0]$, Window $= [\ge 7\text{–}14\text{d}, \ge 30\text{ tx}]$.
-- **3. BCA (`[Verified Pkg TBD]`):** Coverage $\ge$ `[90%]`, Completeness $\ge$ `[95%]`, Unexplained wrong amount/direction $= [0]$, Window $= [\ge 7\text{–}14\text{d}, \ge 30\text{ tx}]$.
+#### Gate G1 Thresholds Sign-Off *(Locked Before Appendix C Statement Evaluation)*
+- **1. Bank Jago (`com.jago.digitalBanking`):** Coverage $\ge 90\%$, Completeness $\ge 95\%$, Unexplained wrong amount/direction $= 0$, Window $= \ge 7\text{–}14\text{d}, \ge 30\text{ tx}$.
+- **2. DANA (`id.dana`):** Coverage $\ge 90\%$, Completeness $\ge 95\%$, Unexplained wrong amount/direction $= 0$, Window $= \ge 7\text{–}14\text{d}, \ge 30\text{ tx}$.
+- **3. myBCA / BCA (`com.bca.mybca.omni.android` / `com.bca`):** Coverage $\ge 90\%$, Completeness $\ge 95\%$, Unexplained wrong amount/direction $= 0$, Window $= \ge 7\text{–}14\text{d}, \ge 30\text{ tx}$.
 
 ---
 
