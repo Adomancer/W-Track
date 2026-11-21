@@ -388,4 +388,4 @@ Before **Gate G1** opens, ADR-003 and [PROVIDERS.md](file:///home/adomancer/Docu
 - **Re-scope:** One provider misses coverage (keeps manual-assisted role or swap provider) or misses completeness (replace provider / re-evaluate channel).
 - **No-go:** Neither provider meets thresholds → halt M3b–M5 investment and re-plan ingestion strategy.
 
-*(Evidence rows are logged verbatim using the Appendix C table format in `README.md` without using app DB counts as ground truth for $A$.)*
+*(Evidence rows are logged verbatim using the Appendix C table format in `docs/PRD.md` without using app DB counts as ground truth for $A$.)*
