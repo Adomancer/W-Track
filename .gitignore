@@ -23,5 +23,6 @@ captures/
 output-metadata.json
 
 # Secrets
+keystore.properties
 *.jks
 *.keystore

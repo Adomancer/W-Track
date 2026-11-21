@@ -1,6 +1,7 @@
 package wtrack.buildlogic
 
 import com.android.build.api.dsl.ApplicationExtension
+import java.util.Properties
 import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -19,6 +20,22 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
             pluginManager.apply("com.google.dagger.hilt.android")
             pluginManager.apply("com.google.devtools.ksp")
 
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            val keystoreProps = if (keystorePropertiesFile.isFile) {
+                Properties().apply { keystorePropertiesFile.inputStream().use(::load) }
+            } else {
+                null
+            }
+            val storeFilePath = keystoreProps?.getProperty("storeFile")?.trim().orEmpty()
+            val storePass = keystoreProps?.getProperty("storePassword").orEmpty()
+            val releaseKeyAlias = keystoreProps?.getProperty("keyAlias")?.trim().orEmpty()
+            val releaseKeyPass = keystoreProps?.getProperty("keyPassword").orEmpty()
+            val hasReleaseSigning = storeFilePath.isNotEmpty() &&
+                storePass.isNotEmpty() &&
+                releaseKeyAlias.isNotEmpty() &&
+                releaseKeyPass.isNotEmpty() &&
+                rootProject.file(storeFilePath).isFile
+
             val android = extensions.getByType(ApplicationExtension::class.java)
             android.apply {
                 compileSdk = 37
@@ -26,9 +43,23 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     sourceCompatibility = JavaVersion.VERSION_17
                     targetCompatibility = JavaVersion.VERSION_17
                 }
+                if (hasReleaseSigning) {
+                    signingConfigs {
+                        create("release") {
+                            storeFile = rootProject.file(storeFilePath)
+                            storePassword = storePass
+                            keyAlias = releaseKeyAlias
+                            keyPassword = releaseKeyPass
+                        }
+                    }
+                }
                 buildTypes {
                     getByName("release") {
-                        isMinifyEnabled = false
+                        isMinifyEnabled = true
+                        isShrinkResources = true
+                        if (hasReleaseSigning) {
+                            signingConfig = signingConfigs.getByName("release")
+                        }
                         proguardFiles(
                             getDefaultProguardFile("proguard-android-optimize.txt"),
                             "proguard-rules.pro",
@@ -47,8 +78,8 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     applicationId = "wtrack.app"
                     minSdk = 26
                     targetSdk = 36
-                    versionCode = 1
-                    versionName = "0.1.0-poc"
+                    versionCode = 2
+                    versionName = "0.2.0-rc1"
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                     vectorDrawables.useSupportLibrary = true
                 }
