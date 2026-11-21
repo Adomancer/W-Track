@@ -171,6 +171,7 @@ interface RuleRepository {
 
 interface TagRepository {
     val tags: Flow<List<Tag>>
+    fun observeAllTransactionTags(): Flow<Map<Long, List<Tag>>>
     suspend fun getTagsForTransaction(transactionId: Long): List<Tag>
     suspend fun addTagToTransaction(transactionId: Long, tagName: String)
     suspend fun removeTagFromTransaction(transactionId: Long, tagId: Long)

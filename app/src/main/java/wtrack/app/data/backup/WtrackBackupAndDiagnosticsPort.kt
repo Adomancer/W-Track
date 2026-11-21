@@ -5,6 +5,7 @@ import java.io.OutputStream
 import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.AllowlistCache
+import wtrack.app.data.ingestion.CaptureStatusTracker
 import wtrack.app.data.ingestion.IngestionPipeline
 import wtrack.app.domain.model.DatabaseHealthState
 import wtrack.app.domain.model.NotificationEventStatus
@@ -12,6 +13,7 @@ import wtrack.app.domain.parser.ParserRegistry
 import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.BackupVerificationResult
+import wtrack.app.domain.repository.CaptureSelfCheckResult
 import wtrack.app.domain.repository.CategoryRepository
 import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
@@ -19,6 +21,9 @@ import wtrack.app.domain.repository.RestoreResult
 import wtrack.app.domain.repository.SampleExportResult
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.time.Clock
+import wtrack.integration.Direction
+import wtrack.integration.NotificationEvent
+import wtrack.integration.ParseResult
 import wtrack.integration.providers.catalog.ProviderCatalog
 
 class WtrackBackupAndDiagnosticsPort(
@@ -35,6 +40,7 @@ class WtrackBackupAndDiagnosticsPort(
     private val parserRegistry: ParserRegistry,
     private val ingestionPipeline: IngestionPipeline,
     private val clock: Clock,
+    private val captureStatusTracker: CaptureStatusTracker? = null,
 ) : BackupAndDiagnosticsPort {
 
     override suspend fun exportEncryptedBackup(
@@ -132,5 +138,49 @@ class WtrackBackupAndDiagnosticsPort(
             }
         }
         return reparsed
+    }
+
+    override suspend fun runCaptureSelfCheck(): CaptureSelfCheckResult {
+        val permissionGranted = captureStatusTracker?.isNotificationAccessGranted() == true
+        val listenerConnected = captureStatusTracker?.isListenerConnected?.value == true
+        val databaseReady = holder.healthState.value is DatabaseHealthState.Ready
+        val parserCount = parserRegistry.registeredCount()
+        val syntheticEvent = NotificationEvent(
+            sourceId = "com.jago.digitalBanking",
+            packageName = "com.jago.digitalBanking",
+            title = "Jago",
+            text = "SelfCheck has sent Rp50.000 to you.",
+            bigText = null,
+            subText = null,
+            channelId = "foreground",
+            isGroupSummary = false,
+            isContentRedacted = false,
+            postedAtEpochMillis = clock.nowEpochMillis(),
+            notificationKey = "wtrack_self_check",
+            notificationId = 0,
+            notificationTag = null,
+            sourceEventReference = null,
+        )
+        val dryRunResult = parserRegistry.resolve(syntheticEvent)?.parse(syntheticEvent)
+        val dryRunPassed = dryRunResult is ParseResult.Success &&
+            dryRunResult.transaction.amountMinor == 5_000_000L &&
+            dryRunResult.transaction.direction == Direction.INFLOW
+
+        val summary = when {
+            !databaseReady -> "Encrypted database is not ready."
+            !permissionGranted -> "Dry-run parser passed ($parserCount parsers active). Grant Notification Access to start background capture."
+            !listenerConnected -> "Permission granted ($parserCount parsers active); awaiting Android listener service bind."
+            !dryRunPassed -> "Listener bound, but synthetic parser dry-run did not pass."
+            else -> "All capture checks passed ($parserCount parsers active)."
+        }
+
+        return CaptureSelfCheckResult(
+            permissionGranted = permissionGranted,
+            listenerConnected = listenerConnected,
+            databaseReady = databaseReady,
+            registeredParserCount = parserCount,
+            dryRunParserPassed = dryRunPassed,
+            summary = summary,
+        )
     }
 }

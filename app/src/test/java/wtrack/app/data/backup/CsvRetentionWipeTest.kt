@@ -176,6 +176,14 @@ class RetentionAndWipeTest {
             ) = SampleExportResult(0, 0)
             override suspend fun purgeRetainedM3aSamplesNow() = 0
             override suspend fun reparseRetainedM3aSamples() = 0
+            override suspend fun runCaptureSelfCheck() = wtrack.app.domain.repository.CaptureSelfCheckResult(
+                permissionGranted = true,
+                listenerConnected = true,
+                databaseReady = true,
+                registeredParserCount = 0,
+                dryRunParserPassed = false,
+                summary = "test",
+            )
         }
 
         WipeAllDataUseCase(port).invoke()

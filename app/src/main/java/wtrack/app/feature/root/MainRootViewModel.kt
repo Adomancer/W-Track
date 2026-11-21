@@ -25,6 +25,7 @@ import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.ThemeMode
 import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.BackupAndDiagnosticsPort
+import wtrack.app.domain.repository.CaptureSelfCheckResult
 import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CreateAccountRequest
 import wtrack.app.domain.repository.DatabaseHealthRepository
@@ -48,6 +49,7 @@ sealed interface RootUiState {
         val hasAccounts: Boolean,
         val isBusy: Boolean = false,
         val actionMessage: String? = null,
+        val selfCheckResult: CaptureSelfCheckResult? = null,
     ) : RootUiState
 
     data class Ready(
@@ -76,6 +78,7 @@ class MainRootViewModel @Inject constructor(
     private val isBusy = MutableStateFlow(false)
     private val actionMessage = MutableStateFlow<String?>(null)
     private val postRestorePrompt = MutableStateFlow(false)
+    private val selfCheckFlow = MutableStateFlow<CaptureSelfCheckResult?>(null)
 
     private val operationalSignals = combine(
         settingsRepository.settings,
@@ -103,7 +106,8 @@ class MainRootViewModel @Inject constructor(
                     isBusy,
                     actionMessage,
                     postRestorePrompt,
-                ) { ops, busy, message, restorePrompt ->
+                    selfCheckFlow,
+                ) { ops, busy, message, restorePrompt, selfCheck ->
                     if (!ops.settings.onboardingCompleted) {
                         RootUiState.Onboarding(
                             settings = ops.settings,
@@ -111,6 +115,7 @@ class MainRootViewModel @Inject constructor(
                             hasAccounts = ops.hasAccounts,
                             isBusy = busy,
                             actionMessage = message,
+                            selfCheckResult = selfCheck,
                         )
                     } else {
                         RootUiState.Ready(
@@ -133,6 +138,19 @@ class MainRootViewModel @Inject constructor(
     fun refreshCaptureStatus() {
         viewModelScope.launch {
             runCatching { captureStatusRepository.refreshStatus() }
+        }
+    }
+
+    fun runCaptureSelfCheck() {
+        viewModelScope.launch {
+            runCatching {
+                captureStatusRepository.refreshStatus()
+                backupPort.runCaptureSelfCheck()
+            }.onSuccess { res ->
+                selfCheckFlow.value = res
+            }.onFailure { err ->
+                actionMessage.value = err.message ?: "Capture self-check failed."
+            }
         }
     }
 

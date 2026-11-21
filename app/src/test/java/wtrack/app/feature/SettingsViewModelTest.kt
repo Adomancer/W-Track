@@ -37,6 +37,11 @@ class SettingsViewModelTest {
             vm.setThemeMode(ThemeMode.DARK)
             assertThat(awaitItem().settings.themeMode).isEqualTo(ThemeMode.DARK)
 
+            vm.setBackupReminderThresholds(30, 250)
+            val withThresholds = awaitItem()
+            assertThat(withThresholds.settings.backupReminderDays).isEqualTo(30)
+            assertThat(withThresholds.settings.backupReminderTxCount).isEqualTo(250)
+
             vm.evaluateGateG1(
                 listOf(
                     ProviderMeasurementInput("Bank Jago", 14, 35, 35, 34, 34, 0),

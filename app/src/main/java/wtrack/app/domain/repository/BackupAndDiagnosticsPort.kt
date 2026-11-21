@@ -35,6 +35,15 @@ data class ProviderCatalogEntry(
     val notes: String,
 )
 
+data class CaptureSelfCheckResult(
+    val permissionGranted: Boolean,
+    val listenerConnected: Boolean,
+    val databaseReady: Boolean,
+    val registeredParserCount: Int,
+    val dryRunParserPassed: Boolean,
+    val summary: String,
+)
+
 /**
  * Pure-Kotlin domain port bridging encrypted backup/restore, CSV export, wipe, diagnostic logs,
  * and provider catalog inspection to presentation ViewModels without leaking data/crypto internals.
@@ -59,6 +68,7 @@ interface BackupAndDiagnosticsPort {
     ): SampleExportResult
     suspend fun purgeRetainedM3aSamplesNow(): Int
     suspend fun reparseRetainedM3aSamples(): Int
+    suspend fun runCaptureSelfCheck(): CaptureSelfCheckResult
 }
 
 object BackupReminderEvaluator {

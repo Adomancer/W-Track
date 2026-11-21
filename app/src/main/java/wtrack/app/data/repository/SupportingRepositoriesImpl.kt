@@ -429,6 +429,25 @@ class TagRepositoryImpl(
         if (db == null) flowOf(emptyList()) else db.tagDao().observeAll().map { list -> list.map { it.toDomain() } }
     }
 
+    override fun observeAllTransactionTags(): Flow<Map<Long, List<Tag>>> = holder.databaseFlow.flatMapLatest { db ->
+        if (db == null) {
+            flowOf(emptyMap())
+        } else {
+            kotlinx.coroutines.flow.combine(
+                db.tagDao().observeAll(),
+                db.tagDao().observeAllTransactionTags(),
+            ) { tagEntities, links ->
+                val tagMap = tagEntities.associate { it.id to it.toDomain() }
+                links.groupBy(
+                    keySelector = { it.transactionId },
+                    valueTransform = { link -> tagMap[link.tagId] },
+                ).mapValues { (_, list) ->
+                    list.filterNotNull().sortedBy { it.name.lowercase() }
+                }
+            }
+        }
+    }
+
     override suspend fun getTagsForTransaction(transactionId: Long): List<Tag> =
         holder.requireDatabase().tagDao().getTagsForTransaction(transactionId).map { it.toDomain() }
 

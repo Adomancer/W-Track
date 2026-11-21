@@ -235,6 +235,26 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
+                    Text("Backup reminder interval (days)", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(7, 14, 30).forEach { days ->
+                            FilterChip(
+                                selected = state.settings.backupReminderDays == days,
+                                onClick = { viewModel.setBackupReminderThresholds(days, state.settings.backupReminderTxCount) },
+                                label = { Text("${days}d") },
+                            )
+                        }
+                    }
+                    Text("Backup reminder transaction threshold", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(50, 100, 250).forEach { txCount ->
+                            FilterChip(
+                                selected = state.settings.backupReminderTxCount == txCount,
+                                onClick = { viewModel.setBackupReminderThresholds(state.settings.backupReminderDays, txCount) },
+                                label = { Text("$txCount tx") },
+                            )
+                        }
+                    }
                     Button(
                         onClick = { exportBackupLauncher.launch("wtrack-backup.wtrackbackup") },
                         enabled = !state.isBusy,

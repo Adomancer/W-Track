@@ -1,10 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">W-Track</string>
-
-    <string name="foundation_title">Fondasi W-Track</string>
-    <string name="foundation_subtitle">Milestone M0 — Arsitektur Modular Siap</string>
-    <string name="foundation_status_label">Status fondasi</string>
-    <string name="foundation_status_value">Kerangka inti, DI, tema, dan kontrak parser Kotlin murni telah terverifikasi.</string>
-    <string name="foundation_scope_note">Enkripsi penyimpanan (M1), penangkapan notifikasi (M2), dan parser penyedia (M3a/M3b) akan diaktifkan pada tahap berikutnya.</string>
 </resources>

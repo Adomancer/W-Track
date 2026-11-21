@@ -166,6 +166,9 @@ interface TagDao {
     suspend fun getAllTagsOnce(): List<TagEntity>
 
     @Query("SELECT * FROM transaction_tags ORDER BY transaction_id ASC, tag_id ASC")
+    fun observeAllTransactionTags(): Flow<List<TransactionTagEntity>>
+
+    @Query("SELECT * FROM transaction_tags ORDER BY transaction_id ASC, tag_id ASC")
     suspend fun getAllTransactionTagsOnce(): List<TransactionTagEntity>
 
     @Query("SELECT * FROM tags WHERE LOWER(name) = LOWER(:name) LIMIT 1")

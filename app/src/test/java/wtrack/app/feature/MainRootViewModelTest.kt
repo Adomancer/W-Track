@@ -127,4 +127,39 @@ class MainRootViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun runsOnboardingCaptureSelfCheckWithoutModifyingLedger() = runTest {
+        val healthRepo = object : DatabaseHealthRepository {
+            override val state: Flow<DatabaseHealthState> = MutableStateFlow(DatabaseHealthState.Ready)
+            override suspend fun wipeAllDataAndReset() {}
+        }
+        val vm = MainRootViewModel(
+            databaseHealthRepository = healthRepo,
+            settingsRepository = FakeSettingsRepository(AppSettings(onboardingCompleted = false)),
+            captureStatusRepository = FakeCaptureStatusRepository(),
+            needsReviewRepository = FakeNeedsReviewRepository(),
+            accountRepository = FakeAccountRepository(),
+            backupPort = FakeBackupAndDiagnosticsPort(),
+            clock = FakeClock(),
+            dispatcherProvider = TestDispatcherProvider(mainDispatcherRule.dispatcher),
+        )
+
+        vm.uiState.test {
+            var current = awaitItem()
+            while (current !is RootUiState.Onboarding) {
+                current = awaitItem()
+            }
+            assertThat(current.selfCheckResult).isNull()
+
+            vm.runCaptureSelfCheck()
+            var checked = awaitItem()
+            while (checked !is RootUiState.Onboarding || checked.selfCheckResult == null) {
+                checked = awaitItem()
+            }
+            assertThat(checked.selfCheckResult?.dryRunParserPassed).isTrue()
+            assertThat(checked.selfCheckResult?.registeredParserCount).isEqualTo(3)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

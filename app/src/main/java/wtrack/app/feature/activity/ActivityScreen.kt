@@ -160,6 +160,21 @@ fun ActivityScreen(
                             )
                         }
                     }
+                    if (state.tags.isNotEmpty()) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            state.tags.forEach { tag ->
+                                FilterChip(
+                                    selected = state.filter.tagId == tag.id,
+                                    onClick = {
+                                        viewModel.updateFilter {
+                                            it.copy(tagId = if (it.tagId == tag.id) null else tag.id)
+                                        }
+                                    },
+                                    label = { Text("#${tag.name}") },
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -228,6 +243,7 @@ fun ActivityScreen(
                                     if (item.transferPair != null) StatusPill("Paired ↔ ${item.counterpartAccountName ?: ""}")
                                     if (tx.currency != state.baseCurrency) StatusPill("Foreign (${tx.currency})")
                                     if (tx.transactionType == DomainTransactionType.ADJUSTMENT) StatusPill("Adjustment")
+                                    item.tags.forEach { tag -> StatusPill("#${tag.name}") }
                                 }
                             }
                             Text(
@@ -364,6 +380,7 @@ fun TransactionDetailScreen(
     var editCategoryId by remember(tx.id, tx.categoryId) { mutableStateOf(tx.categoryId) }
     var saveRuleChecked by remember(tx.id) { mutableStateOf(true) }
     var backfillChecked by remember(tx.id) { mutableStateOf(false) }
+    var newTagInput by remember(tx.id) { mutableStateOf("") }
     var showTransferPicker by remember { mutableStateOf(false) }
     var showRefundPicker by remember { mutableStateOf(false) }
     var confirmPairedVoid by remember { mutableStateOf(false) }
@@ -545,6 +562,60 @@ fun TransactionDetailScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("Apply Category") }
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Tags (TX-06)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        if (item.tags.isEmpty()) {
+                            Text("No tags attached.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                item.tags.forEach { tag ->
+                                    FilterChip(
+                                        selected = true,
+                                        onClick = { viewModel.removeTagFromTransaction(tx.id, tag.id) },
+                                        label = { Text("#${tag.name} ×") },
+                                    )
+                                }
+                            }
+                        }
+                        val availableSuggestions = state.tags.filter { existing -> item.tags.none { it.id == existing.id } }
+                        if (availableSuggestions.isNotEmpty()) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                availableSuggestions.forEach { suggestion ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { viewModel.addTagToTransaction(tx.id, suggestion.name) },
+                                        label = { Text("+ #${suggestion.name}") },
+                                    )
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                value = newTagInput,
+                                onValueChange = { newTagInput = it },
+                                label = { Text("Add tag (e.g., work, travel)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedButton(
+                                enabled = newTagInput.isNotBlank(),
+                                onClick = {
+                                    val tag = newTagInput
+                                    newTagInput = ""
+                                    viewModel.addTagToTransaction(tx.id, tag)
+                                },
+                            ) { Text("Add Tag") }
+                        }
                     }
                 }
             }

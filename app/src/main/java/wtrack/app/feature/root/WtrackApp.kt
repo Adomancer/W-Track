@@ -127,6 +127,7 @@ fun WtrackApp(rootViewModel: MainRootViewModel = hiltViewModel()) {
                     onSelectBaseCurrency = rootViewModel::selectBaseCurrency,
                     onCreateFirstAccount = rootViewModel::createInitialAccount,
                     onRestoreBackup = rootViewModel::restoreFromBackup,
+                    onRunSelfCheck = rootViewModel::runCaptureSelfCheck,
                     onFinish = rootViewModel::finishOnboarding,
                     onClearMessage = rootViewModel::clearMessage,
                 )

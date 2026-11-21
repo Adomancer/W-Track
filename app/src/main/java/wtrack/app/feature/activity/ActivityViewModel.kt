@@ -15,6 +15,7 @@ import wtrack.app.domain.model.Category
 import wtrack.app.domain.model.DerivedFeeRow
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
+import wtrack.app.domain.model.Tag
 import wtrack.app.domain.model.Transaction
 import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.domain.model.TransferPair
@@ -23,6 +24,7 @@ import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.CategoryRepository
 import wtrack.app.domain.repository.CreateManualTransactionRequest
 import wtrack.app.domain.repository.SettingsRepository
+import wtrack.app.domain.repository.TagRepository
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.repository.TransferRepository
 import wtrack.app.domain.repository.UpdateTransactionRequest
@@ -51,6 +53,7 @@ data class ActivityFilterState(
     val dateFilter: ActivityDateFilter = ActivityDateFilter.ALL,
     val accountId: Long? = null,
     val categoryId: Long? = null,
+    val tagId: Long? = null,
     val type: DomainTransactionType? = null,
     val direction: Direction? = null,
     val showVoided: Boolean = false,
@@ -63,6 +66,7 @@ data class ActivityTransactionItem(
     val categoryName: String,
     val transferPair: TransferPair?,
     val counterpartAccountName: String?,
+    val tags: List<Tag> = emptyList(),
 )
 
 data class ActivityUiState(
@@ -72,6 +76,7 @@ data class ActivityUiState(
     val derivedFees: List<DerivedFeeRow> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
+    val tags: List<Tag> = emptyList(),
     val baseCurrency: String = "IDR",
     val actionMessage: String? = null,
 )
@@ -82,6 +87,7 @@ class ActivityViewModel @Inject constructor(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     transferRepository: TransferRepository,
+    private val tagRepository: TagRepository,
     settingsRepository: SettingsRepository,
     private val aggregateCalculator: AggregateCalculator,
     private val createManualTransactionUseCase: CreateManualTransactionUseCase,
@@ -108,11 +114,19 @@ class ActivityViewModel @Inject constructor(
         ActivityDataSnapshot(transactions, accounts, categories, pairs, settings.baseCurrency)
     }
 
+    private val tagSnapshot = combine(
+        tagRepository.tags,
+        tagRepository.observeAllTransactionTags(),
+    ) { tags, txTags ->
+        tags to txTags
+    }
+
     val uiState: StateFlow<ActivityUiState> = combine(
         dataSnapshot,
+        tagSnapshot,
         filterState,
         actionMessage,
-    ) { snapshot, filter, message ->
+    ) { snapshot, (allTags, txTagsMap), filter, message ->
         val accountMap = snapshot.accounts.associateBy { it.id }
         val categoryMap = snapshot.categories.associateBy { it.id }
         val txMap = snapshot.transactions.associateBy { it.id }
@@ -145,6 +159,7 @@ class ActivityViewModel @Inject constructor(
                 categoryName = categoryMap[tx.categoryId]?.name ?: "Uncategorized",
                 transferPair = pair,
                 counterpartAccountName = counterpartAccountId?.let { accountMap[it]?.name },
+                tags = txTagsMap[tx.id].orEmpty(),
             )
         }
 
@@ -154,6 +169,7 @@ class ActivityViewModel @Inject constructor(
             if (tx.occurredAt < dateStart || tx.occurredAt >= dateEnd) return@filter false
             if (filter.accountId != null && tx.accountId != filter.accountId) return@filter false
             if (filter.categoryId != null && tx.categoryId != filter.categoryId) return@filter false
+            if (filter.tagId != null && item.tags.none { it.id == filter.tagId }) return@filter false
             if (filter.type != null && tx.transactionType != filter.type) return@filter false
             if (filter.direction != null && tx.direction != filter.direction) return@filter false
             if (filter.uncategorizedOnly && !(tx.categoryId == null || tx.categoryId == uncatId)) return@filter false
@@ -161,11 +177,13 @@ class ActivityViewModel @Inject constructor(
                 val q = filter.query.trim().lowercase()
                 val accName = item.accountName.lowercase()
                 val catName = item.categoryName.lowercase()
+                val tagMatch = item.tags.any { it.name.lowercase().contains(q) }
                 val match = (tx.merchantName?.lowercase()?.contains(q) == true) ||
                     (tx.description?.lowercase()?.contains(q) == true) ||
                     (tx.note?.lowercase()?.contains(q) == true) ||
                     accName.contains(q) ||
-                    catName.contains(q)
+                    catName.contains(q) ||
+                    tagMatch
                 if (!match) return@filter false
             }
             true
@@ -188,6 +206,7 @@ class ActivityViewModel @Inject constructor(
             derivedFees = summary.derivedFees,
             accounts = snapshot.accounts.filter { it.isActive },
             categories = snapshot.categories.filter { !it.isArchived },
+            tags = allTags,
             baseCurrency = snapshot.baseCurrency,
             actionMessage = message,
         )
@@ -372,6 +391,24 @@ class ActivityViewModel @Inject constructor(
                     actionMessage.value = if (originalTxId == null) "Refund unlinked." else "Refund linked to original."
                 }
                 .onFailure { actionMessage.value = it.message ?: "Failed to link refund." }
+        }
+    }
+
+    fun addTagToTransaction(txId: Long, tagName: String) {
+        val cleaned = tagName.trim()
+        if (cleaned.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { tagRepository.addTagToTransaction(txId, cleaned) }
+                .onSuccess { actionMessage.value = "Tag #$cleaned added." }
+                .onFailure { actionMessage.value = it.message ?: "Failed to add tag." }
+        }
+    }
+
+    fun removeTagFromTransaction(txId: Long, tagId: Long) {
+        viewModelScope.launch {
+            runCatching { tagRepository.removeTagFromTransaction(txId, tagId) }
+                .onSuccess { actionMessage.value = "Tag removed." }
+                .onFailure { actionMessage.value = it.message ?: "Failed to remove tag." }
         }
     }
 

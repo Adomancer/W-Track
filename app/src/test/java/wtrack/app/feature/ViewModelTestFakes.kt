@@ -27,6 +27,7 @@ import wtrack.app.domain.model.CategorySource
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.NeedsReviewItem
 import wtrack.app.domain.model.NotificationEventRecord
+import wtrack.app.domain.model.Tag
 import wtrack.app.domain.model.ThemeMode
 import wtrack.app.domain.model.Transaction
 import wtrack.app.domain.model.TransactionRule
@@ -39,6 +40,7 @@ import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.BackupVerificationResult
 import wtrack.app.domain.repository.BudgetRepository
+import wtrack.app.domain.repository.CaptureSelfCheckResult
 import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CategoryRepository
 import wtrack.app.domain.repository.CreateAccountRequest
@@ -52,6 +54,7 @@ import wtrack.app.domain.repository.SampleExportResult
 import wtrack.app.domain.repository.SaveReviewItemRequest
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.repository.SourceAndEventRepository
+import wtrack.app.domain.repository.TagRepository
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.repository.TransferRepository
 import wtrack.app.domain.repository.UpdateAccountRequest
@@ -358,6 +361,45 @@ class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {
     ) = SampleExportResult(0, 0)
     override suspend fun purgeRetainedM3aSamplesNow(): Int = 0
     override suspend fun reparseRetainedM3aSamples(): Int = 0
+    var selfCheckResult = CaptureSelfCheckResult(
+        permissionGranted = true,
+        listenerConnected = true,
+        databaseReady = true,
+        registeredParserCount = 3,
+        dryRunParserPassed = true,
+        summary = "All capture checks passed (3 parsers active).",
+    )
+    override suspend fun runCaptureSelfCheck(): CaptureSelfCheckResult = selfCheckResult
+}
+
+class FakeTagRepository : TagRepository {
+    val tagsFlow = MutableStateFlow<List<Tag>>(emptyList())
+    val txTagsFlow = MutableStateFlow<Map<Long, List<Tag>>>(emptyMap())
+    private var nextId = 1L
+
+    override val tags: Flow<List<Tag>> = tagsFlow
+    override fun observeAllTransactionTags(): Flow<Map<Long, List<Tag>>> = txTagsFlow
+    override suspend fun getTagsForTransaction(transactionId: Long): List<Tag> = txTagsFlow.value[transactionId].orEmpty()
+
+    override suspend fun addTagToTransaction(transactionId: Long, tagName: String) {
+        val cleaned = tagName.trim()
+        if (cleaned.isEmpty()) return
+        val existing = tagsFlow.value.firstOrNull { it.name.equals(cleaned, ignoreCase = true) }
+        val tag = existing ?: Tag(nextId++, cleaned, 1_000L).also { tagsFlow.value = tagsFlow.value + it }
+        val currentForTx = txTagsFlow.value[transactionId].orEmpty()
+        if (currentForTx.none { it.id == tag.id }) {
+            txTagsFlow.value = txTagsFlow.value + (transactionId to (currentForTx + tag).sortedBy { it.name.lowercase() })
+        }
+    }
+
+    override suspend fun removeTagFromTransaction(transactionId: Long, tagId: Long) {
+        val currentForTx = txTagsFlow.value[transactionId].orEmpty().filterNot { it.id == tagId }
+        txTagsFlow.value = if (currentForTx.isEmpty()) {
+            txTagsFlow.value - transactionId
+        } else {
+            txTagsFlow.value + (transactionId to currentForTx)
+        }
+    }
 }
 
 class FakeBudgetRepository : BudgetRepository {

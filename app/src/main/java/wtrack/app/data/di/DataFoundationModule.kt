@@ -359,6 +359,7 @@ object DataFoundationModule {
         parserRegistry: ParserRegistry,
         ingestionPipeline: IngestionPipeline,
         clock: Clock,
+        captureStatusTracker: CaptureStatusTracker,
     ): BackupAndDiagnosticsPort = WtrackBackupAndDiagnosticsPort(
         holder = holder,
         backupService = backupService,
@@ -373,5 +374,6 @@ object DataFoundationModule {
         parserRegistry = parserRegistry,
         ingestionPipeline = ingestionPipeline,
         clock = clock,
+        captureStatusTracker = captureStatusTracker,
     )
 }

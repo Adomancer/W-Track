@@ -50,6 +50,7 @@ fun OnboardingScreen(
     onSelectBaseCurrency: (String) -> Unit,
     onCreateFirstAccount: (String, String, AccountType, String, String) -> Unit,
     onRestoreBackup: (String, () -> InputStream?) -> Unit,
+    onRunSelfCheck: () -> Unit = {},
     onFinish: () -> Unit,
     onClearMessage: () -> Unit,
 ) {
@@ -132,6 +133,11 @@ fun OnboardingScreen(
                         },
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    Text(
+                        text = "Battery & Autostart (ING-10): For baseline Gate G1 testing, keep default battery settings first. If vivo/iQOO OriginOS kills background capture, open App Info → Battery → Allow high background power consumption & Autostart.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     OutlinedButton(
                         onClick = {
                             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -139,6 +145,17 @@ fun OnboardingScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(if (state.captureSummary.isPermissionGranted) "Open Notification Access Settings" else "Grant Notification Access")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val appInfoIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(appInfoIntent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open App Info (Restricted Settings & Battery)")
                     }
                 }
             }
@@ -205,6 +222,35 @@ fun OnboardingScreen(
                         }
                     } else {
                         Text("Initial account configured. You can add more accounts and link notification sources in the Accounts tab.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("3. Verify Capture (Self-Check)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = "Runs a local check of Notification Access, listener binding, encrypted DB health, and registered parsers without creating fake ledger rows (ING-08).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        onClick = onRunSelfCheck,
+                        enabled = !state.isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Run Capture Self-Check")
+                    }
+                    state.selfCheckResult?.let { check ->
+                        Text(
+                            text = "• Notification Access: ${if (check.permissionGranted) "Granted" else "Missing"}\n" +
+                                "• Listener Bound: ${if (check.listenerConnected) "Connected" else "Waiting"}\n" +
+                                "• Encrypted DB: ${if (check.databaseReady) "Ready" else "Locked"}\n" +
+                                "• Registered Parsers: ${check.registeredParserCount}\n" +
+                                "• Dry-Run Parser: ${if (check.dryRunParserPassed) "Passed" else "Failed"}\n" +
+                                check.summary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }

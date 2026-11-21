@@ -35,11 +35,13 @@ class ActivityViewModelTest {
         )
         val txRepo = FakeTransactionRepository()
         val transferRepo = FakeTransferRepository()
+        val tagRepo = FakeTagRepository()
         val vm = ActivityViewModel(
             transactionRepository = txRepo,
             accountRepository = accRepo,
             categoryRepository = FakeCategoryRepository(),
             transferRepository = transferRepo,
+            tagRepository = tagRepo,
             settingsRepository = FakeSettingsRepository(),
             aggregateCalculator = AggregateCalculator(),
             createManualTransactionUseCase = CreateManualTransactionUseCase(txRepo),
@@ -64,6 +66,30 @@ class ActivityViewModelTest {
             }
             val outTx = latest.items.first { it.transaction.accountId == 1L }.transaction
             val inTx = latest.items.first { it.transaction.accountId == 2L }.transaction
+
+            // Add & filter by tag (TX-06)
+            vm.addTagToTransaction(outTx.id, "reimburse")
+            var taggedState = awaitItem()
+            while (taggedState.tags.isEmpty()) {
+                taggedState = awaitItem()
+            }
+            val tagId = taggedState.tags.single().id
+            assertThat(taggedState.items.first { it.transaction.id == outTx.id }.tags.map { it.name }).containsExactly("reimburse")
+
+            vm.updateFilter { it.copy(tagId = tagId) }
+            val tagFiltered = awaitItem()
+            assertThat(tagFiltered.items.map { it.transaction.id }).containsExactly(outTx.id)
+
+            vm.updateFilter { it.copy(tagId = null, query = "reimb") }
+            val queryFiltered = awaitItem()
+            assertThat(queryFiltered.items.map { it.transaction.id }).containsExactly(outTx.id)
+
+            vm.updateFilter { it.copy(query = "") }
+            vm.removeTagFromTransaction(outTx.id, tagId)
+            var untagged = awaitItem()
+            while (untagged.items.first { it.transaction.id == outTx.id }.tags.isNotEmpty()) {
+                untagged = awaitItem()
+            }
 
             vm.linkTransfer(outTx.id, inTx.id)
             latest = awaitItem()
