@@ -60,6 +60,19 @@ class AccountsViewModelTest {
             assertThat(txRepo.txsFlow.value.single().transactionType).isEqualTo(DomainTransactionType.ADJUSTMENT)
             assertThat(txRepo.txsFlow.value.single().direction).isEqualTo(Direction.OUTFLOW)
             assertThat(txRepo.txsFlow.value.single().amountMinor).isEqualTo(5_000_000L)
+
+            // Also verify grouped Indonesian ("50.000") and English ("100,000") balance inputs work
+            vm.correctBalance(accId, "IDR", "50.000", "Grouped dot")
+            latest = awaitItem()
+            assertThat(txRepo.txsFlow.value.last().transactionType).isEqualTo(DomainTransactionType.ADJUSTMENT)
+            assertThat(txRepo.txsFlow.value.last().direction).isEqualTo(Direction.OUTFLOW)
+            assertThat(txRepo.txsFlow.value.last().amountMinor).isEqualTo(40_000_000L)
+
+            vm.correctBalance(accId, "IDR", "100,000", "Grouped comma")
+            latest = awaitItem()
+            assertThat(txRepo.txsFlow.value.last().transactionType).isEqualTo(DomainTransactionType.ADJUSTMENT)
+            assertThat(txRepo.txsFlow.value.last().direction).isEqualTo(Direction.INFLOW)
+            assertThat(txRepo.txsFlow.value.last().amountMinor).isEqualTo(5_000_000L)
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -16,6 +16,7 @@ import wtrack.app.core.coroutines.DispatcherProvider
 import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.backup.BackupService
 import wtrack.app.data.backup.CsvExporter
+import wtrack.app.data.backup.M3aSampleExporter
 import wtrack.app.data.backup.WtrackBackupAndDiagnosticsPort
 import wtrack.app.data.crypto.AndroidKeyStoreWrappingCipher
 import wtrack.app.data.crypto.DatabaseKeyManager
@@ -340,23 +341,37 @@ object DataFoundationModule {
 
     @Provides
     @Singleton
+    fun provideM3aSampleExporter(clock: Clock): M3aSampleExporter = M3aSampleExporter(clock)
+
+    @Provides
+    @Singleton
     fun provideBackupAndDiagnosticsPort(
+        holder: WtrackDatabaseHolder,
         backupService: BackupService,
         csvExporter: CsvExporter,
+        m3aSampleExporter: M3aSampleExporter,
         accountRepository: AccountRepository,
         transactionRepository: TransactionRepository,
         categoryRepository: CategoryRepository,
         databaseHealthRepository: DatabaseHealthRepository,
         logger: WtrackLogger,
         allowlistCache: AllowlistCache,
+        parserRegistry: ParserRegistry,
+        ingestionPipeline: IngestionPipeline,
+        clock: Clock,
     ): BackupAndDiagnosticsPort = WtrackBackupAndDiagnosticsPort(
+        holder = holder,
         backupService = backupService,
         csvExporter = csvExporter,
+        m3aSampleExporter = m3aSampleExporter,
         accountRepository = accountRepository,
         transactionRepository = transactionRepository,
         categoryRepository = categoryRepository,
         databaseHealthRepository = databaseHealthRepository,
         logger = logger,
         allowlistCache = allowlistCache,
+        parserRegistry = parserRegistry,
+        ingestionPipeline = ingestionPipeline,
+        clock = clock,
     )
 }

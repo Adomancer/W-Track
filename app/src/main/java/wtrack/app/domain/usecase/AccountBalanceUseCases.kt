@@ -78,7 +78,7 @@ class CorrectBalanceUseCase(
         val allTransactions = transactionRepository.getAllOnce()
         val estimated = AccountBalanceCalculator.calculateEstimatedBalance(account, allTransactions)
         val delta = actualBalanceMinor - estimated
-        val now = clock.nowEpochMillis()
+        val now = maxOf(clock.nowEpochMillis(), account.initialBalanceAt ?: Long.MIN_VALUE)
 
         if (delta == 0L) {
             accountRepository.updateLastReconciledAt(accountId, now)

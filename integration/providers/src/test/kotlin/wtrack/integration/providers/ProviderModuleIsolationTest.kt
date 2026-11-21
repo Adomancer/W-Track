@@ -6,8 +6,9 @@ import org.junit.Test
 
 class ProviderModuleIsolationTest {
     @Test
-    fun noPrematureProviderParsersRegisteredInFoundation() {
-        assertThat(ProviderParsers.registered()).isEmpty()
+    fun onlyVerifiedProviderParsersAreRegistered() {
+        assertThat(ProviderParsers.registered().map { it.sourceId })
+            .containsExactly("com.jago.digitalBanking", "id.dana", "com.bca.mybca.omni.android")
     }
 
     @Test

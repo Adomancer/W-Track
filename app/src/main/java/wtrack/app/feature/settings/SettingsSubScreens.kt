@@ -2,6 +2,8 @@ package wtrack.app.feature.settings
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -31,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -258,12 +262,27 @@ fun DiagnosticsScreen(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
 
+    var redactTermsInput by remember { mutableStateOf("") }
     var jagoDays by remember { mutableStateOf("14") }
     var jagoA by remember { mutableStateOf("35") }
     var jagoB by remember { mutableStateOf("34") }
     var jagoC by remember { mutableStateOf("33") }
     var jagoD by remember { mutableStateOf("32") }
     var jagoWrong by remember { mutableStateOf("0") }
+
+    val exportSamplesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.exportAnonymizedM3aSamples(redactTermsInput) {
+                context.contentResolver.openOutputStream(uri)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshDiagnostics()
+    }
 
     Scaffold(
         topBar = {
@@ -280,6 +299,21 @@ fun DiagnosticsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (state.actionMessage != null) {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(state.actionMessage!!, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = viewModel::clearMessage) { Text("OK") }
+                        }
+                    }
+                }
+            }
+
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -324,11 +358,61 @@ fun DiagnosticsScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Initial PoC Provider Targets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         state.providerCatalog.forEach { p ->
+                            val pkgInfo = if (p.verifiedPackageId != null) {
+                                val extra = if (p.candidatePackageIds.size > 1) " • all: ${p.candidatePackageIds.joinToString()}" else ""
+                                "verified: ${p.verifiedPackageId}$extra"
+                            } else {
+                                "ref: ${p.candidatePackageIds.joinToString()}"
+                            }
                             Text(
-                                text = "${p.priority}. ${p.displayName} (${p.verificationStatus}) • ref: ${p.candidatePackageIds.joinToString()}",
+                                text = "${p.priority}. ${p.displayName} (${p.verificationStatus}) • $pkgInfo",
                                 style = MaterialTheme.typography.bodySmall,
                             )
+                            Text(
+                                text = p.notes,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("M3a Sample Collection (Anonymized Export)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "Retained encrypted samples: ${state.retainedSampleCount}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "OTPs, PINs, and security notices are never retained. Exporting masks names, emails, phone numbers, and account/card numbers before writing JSON.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        OutlinedTextField(
+                            value = redactTermsInput,
+                            onValueChange = { redactTermsInput = it },
+                            label = { Text("Extra names/aliases to redact (comma-separated, optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Button(
+                            onClick = { exportSamplesLauncher.launch("wtrack-m3a-samples-anonymized.json") },
+                            enabled = !state.isBusy && state.retainedSampleCount > 0,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Export Anonymized Samples (JSON)") }
+                        OutlinedButton(
+                            onClick = viewModel::reparseRetainedM3aSamples,
+                            enabled = !state.isBusy && state.retainedSampleCount > 0,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Re-parse Retained Samples") }
+                        OutlinedButton(
+                            onClick = viewModel::purgeRetainedM3aSamplesNow,
+                            enabled = !state.isBusy && state.retainedSampleCount > 0,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Purge Retained Samples Now") }
                     }
                 }
             }

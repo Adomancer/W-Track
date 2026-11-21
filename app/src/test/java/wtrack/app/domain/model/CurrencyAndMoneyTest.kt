@@ -26,13 +26,48 @@ class CurrencyAndMoneyTest {
     }
 
     @Test
-    fun parsesMajorInputWithout100xScalingErrors() {
+    fun parsesMajorInputAcrossGroupedAndPlainFormatsWithoutScalingErrors() {
         assertThat(MoneyFormatter.parseMajorInput("50000", "IDR")).isEqualTo(5_000_000L)
+        assertThat(MoneyFormatter.parseMajorInput("50.000", "IDR")).isEqualTo(5_000_000L)
+        assertThat(MoneyFormatter.parseMajorInput("50,000", "IDR")).isEqualTo(5_000_000L)
         assertThat(MoneyFormatter.parseMajorInput("1.250.000", "IDR")).isEqualTo(125_000_000L)
+        assertThat(MoneyFormatter.parseMajorInput("1,250,000", "IDR")).isEqualTo(125_000_000L)
         assertThat(MoneyFormatter.parseMajorInput("1.250.000,50", "IDR")).isEqualTo(125_000_050L)
+        assertThat(MoneyFormatter.parseMajorInput("1,250,000.50", "IDR")).isEqualTo(125_000_050L)
         assertThat(MoneyFormatter.parseMajorInput("50000.25", "IDR")).isEqualTo(5_000_025L)
-        // Reject ambiguous single-dot 3-digit grouping instead of guessing.
-        assertThat(MoneyFormatter.parseMajorInput("50.000", "IDR")).isNull()
+        assertThat(MoneyFormatter.parseMajorInput("50000,25", "IDR")).isEqualTo(5_000_025L)
+        assertThat(MoneyFormatter.parseMajorInput("Rp 50.000", "IDR")).isEqualTo(5_000_000L)
+        assertThat(MoneyFormatter.parseMajorInput("IDR 50,000.00", "IDR")).isEqualTo(5_000_000L)
+        assertThat(MoneyFormatter.parseMajorInput("0", "IDR")).isEqualTo(0L)
+        assertThat(MoneyFormatter.parseMajorInput("-50.000", "IDR")).isEqualTo(-5_000_000L)
+
+        // USD / JPY rules
+        assertThat(MoneyFormatter.parseMajorInput("50.000", "USD")).isNull()
+        assertThat(MoneyFormatter.parseMajorInput("50,000", "USD")).isEqualTo(5_000_000L)
+        assertThat(MoneyFormatter.parseMajorInput("50.25", "USD")).isEqualTo(5_025L)
+        assertThat(MoneyFormatter.parseMajorInput("1,500", "JPY")).isEqualTo(1_500L)
+
+        // Malformed inputs rejected cleanly
+        assertThat(MoneyFormatter.parseMajorInput("0.500", "IDR")).isNull()
+        assertThat(MoneyFormatter.parseMajorInput("1.2345", "IDR")).isNull()
+        assertThat(MoneyFormatter.parseMajorInput("50.00.0", "IDR")).isNull()
+        assertThat(MoneyFormatter.parseMajorInput("50,0000", "IDR")).isNull()
+        assertThat(MoneyFormatter.parseMajorInput("abc", "IDR")).isNull()
+    }
+
+    @Test
+    fun formatForInputRoundTripsThroughParseMajorInput() {
+        val cases = listOf(
+            5_000_000L to "IDR",
+            125_000_050L to "IDR",
+            -5_000_000L to "IDR",
+            1_250L to "USD",
+            1_500L to "JPY",
+        )
+        cases.forEach { (minor, currency) ->
+            val formatted = MoneyFormatter.formatForInput(minor, currency)
+            assertThat(MoneyFormatter.parseMajorInput(formatted, currency)).isEqualTo(minor)
+        }
     }
 
     @Test

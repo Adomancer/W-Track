@@ -30,11 +30,13 @@ import wtrack.app.domain.usecase.MerchantKeyNormalizer
 import wtrack.app.domain.usecase.TransactionValidator
 import wtrack.app.domain.usecase.ValidationOutcome
 import wtrack.integration.Direction
+import wtrack.integration.NotTransactionReason
 import wtrack.integration.NotificationEvent
 import wtrack.integration.ParseResult
 import wtrack.integration.ParsedTransaction
 import wtrack.integration.PartialTransaction
 import wtrack.integration.ReviewReason
+import wtrack.integration.providers.common.SensitiveContentGuard
 
 /**
  * Orchestrates the 16-step notification ingestion pipeline (PRD section 6.2):
@@ -208,6 +210,26 @@ class IngestionPipeline(
 
         val parser = parserRegistry.resolve(envelope)
         if (parser == null) {
+            val precheck = SensitiveContentGuard.inspectPreconditions(envelope)
+            if (precheck is ParseResult.NotTransaction && precheck.reason == NotTransactionReason.SECURITY_NOTICE) {
+                db.notificationEventDao().updateOutcome(
+                    id = event.id,
+                    newStatus = NotificationEventStatus.IGNORED.name,
+                    failureReason = NotTransactionReason.SECURITY_NOTICE.name,
+                    reviewDraftJson = null,
+                    payloadJson = null,
+                    purgeAfter = null,
+                    processedAt = now,
+                    updatedAt = now,
+                )
+                logger.logEvent(
+                    "INGEST",
+                    "IGNORED_SECURITY_NOTICE",
+                    mapOf("eventId" to event.id.toString(), "sourceId" to event.sourceId),
+                )
+                return
+            }
+
             // ING-13: allowlisted source without compatible parser -> IGNORED (NO_PARSER) + immediate purge
             // unless explicit M3a Sample Collection is enabled for this source (<= 14d).
             val source = db.transactionSourceDao().getById(event.sourceId)

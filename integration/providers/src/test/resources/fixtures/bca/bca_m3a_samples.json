@@ -1,0 +1,56 @@
+{
+    "schemaVersion": 1,
+    "exportedAtEpochMillis": 1795265662954,
+    "sampleCount": 3,
+    "skippedSecurityCount": 0,
+    "samples": [
+        {
+            "sourceId": "com.bca.mybca.omni.android",
+            "packageName": "com.bca.mybca.omni.android",
+            "postedAtEpochMillis": 1795265482088,
+            "receivedAtEpochMillis": 1795265482351,
+            "notificationKeyHash": "d05009f6e11b",
+            "notificationId": 285226,
+            "notificationTagAnonymized": null,
+            "channelId": "General Notification",
+            "isGroupSummary": false,
+            "isContentRedacted": false,
+            "title": "Financial Diary",
+            "text": "You received IDR 50,000.00 from AL** PR***MA at Account Transfer category.",
+            "bigText": "You received IDR 50,000.00 from AL** PR***MA at Account Transfer category.",
+            "subText": null
+        },
+        {
+            "sourceId": "com.bca.mybca.omni.android",
+            "packageName": "com.bca.mybca.omni.android",
+            "postedAtEpochMillis": 1795265542787,
+            "receivedAtEpochMillis": 1795265543039,
+            "notificationKeyHash": "61080d4ca222",
+            "notificationId": 235859,
+            "notificationTagAnonymized": null,
+            "channelId": "General Notification",
+            "isGroupSummary": false,
+            "isContentRedacted": false,
+            "title": "Financial Diary",
+            "text": "You spent IDR 50,000.00 at Account Transfer.",
+            "bigText": "You spent IDR 50,000.00 at Account Transfer.",
+            "subText": null
+        },
+        {
+            "sourceId": "com.bca.mybca.omni.android",
+            "packageName": "com.bca.mybca.omni.android",
+            "postedAtEpochMillis": 1795265543016,
+            "receivedAtEpochMillis": 1795265543286,
+            "notificationKeyHash": "4faa585754cf",
+            "notificationId": 0,
+            "notificationTagAnonymized": "0|com.bca.mybca.omni.android|g:Aggregate_AlertingSection",
+            "channelId": "General Notification",
+            "isGroupSummary": true,
+            "isContentRedacted": false,
+            "title": null,
+            "text": "",
+            "bigText": null,
+            "subText": null
+        }
+    ]
+}

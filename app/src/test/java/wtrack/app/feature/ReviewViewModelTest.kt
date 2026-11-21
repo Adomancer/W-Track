@@ -61,11 +61,11 @@ class ReviewViewModelTest {
             assertThat(reviewRepo.retriedIds).containsExactly(7L)
             assertThat(awaitItem().actionMessage).isEqualTo("Re-run completed.")
 
-            // Ambiguous 3-digit grouping input ("75.000") must be rejected rather than guessed
+            // Malformed or non-positive amounts must be rejected cleanly
             vm.saveResolved(
                 item = reviewItem,
                 accountId = 1L,
-                amountMajorInput = "75.000",
+                amountMajorInput = "0.500",
                 currency = "IDR",
                 direction = Direction.OUTFLOW,
                 type = DomainTransactionType.PURCHASE,
@@ -80,7 +80,7 @@ class ReviewViewModelTest {
             vm.saveResolved(
                 item = reviewItem,
                 accountId = 1L,
-                amountMajorInput = "75000",
+                amountMajorInput = "75.000",
                 currency = "IDR",
                 direction = Direction.OUTFLOW,
                 type = DomainTransactionType.PURCHASE,

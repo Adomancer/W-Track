@@ -42,8 +42,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import wtrack.app.feature.common.MoneyAmountTextField
 import wtrack.app.feature.common.UiDateHelper
 import wtrack.app.feature.common.formatCurrency
+import wtrack.app.feature.common.isValidMoneyInput
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -226,20 +228,23 @@ fun InsightsScreen(
                             )
                         }
                     }
-                    OutlinedTextField(
+                    MoneyAmountTextField(
                         value = limitInput,
                         onValueChange = { limitInput = it },
-                        label = { Text("Monthly limit (${state.baseCurrency})") },
-                        singleLine = true,
+                        currency = state.baseCurrency,
+                        label = "Monthly limit (${state.baseCurrency})",
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    showBudgetDialog = false
-                    viewModel.upsertBudget(selectedCategoryId, selectedAccountId, limitInput)
-                }) { Text("Save") }
+                Button(
+                    enabled = isValidMoneyInput(limitInput, state.baseCurrency),
+                    onClick = {
+                        showBudgetDialog = false
+                        viewModel.upsertBudget(selectedCategoryId, selectedAccountId, limitInput)
+                    },
+                ) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { showBudgetDialog = false }) { Text("Cancel") } },
         )

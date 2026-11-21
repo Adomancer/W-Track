@@ -82,16 +82,36 @@ interface NotificationEventDao {
         updatedAt: Long,
     )
 
+    @Query("UPDATE notification_events SET payload_json = NULL, purge_after = NULL, updated_at = :nowEpochMillis WHERE purge_after IS NOT NULL AND purge_after <= :nowEpochMillis")
+    suspend fun purgeExpiredPayloads(nowEpochMillis: Long): Int
+
+    @Query(
+        """
+        SELECT * FROM notification_events
+        WHERE failure_reason = 'NO_PARSER' AND payload_json IS NOT NULL
+        ORDER BY posted_at ASC, id ASC
+        """,
+    )
+    suspend fun getRetainedSamplesOnce(): List<NotificationEventEntity>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM notification_events
+        WHERE failure_reason = 'NO_PARSER' AND payload_json IS NOT NULL
+        """,
+    )
+    suspend fun countRetainedSamples(): Int
+
     @Query(
         """
         UPDATE notification_events
         SET payload_json = NULL,
             purge_after = NULL,
             updated_at = :nowEpochMillis
-        WHERE purge_after IS NOT NULL AND purge_after <= :nowEpochMillis
+        WHERE failure_reason = 'NO_PARSER' AND payload_json IS NOT NULL
         """,
     )
-    suspend fun purgeExpiredPayloads(nowEpochMillis: Long): Int
+    suspend fun purgeRetainedSamplesNow(nowEpochMillis: Long): Int
 
     @Query("DELETE FROM notification_events")
     suspend fun deleteAll()

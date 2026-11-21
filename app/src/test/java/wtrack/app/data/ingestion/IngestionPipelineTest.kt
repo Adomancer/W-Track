@@ -131,6 +131,58 @@ class IngestionPipelineTest {
     }
 
     @Test
+    fun noParserWithSampleCollectionNeverRetainsSecurityNoticePayloads() = runTest {
+        val db = harness.db()
+        val now = harness.clock.now
+        val sourceId = "com.jago.digitalBanking"
+        db.transactionSourceDao().upsert(
+            TransactionSourceEntity(
+                id = sourceId,
+                packageName = sourceId,
+                displayName = "Bank Jago",
+                isAllowlisted = true,
+                parserVersion = null,
+                sampleCollectionUntil = now + 7L * 86_400_000L,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        harness.allowlistCache.refreshSnapshotNow()
+        val pipeline = harness.pipeline()
+
+        val otpEventId = pipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Kode OTP",
+                text = "Kode OTP Anda 482910. Jangan berikan kode ini kepada siapa pun.",
+                notificationId = 10,
+                notificationKey = "otp-1",
+            ),
+        )!!
+        val otpEvent = db.notificationEventDao().getById(otpEventId)!!
+        assertThat(otpEvent.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+        assertThat(otpEvent.failureReason).isEqualTo(NotTransactionReason.SECURITY_NOTICE.name)
+        assertThat(otpEvent.payloadJson).isNull()
+        assertThat(otpEvent.purgeAfter).isNull()
+
+        val txSampleId = pipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Transaksi Keluar",
+                text = "Pembayaran Rp 45.000 di Merchant ABC berhasil",
+                notificationId = 11,
+                notificationKey = "tx-1",
+            ),
+        )!!
+        val txSample = db.notificationEventDao().getById(txSampleId)!!
+        assertThat(txSample.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+        assertThat(txSample.failureReason).isEqualTo("NO_PARSER")
+        assertThat(txSample.payloadJson).isNotNull()
+        assertThat(txSample.purgeAfter).isEqualTo(now + 7L * 86_400_000L)
+        assertThat(db.notificationEventDao().countRetainedSamples()).isEqualTo(1)
+    }
+
+    @Test
     fun notTransactionPurgesPayloadImmediatelyWithoutCreatingTransaction() = runTest {
         val db = harness.db()
         val sourceId = "pkg.bank"

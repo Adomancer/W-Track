@@ -28,6 +28,7 @@ import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.BackupVerificationResult
 import wtrack.app.domain.repository.ProviderCatalogEntry
 import wtrack.app.domain.repository.RestoreResult
+import wtrack.app.domain.repository.SampleExportResult
 import wtrack.app.domain.usecase.WipeAllDataUseCase
 import wtrack.integration.Direction
 
@@ -168,6 +169,13 @@ class RetentionAndWipeTest {
             override fun clearDiagnosticLogs() = harness.logger.clearAll()
             override fun providerCatalogEntries() = emptyList<ProviderCatalogEntry>()
             override suspend fun refreshAllowlistCache() = harness.allowlistCache.refreshSnapshotNow()
+            override suspend fun countRetainedM3aSamples() = 0
+            override suspend fun exportAnonymizedM3aSamples(
+                outputStream: java.io.OutputStream,
+                redactTerms: List<String>,
+            ) = SampleExportResult(0, 0)
+            override suspend fun purgeRetainedM3aSamplesNow() = 0
+            override suspend fun reparseRetainedM3aSamples() = 0
         }
 
         WipeAllDataUseCase(port).invoke()

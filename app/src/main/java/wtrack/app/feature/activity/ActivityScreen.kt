@@ -47,9 +47,11 @@ import androidx.compose.ui.unit.dp
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.TransactionStatus
+import wtrack.app.feature.common.MoneyAmountTextField
 import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.UiDateHelper
 import wtrack.app.feature.common.formatCurrency
+import wtrack.app.feature.common.isValidMoneyInput
 import wtrack.integration.Direction
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -242,6 +244,7 @@ fun ActivityScreen(
 
     if (showCreateDialog) {
         var selectedAccountId by remember { mutableLongStateOf(state.accounts.first().id) }
+        val selectedCurrency = state.accounts.firstOrNull { it.id == selectedAccountId }?.currency ?: state.baseCurrency
         var amountInput by remember { mutableStateOf("") }
         var direction by remember { mutableStateOf(Direction.OUTFLOW) }
         var type by remember { mutableStateOf(DomainTransactionType.PURCHASE) }
@@ -263,11 +266,11 @@ fun ActivityScreen(
                             )
                         }
                     }
-                    OutlinedTextField(
+                    MoneyAmountTextField(
                         value = amountInput,
                         onValueChange = { amountInput = it },
-                        label = { Text("Amount") },
-                        singleLine = true,
+                        currency = selectedCurrency,
+                        label = "Amount ($selectedCurrency)",
                         modifier = Modifier.fillMaxWidth(),
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -306,10 +309,13 @@ fun ActivityScreen(
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    showCreateDialog = false
-                    viewModel.createManualTransaction(selectedAccountId, amountInput, direction, type, categoryId, description, note)
-                }) { Text("Save") }
+                Button(
+                    enabled = isValidMoneyInput(amountInput, selectedCurrency),
+                    onClick = {
+                        showCreateDialog = false
+                        viewModel.createManualTransaction(selectedAccountId, amountInput, direction, type, categoryId, description, note)
+                    },
+                ) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text("Cancel") } },
         )
@@ -350,7 +356,7 @@ fun TransactionDetailScreen(
         mutableStateOf(UiDateHelper.formatEditableDateTime(tx.occurredAt))
     }
     var editAmount by remember(tx.id, tx.amountMinor) {
-        mutableStateOf(MoneyFormatter.formatForCsv(tx.amountMinor, tx.currency))
+        mutableStateOf(MoneyFormatter.formatForInput(tx.amountMinor, tx.currency))
     }
     var editDescription by remember(tx.id, tx.description) { mutableStateOf(tx.description.orEmpty()) }
     var editNote by remember(tx.id, tx.note) { mutableStateOf(tx.note.orEmpty()) }
@@ -448,11 +454,11 @@ fun TransactionDetailScreen(
                                 }
                             }
                         }
-                        OutlinedTextField(
+                        MoneyAmountTextField(
                             value = editAmount,
                             onValueChange = { editAmount = it },
-                            label = { Text("Amount (${tx.currency})") },
-                            singleLine = true,
+                            currency = tx.currency,
+                            label = "Amount (${tx.currency})",
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedTextField(
@@ -488,6 +494,7 @@ fun TransactionDetailScreen(
                             }
                         }
                         Button(
+                            enabled = isValidMoneyInput(editAmount, tx.currency),
                             onClick = {
                                 val parsedDate = UiDateHelper.parseEditableDateTime(editDateTime) ?: tx.occurredAt
                                 viewModel.updateTransaction(

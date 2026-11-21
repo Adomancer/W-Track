@@ -154,10 +154,12 @@ class InsightsViewModel @Inject constructor(
     fun upsertBudget(categoryId: Long, accountId: Long?, limitMajorInput: String) {
         viewModelScope.launch {
             val baseCurrency = uiState.value.baseCurrency
-            val minor = MoneyFormatter.parseMajorInput(limitMajorInput, baseCurrency) ?: run {
-                actionMessage.value = "Invalid budget limit for $baseCurrency."
-                return@launch
-            }
+            val minor = MoneyFormatter.parseMajorInput(limitMajorInput, baseCurrency)
+                ?.takeIf { it > 0L }
+                ?: run {
+                    actionMessage.value = "Invalid budget limit for $baseCurrency."
+                    return@launch
+                }
             runCatching {
                 budgetRepository.upsertBudget(categoryId, accountId, minor, "MONTHLY")
             }.onSuccess {

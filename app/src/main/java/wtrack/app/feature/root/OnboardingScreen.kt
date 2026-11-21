@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import java.io.InputStream
 import wtrack.app.domain.model.AccountType
 import wtrack.app.feature.common.CaptureStatusPill
+import wtrack.app.feature.common.MoneyAmountTextField
+import wtrack.app.feature.common.isValidMoneyInput
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -181,14 +183,19 @@ fun OnboardingScreen(
                                 )
                             }
                         }
-                        OutlinedTextField(
+                        MoneyAmountTextField(
                             value = openingBalance,
                             onValueChange = { openingBalance = it },
-                            label = { Text("Opening balance ($selectedCurrency, optional)") },
-                            singleLine = true,
+                            currency = selectedCurrency,
+                            label = "Opening balance ($selectedCurrency, optional)",
+                            allowZero = true,
+                            allowNegative = true,
+                            isOptional = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedButton(
+                            enabled = accountName.isNotBlank() &&
+                                isValidMoneyInput(openingBalance, selectedCurrency, allowZero = true, allowNegative = true, isOptional = true),
                             onClick = {
                                 onCreateFirstAccount(accountName, accountProvider, accountType, selectedCurrency, openingBalance)
                             },

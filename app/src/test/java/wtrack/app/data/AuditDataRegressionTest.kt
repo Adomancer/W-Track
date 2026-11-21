@@ -22,6 +22,7 @@ import wtrack.app.data.backup.BackupCryptoConfig
 import wtrack.app.data.backup.BackupCryptoContainer
 import wtrack.app.data.backup.BackupService
 import wtrack.app.data.backup.CsvExporter
+import wtrack.app.data.backup.M3aSampleExporter
 import wtrack.app.data.backup.WtrackBackupAndDiagnosticsPort
 import wtrack.app.data.crypto.DatabaseKeyManager
 import wtrack.app.data.crypto.EncryptedOpenHelperFactoryProvider
@@ -29,14 +30,18 @@ import wtrack.app.data.crypto.WrappedKeyStore
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.CaptureStatusTracker
 import wtrack.app.data.ingestion.InMemoryAesGcmCipher
+import wtrack.app.data.ingestion.IngestionPipeline
 import wtrack.app.data.ingestion.IngestionTestHarness
 import wtrack.app.data.ingestion.StubTransactionParser
 import wtrack.app.data.ingestion.sampleEnvelope
 import wtrack.app.data.local.entity.AccountEntity
 import wtrack.app.data.local.entity.AccountSourceEntity
+import wtrack.app.data.local.entity.NotificationEventEntity
 import wtrack.app.data.local.entity.TransactionEntity
 import wtrack.app.data.local.entity.TransactionSourceEntity
 import wtrack.app.data.local.entity.TransferMatchEntity
+import wtrack.app.data.local.mapper.LocalJson
+import wtrack.app.data.local.mapper.NotificationPayloadJson
 import wtrack.app.data.repository.AccountRepositoryImpl
 import wtrack.app.data.repository.CategoryRepositoryImpl
 import wtrack.app.data.repository.DatabaseHealthRepositoryImpl
@@ -50,7 +55,10 @@ import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.domain.model.DatabaseHealthState
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.LockedReason
+import wtrack.app.domain.model.NotificationEventStatus
+import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.domain.parser.DefaultParserRegistry
+import wtrack.integration.providers.ProviderParsers
 import wtrack.app.domain.repository.CreateAccountRequest
 import wtrack.app.domain.repository.SaveReviewItemRequest
 import wtrack.app.domain.repository.UpdateTransactionRequest
@@ -265,14 +273,19 @@ class AuditDataRegressionTest {
 
         // CSV export via port MUST include merchantName ("Kopi Kenangan")!
         val port = WtrackBackupAndDiagnosticsPort(
+            holder = harness.holder,
             backupService = BackupService(harness.holder, harness.settingsStore, harness.allowlistCache, harness.captureStatusTracker, harness.clock, harness.logger, fastArgonConfig),
             csvExporter = CsvExporter(),
+            m3aSampleExporter = M3aSampleExporter(harness.clock),
             accountRepository = accountRepo,
             transactionRepository = txRepo,
             categoryRepository = catRepo,
             databaseHealthRepository = healthRepo,
             logger = harness.logger,
             allowlistCache = harness.allowlistCache,
+            parserRegistry = DefaultParserRegistry(emptySet()),
+            ingestionPipeline = harness.pipeline(),
+            clock = harness.clock,
         )
         val csvOut = ByteArrayOutputStream()
         assertThat(port.exportCsv(csvOut)).isEqualTo(1)
@@ -358,5 +371,532 @@ class AuditDataRegressionTest {
         val trackerAfterRestore = CaptureStatusTracker(harness.context, harness.holder, harness.clock, harness.logger) { true }
         trackerAfterRestore.onPermissionStateChecked()
         assertThat(db.captureGapDao().getLatestOpen()).isNull()
+    }
+
+    @Test
+    fun reparsesRetainedJagoSamplesIntoConfirmedTransactionsAndIgnoresGroupSummaryIdempotently() = runTest {
+        val db = harness.db()
+        val now = harness.clock.now
+        val sourceId = "com.jago.digitalBanking"
+
+        val accountRepo = AccountRepositoryImpl(harness.holder, harness.clock)
+        val txRepo = TransactionRepositoryImpl(harness.holder, harness.settingsStore, harness.clock)
+        val catRepo = CategoryRepositoryImpl(harness.holder, harness.clock)
+        val healthRepo = DatabaseHealthRepositoryImpl(harness.holder, harness.settingsStore)
+
+        db.transactionSourceDao().upsert(
+            TransactionSourceEntity(
+                id = sourceId,
+                packageName = sourceId,
+                displayName = "Bank Jago",
+                isAllowlisted = true,
+                parserVersion = null,
+                sampleCollectionUntil = now + 14L * 86_400_000L,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val accountId = accountRepo.create(
+            CreateAccountRequest("Bank Jago", "Bank Jago", wtrack.app.domain.model.AccountType.BANK, "IDR"),
+        )
+        db.accountSourceDao().insert(AccountSourceEntity(accountId = accountId, sourceId = sourceId, accountHint = null, createdAt = now))
+        harness.allowlistCache.refreshSnapshotNow()
+
+        // Stage 1: simulate M3a capture BEFORE JagoTransactionParser existed (NO_PARSER retained samples)
+        val emptyPipeline = harness.pipeline()
+        emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Jago",
+                text = "ALEX PRATAMA has sent Rp50.000 to you. Need help? Contact Tanya Jago at 1500 746.",
+                bigText = "ALEX PRATAMA has sent Rp50.000 to you. Need help? Contact Tanya Jago at 1500 746.",
+                channelId = "foreground",
+                postedAtEpochMillis = now - 50_000L,
+                notificationKey = "0|$sourceId|1144404937|null|1001",
+                notificationId = 1144404937,
+            ),
+        )
+        emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Jago",
+                text = "You've transferred Rp50.000 to BUDI SANTOSO. Need help? Contact Tanya Jago at 1500 746.",
+                bigText = "You've transferred Rp50.000 to BUDI SANTOSO. Need help? Contact Tanya Jago at 1500 746.",
+                channelId = "foreground",
+                postedAtEpochMillis = now - 5_000L,
+                notificationKey = "0|$sourceId|1302759633|null|1001",
+                notificationId = 1302759633,
+            ),
+        )
+        val summaryId = emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = null,
+                text = "",
+                bigText = null,
+                channelId = "foreground",
+                isGroupSummary = true,
+                postedAtEpochMillis = now - 4_700L,
+                notificationKey = "0|$sourceId|0|0|$sourceId|g:Aggregate_AlertingSection|1001",
+                notificationId = 0,
+                notificationTag = "0|$sourceId|g:Aggregate_AlertingSection",
+            ),
+        )!!
+        assertThat(db.notificationEventDao().countRetainedSamples()).isEqualTo(3)
+        assertThat(db.transactionDao().getAllOnce()).isEmpty()
+
+        // Stage 2: re-parse using registered production parsers (JagoTransactionParser v1)
+        val productionParsers = ProviderParsers.registered()
+        val registry = DefaultParserRegistry(productionParsers)
+        val productionPipeline = IngestionPipeline(
+            holder = harness.holder,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            settingsStore = harness.settingsStore,
+            heartbeatMonitor = harness.heartbeatMonitor,
+            clock = harness.clock,
+            logger = harness.logger,
+        )
+        val port = WtrackBackupAndDiagnosticsPort(
+            holder = harness.holder,
+            backupService = BackupService(harness.holder, harness.settingsStore, harness.allowlistCache, harness.captureStatusTracker, harness.clock, harness.logger, fastArgonConfig),
+            csvExporter = CsvExporter(),
+            m3aSampleExporter = M3aSampleExporter(harness.clock),
+            accountRepository = accountRepo,
+            transactionRepository = txRepo,
+            categoryRepository = catRepo,
+            databaseHealthRepository = healthRepo,
+            logger = harness.logger,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            ingestionPipeline = productionPipeline,
+            clock = harness.clock,
+        )
+
+        val reparsedFirst = port.reparseRetainedM3aSamples()
+        assertThat(reparsedFirst).isEqualTo(3)
+        assertThat(port.countRetainedM3aSamples()).isEqualTo(0)
+
+        val txs = txRepo.getAllOnce().sortedBy { it.occurredAt }
+        assertThat(txs).hasSize(2)
+        assertThat(txs[0].status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs[0].direction).isEqualTo(Direction.INFLOW)
+        assertThat(txs[0].transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs[0].amountMinor).isEqualTo(5_000_000L)
+        assertThat(txs[0].merchantName).isEqualTo("ALEX PRATAMA")
+
+        assertThat(txs[1].status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs[1].direction).isEqualTo(Direction.OUTFLOW)
+        assertThat(txs[1].transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs[1].amountMinor).isEqualTo(5_000_000L)
+        assertThat(txs[1].merchantName).isEqualTo("BUDI SANTOSO")
+
+        val summaryAfter = db.notificationEventDao().getById(summaryId)!!
+        assertThat(summaryAfter.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+        assertThat(summaryAfter.failureReason).isEqualTo("OTHER")
+        assertThat(summaryAfter.payloadJson).isNull()
+        assertThat(db.notificationEventDao().observeNeedsReviewCount().first()).isEqualTo(0)
+
+        // Second re-parse pass must do nothing and create zero duplicates
+        assertThat(port.reparseRetainedM3aSamples()).isEqualTo(0)
+        assertThat(txRepo.getAllOnce()).hasSize(2)
+    }
+
+    @Test
+    fun reparsesRetainedMyBcaSamplesIntoConfirmedTransactionsAndIgnoresGroupSummaryIdempotently() = runTest {
+        val db = harness.db()
+        val now = harness.clock.now
+        val sourceId = "com.bca.mybca.omni.android"
+
+        val accountRepo = AccountRepositoryImpl(harness.holder, harness.clock)
+        val txRepo = TransactionRepositoryImpl(harness.holder, harness.settingsStore, harness.clock)
+        val catRepo = CategoryRepositoryImpl(harness.holder, harness.clock)
+        val healthRepo = DatabaseHealthRepositoryImpl(harness.holder, harness.settingsStore)
+
+        db.transactionSourceDao().upsert(
+            TransactionSourceEntity(
+                id = sourceId,
+                packageName = sourceId,
+                displayName = "myBCA",
+                isAllowlisted = true,
+                parserVersion = null,
+                sampleCollectionUntil = now + 14L * 86_400_000L,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val accountId = accountRepo.create(
+            CreateAccountRequest("myBCA", "BCA", wtrack.app.domain.model.AccountType.BANK, "IDR"),
+        )
+        db.accountSourceDao().insert(AccountSourceEntity(accountId = accountId, sourceId = sourceId, accountHint = null, createdAt = now))
+        harness.allowlistCache.refreshSnapshotNow()
+
+        // Stage 1: simulate M3a capture BEFORE BcaTransactionParser existed (NO_PARSER retained samples)
+        val emptyPipeline = harness.pipeline()
+        emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Financial Diary",
+                text = "You received IDR 50,000.00 from AL** PR***MA at Account Transfer category.",
+                bigText = "You received IDR 50,000.00 from AL** PR***MA at Account Transfer category.",
+                channelId = "General Notification",
+                postedAtEpochMillis = now - 60_000L,
+                notificationKey = "0|$sourceId|285226|null|1001",
+                notificationId = 285226,
+            ),
+        )
+        emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Financial Diary",
+                text = "You spent IDR 50,000.00 at Account Transfer.",
+                bigText = "You spent IDR 50,000.00 at Account Transfer.",
+                channelId = "General Notification",
+                postedAtEpochMillis = now - 5_000L,
+                notificationKey = "0|$sourceId|235859|null|1001",
+                notificationId = 235859,
+            ),
+        )
+        val summaryId = emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = null,
+                text = "",
+                bigText = null,
+                channelId = "General Notification",
+                isGroupSummary = true,
+                postedAtEpochMillis = now - 4_771L,
+                notificationKey = "0|$sourceId|0|0|$sourceId|g:Aggregate_AlertingSection|1001",
+                notificationId = 0,
+                notificationTag = "0|$sourceId|g:Aggregate_AlertingSection",
+            ),
+        )!!
+        assertThat(db.notificationEventDao().countRetainedSamples()).isEqualTo(3)
+        assertThat(db.transactionDao().getAllOnce()).isEmpty()
+
+        // Stage 2: re-parse using registered production parsers (including BcaTransactionParser v1)
+        val registry = DefaultParserRegistry(ProviderParsers.registered())
+        val productionPipeline = IngestionPipeline(
+            holder = harness.holder,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            settingsStore = harness.settingsStore,
+            heartbeatMonitor = harness.heartbeatMonitor,
+            clock = harness.clock,
+            logger = harness.logger,
+        )
+        val port = WtrackBackupAndDiagnosticsPort(
+            holder = harness.holder,
+            backupService = BackupService(harness.holder, harness.settingsStore, harness.allowlistCache, harness.captureStatusTracker, harness.clock, harness.logger, fastArgonConfig),
+            csvExporter = CsvExporter(),
+            m3aSampleExporter = M3aSampleExporter(harness.clock),
+            accountRepository = accountRepo,
+            transactionRepository = txRepo,
+            categoryRepository = catRepo,
+            databaseHealthRepository = healthRepo,
+            logger = harness.logger,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            ingestionPipeline = productionPipeline,
+            clock = harness.clock,
+        )
+
+        val reparsedFirst = port.reparseRetainedM3aSamples()
+        assertThat(reparsedFirst).isEqualTo(3)
+        assertThat(port.countRetainedM3aSamples()).isEqualTo(0)
+
+        val txs = txRepo.getAllOnce().sortedBy { it.occurredAt }
+        assertThat(txs).hasSize(2)
+        assertThat(txs[0].status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs[0].direction).isEqualTo(Direction.INFLOW)
+        assertThat(txs[0].transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs[0].amountMinor).isEqualTo(5_000_000L)
+        assertThat(txs[0].merchantName).isEqualTo("AL** PR***MA")
+
+        assertThat(txs[1].status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs[1].direction).isEqualTo(Direction.OUTFLOW)
+        assertThat(txs[1].transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs[1].amountMinor).isEqualTo(5_000_000L)
+        assertThat(txs[1].merchantName).isEqualTo("Account Transfer")
+
+        val summaryAfter = db.notificationEventDao().getById(summaryId)!!
+        assertThat(summaryAfter.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+        assertThat(summaryAfter.failureReason).isEqualTo("OTHER")
+        assertThat(summaryAfter.payloadJson).isNull()
+        assertThat(db.notificationEventDao().observeNeedsReviewCount().first()).isEqualTo(0)
+
+        // Second re-parse pass must do nothing and create zero duplicates
+        assertThat(port.reparseRetainedM3aSamples()).isEqualTo(0)
+        assertThat(txRepo.getAllOnce()).hasSize(2)
+    }
+
+    @Test
+    fun reparsesRetainedDanaSamplesCreatesTransferDropsQuestPromosAndSummaryIdempotently() = runTest {
+        val db = harness.db()
+        val now = harness.clock.now
+        val sourceId = "id.dana"
+
+        val accountRepo = AccountRepositoryImpl(harness.holder, harness.clock)
+        val txRepo = TransactionRepositoryImpl(harness.holder, harness.settingsStore, harness.clock)
+        val catRepo = CategoryRepositoryImpl(harness.holder, harness.clock)
+        val healthRepo = DatabaseHealthRepositoryImpl(harness.holder, harness.settingsStore)
+
+        db.transactionSourceDao().upsert(
+            TransactionSourceEntity(
+                id = sourceId,
+                packageName = sourceId,
+                displayName = "DANA",
+                isAllowlisted = true,
+                parserVersion = null,
+                sampleCollectionUntil = now + 14L * 86_400_000L,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val accountId = accountRepo.create(
+            CreateAccountRequest("DANA", "DANA", wtrack.app.domain.model.AccountType.EWALLET, "IDR"),
+        )
+        db.accountSourceDao().insert(AccountSourceEntity(accountId = accountId, sourceId = sourceId, accountHint = null, createdAt = now))
+        harness.allowlistCache.refreshSnapshotNow()
+
+        // Stage 1: simulate M3a capture BEFORE DanaTransactionParser existed (7 NO_PARSER samples)
+        val emptyPipeline = harness.pipeline()
+        val questIds = listOf(21004, 21005, 21007, 21008, 21009).mapIndexed { index, nid ->
+            val msg = if (nid == 21005) {
+                "Misi selesai🎉 Yuk, klaim hadiahmu sekarang!"
+            } else {
+                "Yay, kamu berhasil selesaikan quest!"
+            }
+            emptyPipeline.ingest(
+                sampleEnvelope(
+                    sourceId = sourceId,
+                    title = "DANA",
+                    text = msg,
+                    bigText = msg,
+                    channelId = "fcm_default_channel_sound_2131951648",
+                    postedAtEpochMillis = now - 50_000L + index * 5_000L,
+                    notificationKey = "0|$sourceId|$nid|null|1001",
+                    notificationId = nid,
+                ),
+            )!!
+        }
+        val summaryId = emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = null,
+                text = "",
+                bigText = null,
+                channelId = "fcm_default_channel_sound_2131951648",
+                isGroupSummary = true,
+                postedAtEpochMillis = now - 44_000L,
+                notificationKey = "0|$sourceId|0|0|$sourceId|g:Aggregate_AlertingSection|1001",
+                notificationId = 0,
+                notificationTag = "0|$sourceId|g:Aggregate_AlertingSection",
+            ),
+        )!!
+        emptyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "DANA",
+                text = "Rp2.000 telah diterima dari ALEX PRATAMA 💰",
+                bigText = "Rp2.000 telah diterima dari ALEX PRATAMA 💰",
+                channelId = "fcm_default_channel_sound_2131951648",
+                postedAtEpochMillis = now - 30_000L,
+                notificationKey = "0|$sourceId|21006|null|1001",
+                notificationId = 21006,
+            ),
+        )
+        assertThat(db.notificationEventDao().countRetainedSamples()).isEqualTo(7)
+        assertThat(db.transactionDao().getAllOnce()).isEmpty()
+
+        // Stage 2: re-parse using registered production parsers (including DanaTransactionParser v1)
+        val registry = DefaultParserRegistry(ProviderParsers.registered())
+        val productionPipeline = IngestionPipeline(
+            holder = harness.holder,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            settingsStore = harness.settingsStore,
+            heartbeatMonitor = harness.heartbeatMonitor,
+            clock = harness.clock,
+            logger = harness.logger,
+        )
+        val port = WtrackBackupAndDiagnosticsPort(
+            holder = harness.holder,
+            backupService = BackupService(harness.holder, harness.settingsStore, harness.allowlistCache, harness.captureStatusTracker, harness.clock, harness.logger, fastArgonConfig),
+            csvExporter = CsvExporter(),
+            m3aSampleExporter = M3aSampleExporter(harness.clock),
+            accountRepository = accountRepo,
+            transactionRepository = txRepo,
+            categoryRepository = catRepo,
+            databaseHealthRepository = healthRepo,
+            logger = harness.logger,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            ingestionPipeline = productionPipeline,
+            clock = harness.clock,
+        )
+
+        val reparsedFirst = port.reparseRetainedM3aSamples()
+        assertThat(reparsedFirst).isEqualTo(7)
+        assertThat(port.countRetainedM3aSamples()).isEqualTo(0)
+
+        val txs = txRepo.getAllOnce()
+        assertThat(txs).hasSize(1)
+        assertThat(txs.single().status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs.single().direction).isEqualTo(Direction.INFLOW)
+        assertThat(txs.single().transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs.single().amountMinor).isEqualTo(200_000L)
+        assertThat(txs.single().merchantName).isEqualTo("ALEX PRATAMA")
+
+        questIds.forEach { qid ->
+            val evt = db.notificationEventDao().getById(qid)!!
+            assertThat(evt.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+            assertThat(evt.failureReason).isEqualTo("PROMOTION")
+            assertThat(evt.payloadJson).isNull()
+        }
+
+        val summaryAfter = db.notificationEventDao().getById(summaryId)!!
+        assertThat(summaryAfter.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+        assertThat(summaryAfter.failureReason).isEqualTo("OTHER")
+        assertThat(summaryAfter.payloadJson).isNull()
+        assertThat(db.notificationEventDao().observeNeedsReviewCount().first()).isEqualTo(0)
+
+        // Second re-parse pass must do nothing and create zero duplicates
+        assertThat(port.reparseRetainedM3aSamples()).isEqualTo(0)
+        assertThat(txRepo.getAllOnce()).hasSize(1)
+    }
+
+    @Test
+    fun retryingJagoPocketNeedsReviewEventsWithV2TracksOnlyMainPocketAndIgnoresSubPockets() = runTest {
+        val db = harness.db()
+        val now = harness.clock.now
+        val sourceId = "com.jago.digitalBanking"
+
+        val accountRepo = AccountRepositoryImpl(harness.holder, harness.clock)
+        val txRepo = TransactionRepositoryImpl(harness.holder, harness.settingsStore, harness.clock)
+
+        db.transactionSourceDao().upsert(
+            TransactionSourceEntity(
+                id = sourceId,
+                packageName = sourceId,
+                displayName = "Bank Jago",
+                isAllowlisted = true,
+                parserVersion = 1,
+                sampleCollectionUntil = null,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        val accountId = accountRepo.create(
+            CreateAccountRequest("Bank Jago", "Bank Jago", wtrack.app.domain.model.AccountType.BANK, "IDR"),
+        )
+        db.accountSourceDao().insert(
+            AccountSourceEntity(accountId = accountId, sourceId = sourceId, accountHint = null, createdAt = now),
+        )
+        harness.allowlistCache.refreshSnapshotNow()
+
+        // Stage 1: simulate the 4 Bank Jago pocket-move events landing in NEEDS_REVIEW under parser v1
+        val v1Stub = StubTransactionParser(sourceId, version = 1) {
+            ParseResult.NeedsReview(ReviewReason.UNKNOWN_FORMAT, null)
+        }
+        val legacyPipeline = harness.pipeline(v1Stub)
+        val subToMainId = legacyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Jago",
+                text = "You've moved Rp250.000 out of your Laptop Savings Pocket. Need help? Contact Tanya Jago at 1500 746.",
+                bigText = "You've moved Rp250.000 out of your Laptop Savings Pocket. Need help? Contact Tanya Jago at 1500 746.",
+                channelId = "foreground",
+                postedAtEpochMillis = now - 360_000L,
+                notificationKey = "0|$sourceId|14001|null|1001",
+                notificationId = 14001,
+            ),
+        )!!
+        val mainToSubId = legacyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Jago",
+                text = "Rp250.000 has been moved from your Main Pocket Pocket to your Laptop Savings Pocket.",
+                bigText = "Rp250.000 has been moved from your Main Pocket Pocket to your Laptop Savings Pocket.",
+                channelId = "foreground",
+                postedAtEpochMillis = now - 60_000L,
+                notificationKey = "0|$sourceId|14002|null|1001",
+                notificationId = 14002,
+            ),
+        )!!
+        val subAToSubBId = legacyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Jago",
+                text = "You've moved Rp1.000 from Daily Savings Pocket to your Laptop Savings Pocket. Click here to see how to add money to Jago. Need help? Contact Tanya Jago at 1500 746.",
+                bigText = "You've moved Rp1.000 from Daily Savings Pocket to your Laptop Savings Pocket. Click here to see how to add money to Jago. Need help? Contact Tanya Jago at 1500 746.",
+                channelId = "foreground",
+                postedAtEpochMillis = now - 30_000L,
+                notificationKey = "0|$sourceId|14003|null|1001",
+                notificationId = 14003,
+            ),
+        )!!
+        val subBToSubAId = legacyPipeline.ingest(
+            sampleEnvelope(
+                sourceId = sourceId,
+                title = "Jago",
+                text = "You've moved Rp1.000 from Laptop Savings Pocket to your Daily Savings Pocket. Click here to see how to add money to Jago. Need help? Contact Tanya Jago at 1500 746.",
+                bigText = "You've moved Rp1.000 from Laptop Savings Pocket to your Daily Savings Pocket. Click here to see how to add money to Jago. Need help? Contact Tanya Jago at 1500 746.",
+                channelId = "foreground",
+                postedAtEpochMillis = now - 25_000L,
+                notificationKey = "0|$sourceId|14004|null|1001",
+                notificationId = 14004,
+            ),
+        )!!
+        assertThat(db.notificationEventDao().observeNeedsReviewCount().first()).isEqualTo(4)
+
+        // Stage 2: retry all 4 Review items using production JagoTransactionParser v2
+        val registry = DefaultParserRegistry(ProviderParsers.registered())
+        val productionPipeline = IngestionPipeline(
+            holder = harness.holder,
+            allowlistCache = harness.allowlistCache,
+            parserRegistry = registry,
+            settingsStore = harness.settingsStore,
+            heartbeatMonitor = harness.heartbeatMonitor,
+            clock = harness.clock,
+            logger = harness.logger,
+        )
+        val reviewRepo = NeedsReviewRepositoryImpl(
+            holder = harness.holder,
+            settingsStore = harness.settingsStore,
+            clock = harness.clock,
+            onRetryRequested = { eventId -> productionPipeline.processEvent(eventId) },
+        )
+
+        listOf(subToMainId, mainToSubId, subAToSubBId, subBToSubAId).forEach { id ->
+            reviewRepo.retry(id)
+        }
+
+        val txs = txRepo.getAllOnce().sortedBy { it.occurredAt }
+        assertThat(txs).hasSize(2)
+        assertThat(txs[0].accountId).isEqualTo(accountId)
+        assertThat(txs[0].status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs[0].direction).isEqualTo(Direction.INFLOW)
+        assertThat(txs[0].transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs[0].amountMinor).isEqualTo(25_000_000L)
+        assertThat(txs[0].merchantName).isEqualTo("Laptop Savings")
+
+        assertThat(txs[1].accountId).isEqualTo(accountId)
+        assertThat(txs[1].status).isEqualTo(TransactionStatus.CONFIRMED)
+        assertThat(txs[1].direction).isEqualTo(Direction.OUTFLOW)
+        assertThat(txs[1].transactionType).isEqualTo(DomainTransactionType.TRANSFER)
+        assertThat(txs[1].amountMinor).isEqualTo(25_000_000L)
+        assertThat(txs[1].merchantName).isEqualTo("Laptop Savings")
+
+        val jagoAccount = accountRepo.accounts.first().single()
+        assertThat(jagoAccount.estimatedBalanceMinor).isEqualTo(0L)
+
+        listOf(subAToSubBId, subBToSubAId).forEach { ignoredId ->
+            val ignoredEvent = db.notificationEventDao().getById(ignoredId)!!
+            assertThat(ignoredEvent.processingStatus).isEqualTo(NotificationEventStatus.IGNORED.name)
+            assertThat(ignoredEvent.failureReason).isEqualTo("OTHER")
+            assertThat(ignoredEvent.payloadJson).isNull()
+        }
+        assertThat(reviewRepo.pendingCount.first()).isEqualTo(0)
     }
 }

@@ -216,10 +216,12 @@ class ActivityViewModel @Inject constructor(
                 actionMessage.value = "Select an account."
                 return@launch
             }
-            val minor = MoneyFormatter.parseMajorInput(amountMajorInput, account.currency) ?: run {
-                actionMessage.value = "Invalid amount for ${account.currency}."
-                return@launch
-            }
+            val minor = MoneyFormatter.parseMajorInput(amountMajorInput, account.currency)
+                ?.takeIf { it > 0L }
+                ?: run {
+                    actionMessage.value = "Invalid amount for ${account.currency}."
+                    return@launch
+                }
             runCatching {
                 createManualTransactionUseCase(
                     CreateManualTransactionRequest(
@@ -255,10 +257,12 @@ class ActivityViewModel @Inject constructor(
         note: String?,
     ) {
         viewModelScope.launch {
-            val minor = MoneyFormatter.parseMajorInput(amountMajorInput, tx.currency) ?: run {
-                actionMessage.value = "Invalid amount format for ${tx.currency}."
-                return@launch
-            }
+            val minor = MoneyFormatter.parseMajorInput(amountMajorInput, tx.currency)
+                ?.takeIf { it > 0L }
+                ?: run {
+                    actionMessage.value = "Invalid amount format for ${tx.currency}."
+                    return@launch
+                }
             runCatching {
                 updateTransactionUseCase(
                     UpdateTransactionRequest(

@@ -77,10 +77,12 @@ class ReviewViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val normalizedCurrency = currency.trim().uppercase().ifEmpty { uiState.value.defaultCurrency }
-            val minor = MoneyFormatter.parseMajorInput(amountMajorInput, normalizedCurrency) ?: run {
-                actionMessage.value = "Enter a valid positive amount for $normalizedCurrency."
-                return@launch
-            }
+            val minor = MoneyFormatter.parseMajorInput(amountMajorInput, normalizedCurrency)
+                ?.takeIf { it > 0L }
+                ?: run {
+                    actionMessage.value = "Enter a valid positive amount for $normalizedCurrency."
+                    return@launch
+                }
             runCatching {
                 resolveNeedsReviewUseCase.save(
                     itemId = item.id,

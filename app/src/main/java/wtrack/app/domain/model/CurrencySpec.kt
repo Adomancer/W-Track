@@ -89,48 +89,137 @@ object MoneyFormatter {
     }
 
     /**
-     * Parses a user-entered major-unit input string (supports Indonesian `,` or standard `.` decimal)
-     * into exact minor units according to [CurrencyRegistry]. Returns null when malformed or > allowed scale.
+     * Formats minor units for pre-filling editable amount text fields without thousands clutter.
+     */
+    fun formatForInput(amountMinor: Long, currencyCode: String): String {
+        val spec = CurrencyRegistry.specFor(currencyCode)
+        if (spec.minorUnitDigits == 0) {
+            return amountMinor.toString()
+        }
+        val factor = CurrencyRegistry.scaleFactor(spec.code)
+        val negative = amountMinor < 0L
+        val absMinor = if (amountMinor == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(amountMinor)
+        val major = absMinor / factor
+        val minor = absMinor % factor
+        val prefix = if (negative) "-" else ""
+        return when {
+            spec.code == "IDR" && minor == 0L -> "$prefix$major"
+            spec.code == "IDR" -> "$prefix$major,${minor.toString().padStart(spec.minorUnitDigits, '0')}"
+            else -> "$prefix$major.${minor.toString().padStart(spec.minorUnitDigits, '0')}"
+        }
+    }
+
+    private val leadingCurrencyPrefixRegex = Regex(
+        pattern = "^(?:IDR|Rp\\.?|USD|US\\$|SGD|S\\$|EUR|€|MYR|RM|JPY|¥|KRW|₩|\\$)+",
+        option = RegexOption.IGNORE_CASE,
+    )
+    private val indonesianGroupedIntRegex = Regex("^\\d{1,3}(\\.\\d{3})+$")
+    private val englishGroupedIntRegex = Regex("^\\d{1,3}(,\\d{3})+$")
+    private val digitsOnlyRegex = Regex("^\\d+$")
+
+    /**
+     * Parses user-entered major-unit input strings into exact minor units according to [CurrencyRegistry].
+     * Accepts plain digits (`50000`), Indonesian grouping (`50.000`, `1.250.000,50`), English grouping
+     * (`50,000`, `1,250,000.50`), optional pasted currency prefixes (`Rp 50.000`), and decimal sen/cents.
      */
     fun parseMajorInput(input: String, currencyCode: String): Long? {
-        val cleaned = input.trim().replace(" ", "")
+        var cleaned = input.replace('\u00A0', ' ').replace(" ", "").trim()
         if (cleaned.isEmpty()) return null
-        val spec = CurrencyRegistry.specFor(currencyCode)
 
-        // Accept either plain digits, Indonesian format (50.000 / 1.250.000,50), or plain dot decimal (1250000.50).
+        var negative = false
+        if (cleaned.startsWith("-") || cleaned.startsWith("+")) {
+            negative = cleaned.startsWith("-")
+            cleaned = cleaned.substring(1)
+        }
+        cleaned = cleaned.replace(leadingCurrencyPrefixRegex, "")
+        if (!negative && (cleaned.startsWith("-") || cleaned.startsWith("+"))) {
+            negative = cleaned.startsWith("-")
+            cleaned = cleaned.substring(1)
+        }
+        if (cleaned.isEmpty() || !cleaned.matches(Regex("^[0-9.,]+$"))) return null
+
+        val spec = CurrencyRegistry.specFor(currencyCode)
+        val dotCount = cleaned.count { it == '.' }
+        val commaCount = cleaned.count { it == ',' }
+
         val normalized = when {
-            cleaned.contains(',') && cleaned.contains('.') -> {
-                // Only valid if dots precede comma (e.g. 1.250.000,50) or commas precede dot (1,250,000.50).
+            dotCount > 0 && commaCount > 0 -> {
+                if (spec.minorUnitDigits == 0) return null
                 val lastDot = cleaned.lastIndexOf('.')
                 val lastComma = cleaned.lastIndexOf(',')
                 if (lastComma > lastDot) {
-                    cleaned.replace(".", "").replace(',', '.')
+                    val intPart = cleaned.substring(0, lastComma)
+                    val fracPart = cleaned.substring(lastComma + 1)
+                    if (!indonesianGroupedIntRegex.matches(intPart) ||
+                        !digitsOnlyRegex.matches(fracPart) ||
+                        fracPart.length !in 1..spec.minorUnitDigits
+                    ) {
+                        return null
+                    }
+                    "${intPart.replace(".", "")}.$fracPart"
                 } else {
-                    cleaned.replace(",", "")
+                    val intPart = cleaned.substring(0, lastDot)
+                    val fracPart = cleaned.substring(lastDot + 1)
+                    if (!englishGroupedIntRegex.matches(intPart) ||
+                        !digitsOnlyRegex.matches(fracPart) ||
+                        fracPart.length !in 1..spec.minorUnitDigits
+                    ) {
+                        return null
+                    }
+                    "${intPart.replace(",", "")}.$fracPart"
                 }
             }
-            cleaned.contains(',') -> {
-                val parts = cleaned.split(',')
-                if (parts.size != 2 || parts[1].length > spec.minorUnitDigits) return null
-                "${parts[0]}.${parts[1]}"
-            }
-            cleaned.count { it == '.' } > 1 -> {
-                // Multiple dots: Indonesian thousands separator (e.g., 1.250.000)
-                if (!cleaned.matches(Regex("^\\d{1,3}(\\.\\d{3})+$"))) return null
+
+            dotCount > 1 -> {
+                if (!indonesianGroupedIntRegex.matches(cleaned)) return null
                 cleaned.replace(".", "")
             }
-            cleaned.contains('.') -> {
+
+            commaCount > 1 -> {
+                if (!englishGroupedIntRegex.matches(cleaned)) return null
+                cleaned.replace(",", "")
+            }
+
+            dotCount == 1 -> {
                 val parts = cleaned.split('.')
-                if (parts.size != 2) return null
-                // If user typed Rp grouping like 50.000 (3 trailing digits) for IDR, disallow silent ambiguity or require exact scale:
-                if (parts[1].length == 3 && spec.minorUnitDigits == 2) return null
-                if (parts[1].length > spec.minorUnitDigits) return null
+                val intPart = parts[0]
+                val fracPart = parts[1]
+                if (!digitsOnlyRegex.matches(intPart) || !digitsOnlyRegex.matches(fracPart)) return null
+                when {
+                    fracPart.length == 3 && intPart.length in 1..3 && !intPart.startsWith("0") -> {
+                        if (spec.code == "IDR" || spec.minorUnitDigits == 0) {
+                            intPart + fracPart
+                        } else {
+                            return null
+                        }
+                    }
+                    fracPart.length in 1..spec.minorUnitDigits -> cleaned
+                    else -> return null
+                }
+            }
+
+            commaCount == 1 -> {
+                val parts = cleaned.split(',')
+                val intPart = parts[0]
+                val fracPart = parts[1]
+                if (!digitsOnlyRegex.matches(intPart) || !digitsOnlyRegex.matches(fracPart)) return null
+                when {
+                    fracPart.length == 3 && intPart.length in 1..3 && !intPart.startsWith("0") -> {
+                        intPart + fracPart
+                    }
+                    fracPart.length in 1..spec.minorUnitDigits -> "$intPart.$fracPart"
+                    else -> return null
+                }
+            }
+
+            else -> {
+                if (!digitsOnlyRegex.matches(cleaned)) return null
                 cleaned
             }
-            else -> cleaned
         }
 
-        val bd = normalized.toBigDecimalOrNull() ?: return null
+        val signedNormalized = if (negative) "-$normalized" else normalized
+        val bd = signedNormalized.toBigDecimalOrNull() ?: return null
         if (bd.scale() > spec.minorUnitDigits) return null
         return try {
             bd.movePointRight(spec.minorUnitDigits).longValueExact()

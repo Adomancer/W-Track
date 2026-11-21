@@ -36,8 +36,10 @@ import androidx.compose.ui.unit.dp
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.NeedsReviewItem
+import wtrack.app.feature.common.MoneyAmountTextField
 import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.UiDateHelper
+import wtrack.app.feature.common.isValidMoneyInput
 import wtrack.integration.Direction
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -125,7 +127,7 @@ fun ReviewScreen(viewModel: ReviewViewModel) {
         val initialCurrency = item.draftCurrency
             ?: state.accounts.firstOrNull { it.id == initialAccountId }?.currency
             ?: state.defaultCurrency
-        val initialAmount = item.draftAmountMinor?.let { MoneyFormatter.formatForCsv(it, initialCurrency) }.orEmpty()
+        val initialAmount = item.draftAmountMinor?.let { MoneyFormatter.formatForInput(it, initialCurrency) }.orEmpty()
         var selectedAccountId by remember(item.id) { mutableLongStateOf(initialAccountId) }
         var amountInput by remember(item.id) { mutableStateOf(initialAmount) }
         var currencyInput by remember(item.id) { mutableStateOf(initialCurrency) }
@@ -152,11 +154,11 @@ fun ReviewScreen(viewModel: ReviewViewModel) {
                             )
                         }
                     }
-                    OutlinedTextField(
+                    MoneyAmountTextField(
                         value = amountInput,
                         onValueChange = { amountInput = it },
-                        label = { Text("Amount ($currencyInput)") },
-                        singleLine = true,
+                        currency = currencyInput,
+                        label = "Amount ($currencyInput)",
                         modifier = Modifier.fillMaxWidth(),
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -194,10 +196,13 @@ fun ReviewScreen(viewModel: ReviewViewModel) {
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    resolvingItem = null
-                    viewModel.saveResolved(item, selectedAccountId, amountInput, currencyInput, direction, type, description, categoryId, rememberHint)
-                }) { Text("Confirm & Save") }
+                Button(
+                    enabled = isValidMoneyInput(amountInput, currencyInput),
+                    onClick = {
+                        resolvingItem = null
+                        viewModel.saveResolved(item, selectedAccountId, amountInput, currencyInput, direction, type, description, categoryId, rememberHint)
+                    },
+                ) { Text("Confirm & Save") }
             },
             dismissButton = { TextButton(onClick = { resolvingItem = null }) { Text("Cancel") } },
         )

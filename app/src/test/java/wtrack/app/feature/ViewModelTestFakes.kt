@@ -48,6 +48,7 @@ import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
 import wtrack.app.domain.repository.RestoreResult
 import wtrack.app.domain.repository.RuleRepository
+import wtrack.app.domain.repository.SampleExportResult
 import wtrack.app.domain.repository.SaveReviewItemRequest
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.repository.SourceAndEventRepository
@@ -350,6 +351,13 @@ class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {
     override fun clearDiagnosticLogs() { logs.clear() }
     override fun providerCatalogEntries(): List<ProviderCatalogEntry> = emptyList()
     override suspend fun refreshAllowlistCache() {}
+    override suspend fun countRetainedM3aSamples(): Int = 0
+    override suspend fun exportAnonymizedM3aSamples(
+        outputStream: OutputStream,
+        redactTerms: List<String>,
+    ) = SampleExportResult(0, 0)
+    override suspend fun purgeRetainedM3aSamplesNow(): Int = 0
+    override suspend fun reparseRetainedM3aSamples(): Int = 0
 }
 
 class FakeBudgetRepository : BudgetRepository {

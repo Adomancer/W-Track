@@ -51,6 +51,7 @@ data class SettingsUiState(
     val diagnosticLogs: List<String> = emptyList(),
     val providerCatalog: List<ProviderCatalogEntry> = emptyList(),
     val gateG1Report: GateG1Report? = null,
+    val retainedSampleCount: Int = 0,
     val isBusy: Boolean = false,
     val actionMessage: String? = null,
 )
@@ -70,9 +71,14 @@ class SettingsViewModel @Inject constructor(
 
     private val logsFlow = MutableStateFlow(backupPort.readDiagnosticLogLines(200))
     private val gateReportFlow = MutableStateFlow<GateG1Report?>(null)
+    private val sampleCountFlow = MutableStateFlow(0)
     private val isBusyFlow = MutableStateFlow(false)
     private val actionMessage = MutableStateFlow<String?>(null)
     private val postRestorePrompt = MutableStateFlow(false)
+
+    init {
+        refreshSampleCount()
+    }
 
     private val repoSnapshot = combine(
         settingsRepository.settings,
@@ -89,8 +95,9 @@ class SettingsViewModel @Inject constructor(
         postRestorePrompt,
         logsFlow,
         gateReportFlow,
-    ) { pendingReviewCount, restorePrompt, logs, report ->
-        AuxSnapshot(pendingReviewCount, restorePrompt, logs, report)
+        sampleCountFlow,
+    ) { pendingReviewCount, restorePrompt, logs, report, retainedSampleCount ->
+        AuxSnapshot(pendingReviewCount, restorePrompt, logs, report, retainedSampleCount)
     }
 
     val uiState: StateFlow<SettingsUiState> = combine(
@@ -110,6 +117,7 @@ class SettingsViewModel @Inject constructor(
             diagnosticLogs = aux.logs,
             providerCatalog = backupPort.providerCatalogEntries(),
             gateG1Report = aux.report,
+            retainedSampleCount = aux.retainedSampleCount,
             isBusy = busy,
             actionMessage = message,
         )
@@ -201,6 +209,80 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             captureStatusRepository.refreshStatus()
             logsFlow.value = backupPort.readDiagnosticLogLines(200)
+            sampleCountFlow.value = runCatching { backupPort.countRetainedM3aSamples() }.getOrDefault(0)
+        }
+    }
+
+    private fun refreshSampleCount() {
+        viewModelScope.launch {
+            sampleCountFlow.value = runCatching { backupPort.countRetainedM3aSamples() }.getOrDefault(0)
+        }
+    }
+
+    fun exportAnonymizedM3aSamples(redactTermsCsv: String, streamOpener: () -> OutputStream?) {
+        val redactTerms = redactTermsCsv
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        viewModelScope.launch {
+            isBusyFlow.value = true
+            runCatching {
+                withContext(dispatcherProvider.io) {
+                    val stream = streamOpener() ?: error("Could not open sample export destination.")
+                    stream.use { output -> backupPort.exportAnonymizedM3aSamples(output, redactTerms) }
+                }
+            }.onSuccess { result ->
+                sampleCountFlow.value = runCatching { backupPort.countRetainedM3aSamples() }.getOrDefault(0)
+                actionMessage.value = buildString {
+                    append("Exported ${result.exportedCount} anonymized sample(s)")
+                    if (result.skippedSecurityCount > 0) {
+                        append(" (skipped ${result.skippedSecurityCount} security notice(s))")
+                    }
+                    append(".")
+                }
+            }.onFailure { err ->
+                actionMessage.value = err.message ?: "Sample export failed."
+            }
+            isBusyFlow.value = false
+        }
+    }
+
+    fun purgeRetainedM3aSamplesNow() {
+        viewModelScope.launch {
+            isBusyFlow.value = true
+            runCatching {
+                withContext(dispatcherProvider.io) {
+                    backupPort.purgeRetainedM3aSamplesNow()
+                }
+            }.onSuccess { purged ->
+                sampleCountFlow.value = 0
+                actionMessage.value = "Purged $purged retained sample payload(s) from encrypted storage."
+            }.onFailure { err ->
+                actionMessage.value = err.message ?: "Failed to purge retained samples."
+            }
+            isBusyFlow.value = false
+        }
+    }
+
+    fun reparseRetainedM3aSamples() {
+        viewModelScope.launch {
+            isBusyFlow.value = true
+            runCatching {
+                withContext(dispatcherProvider.io) {
+                    backupPort.reparseRetainedM3aSamples()
+                }
+            }.onSuccess { reparsed ->
+                sampleCountFlow.value = runCatching { backupPort.countRetainedM3aSamples() }.getOrDefault(0)
+                logsFlow.value = backupPort.readDiagnosticLogLines(200)
+                actionMessage.value = if (reparsed > 0) {
+                    "Re-parsed $reparsed retained sample(s) using active parsers."
+                } else {
+                    "No retained samples matched an active parser yet."
+                }
+            }.onFailure { err ->
+                actionMessage.value = err.message ?: "Sample re-parse failed."
+            }
+            isBusyFlow.value = false
         }
     }
 
@@ -282,6 +364,7 @@ class SettingsViewModel @Inject constructor(
                 }
             }.onSuccess {
                 logsFlow.value = emptyList()
+                sampleCountFlow.value = 0
                 actionMessage.value = "All local data wiped."
             }.onFailure { err ->
                 actionMessage.value = err.message ?: "Wipe failed."
@@ -311,5 +394,6 @@ class SettingsViewModel @Inject constructor(
         val restorePrompt: Boolean,
         val logs: List<String>,
         val report: GateG1Report?,
+        val retainedSampleCount: Int,
     )
 }

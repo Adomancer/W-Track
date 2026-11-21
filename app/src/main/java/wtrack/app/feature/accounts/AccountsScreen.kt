@@ -42,9 +42,11 @@ import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.AccountType
 import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.feature.common.CaptureStatusPill
+import wtrack.app.feature.common.MoneyAmountTextField
 import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.UiDateHelper
 import wtrack.app.feature.common.formatCurrency
+import wtrack.app.feature.common.isValidMoneyInput
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -65,27 +67,28 @@ fun AccountsScreen(
             }
         },
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             if (state.actionMessage != null) {
-                item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(state.actionMessage!!, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            TextButton(onClick = viewModel::clearMessage) { Text("OK") }
-                        }
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(state.actionMessage!!, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = viewModel::clearMessage) { Text("OK") }
                     }
                 }
             }
-
-            if (state.activeAccounts.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (state.activeAccounts.isEmpty()) {
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -237,6 +240,7 @@ fun AccountsScreen(
                     }
                 }
             }
+            }
         }
     }
 
@@ -267,8 +271,8 @@ fun AccountsScreen(
 
     if (correctingAccount != null) {
         val acc = correctingAccount!!
-        var actualInput by remember { mutableStateOf("") }
-        var note by remember { mutableStateOf("") }
+        var actualInput by remember(acc.id) { mutableStateOf("") }
+        var note by remember(acc.id) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { correctingAccount = null },
             title = { Text("Correct Balance — ${acc.name}") },
@@ -279,11 +283,13 @@ fun AccountsScreen(
                             "An adjustment updates this account's balance without changing income or spending totals (ACC-08).",
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    OutlinedTextField(
+                    MoneyAmountTextField(
                         value = actualInput,
                         onValueChange = { actualInput = it },
-                        label = { Text("Actual balance (${acc.currency})") },
-                        singleLine = true,
+                        currency = acc.currency,
+                        label = "Actual balance (${acc.currency})",
+                        allowZero = true,
+                        allowNegative = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -296,10 +302,13 @@ fun AccountsScreen(
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    correctingAccount = null
-                    viewModel.correctBalance(acc.id, acc.currency, actualInput, note)
-                }) { Text("Save Adjustment") }
+                Button(
+                    enabled = isValidMoneyInput(actualInput, acc.currency, allowZero = true, allowNegative = true),
+                    onClick = {
+                        correctingAccount = null
+                        viewModel.correctBalance(acc.id, acc.currency, actualInput, note)
+                    },
+                ) { Text("Save Adjustment") }
             },
             dismissButton = { TextButton(onClick = { correctingAccount = null }) { Text("Cancel") } },
         )
@@ -392,11 +401,26 @@ private fun AccountEditorDialog(
                 }
                 OutlinedTextField(value = currency, onValueChange = { currency = it }, label = { Text("ISO Currency (e.g., IDR)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 if (initial == null) {
-                    OutlinedTextField(value = opening, onValueChange = { opening = it }, label = { Text("Opening balance (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    MoneyAmountTextField(
+                        value = opening,
+                        onValueChange = { opening = it },
+                        currency = currency,
+                        label = "Opening balance (optional)",
+                        allowZero = true,
+                        allowNegative = true,
+                        isOptional = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(name, provider, type, currency, opening) }) { Text("Save") } },
+        confirmButton = {
+            Button(
+                enabled = name.isNotBlank() &&
+                    (initial != null || isValidMoneyInput(opening, currency, allowZero = true, allowNegative = true, isOptional = true)),
+                onClick = { onConfirm(name, provider, type, currency, opening) },
+            ) { Text("Save") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

@@ -19,6 +19,11 @@ data class RestoreResult(
     val preservedEventIdentities: Int,
 )
 
+data class SampleExportResult(
+    val exportedCount: Int,
+    val skippedSecurityCount: Int,
+)
+
 data class ProviderCatalogEntry(
     val priority: Int,
     val id: String,
@@ -47,6 +52,13 @@ interface BackupAndDiagnosticsPort {
     fun clearDiagnosticLogs()
     fun providerCatalogEntries(): List<ProviderCatalogEntry>
     suspend fun refreshAllowlistCache()
+    suspend fun countRetainedM3aSamples(): Int
+    suspend fun exportAnonymizedM3aSamples(
+        outputStream: OutputStream,
+        redactTerms: List<String> = emptyList(),
+    ): SampleExportResult
+    suspend fun purgeRetainedM3aSamplesNow(): Int
+    suspend fun reparseRetainedM3aSamples(): Int
 }
 
 object BackupReminderEvaluator {

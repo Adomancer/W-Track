@@ -55,16 +55,20 @@ class SensitiveContentAndCatalogTest {
     }
 
     @Test
-    fun providerCatalogListsInitialThreePoCTargetsPendingDeviceVerification() {
+    fun providerCatalogListsInitialThreeVerifiedPoCTargetsWithNoPrematureParsers() {
         val targets = ProviderCatalog.initialPoCTargets
         assertThat(targets.map { it.displayName }).containsExactly(
             "Bank Jago",
             "DANA",
             "BCA (BCA mobile / myBCA)",
         ).inOrder()
-        assertThat(targets.all { it.verificationStatus == VerificationStatus.PENDING_DEVICE_VERIFICATION }).isTrue()
-        assertThat(targets.all { it.verifiedPackageId == null }).isTrue()
-        assertThat(ProviderParsers.registered()).isEmpty()
+        assertThat(targets.all { it.verificationStatus == VerificationStatus.VERIFIED_ACTIVE }).isTrue()
+        assertThat(targets[0].verifiedPackageId).isEqualTo("com.jago.digitalBanking")
+        assertThat(targets[1].verifiedPackageId).isEqualTo("id.dana")
+        assertThat(targets[2].verifiedPackageId).isEqualTo("com.bca.mybca.omni.android")
+        assertThat(targets[2].verifiedPackageIds).containsExactly("com.bca", "com.bca.mybca.omni.android").inOrder()
+        assertThat(ProviderParsers.registered().map { it.sourceId })
+            .containsExactly("com.jago.digitalBanking", "id.dana", "com.bca.mybca.omni.android")
     }
 
     private fun testEvent(
