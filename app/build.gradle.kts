@@ -4,6 +4,16 @@ plugins {
 
 android {
     namespace = "wtrack.app"
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+    arg("room.generateKotlin", "true")
 }
 
 dependencies {
@@ -28,13 +38,27 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // Dependency Injection (Hilt)
+    // Dependency Injection (Hilt + WorkManager)
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
     ksp(libs.hilt.compiler)
+    ksp(libs.androidx.hilt.compiler)
 
-    // Preferences DataStore & Kotlinx
+    // Room & SQLCipher (ADR-005)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
+    implementation(libs.androidx.sqlite.framework)
+
+    // Background Maintenance, Preferences & Backup Cryptography
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.datastore.preferences)
+    implementation(libs.bouncycastle.bcprov)
+
+    // Kotlinx
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 
@@ -43,9 +67,15 @@ dependencies {
     testImplementation(libs.com.google.truth)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.app.cash.turbine)
+    testImplementation(libs.room.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.com.google.truth)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.room.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
 }

@@ -8,6 +8,11 @@
 
 ## 1. Executive Phasing Overview
 
+> [!NOTE]
+> **Implementation Status Summary (Pre-Physical-Device Verification):**
+> - **Implemented & Automated-Verified (`M0`–`M5`):** `:integration:api`, `:integration:providers` (`LocaleNumberParser`, `ProviderDateTimeParser`, `SensitiveContentGuard`, `FixtureAnonymizer`, `ProviderCatalog`, test-only synthetic parsers), Room Schema v1 + SQLCipher `4.20.0` wrapper + Keystore KEK/DEK lifecycle (`DatabaseKeyManager`, `WtrackDatabaseHolder`), provider-agnostic `WtrackNotificationListenerService` + 16-step `IngestionPipeline` + 3-tier deduplication + `ING-12`/`13`/`14` recovery & heartbeat, complete `M3c` domain engines (16-row Section 4.6 `AggregateCalculator`, derived fees, `CorrectBalanceUseCase`, `BalanceCheckpointEvaluator`, `LinkTransferUseCase`, rule backfill, `GateG1Evaluator`), complete `M4` Material 3 Compose UI & ViewModels, and `M5` (`RetentionPurgeWorker`, `WTBK` v1 Argon2id + PBKDF2-fallback + AES-256-GCM AAD `BackupService`, `CsvExporter`, `WipeAllDataUseCase`).
+> - **Pending Physical Device Testing (`iQOO Z10R I2505`):** On-device `SqlCipherInstrumentedTest` + AFU locked-screen capture (`ADR-005`), default OriginOS battery/Doze lifecycle testing (`TEST-003`), ADB package discovery and real notification parsers for **Bank Jago**, **DANA**, and **BCA** (`docs/PROVIDERS.md`), and live 7–14 day Gate G1 measurement (`Appendix C`).
+
 Development is strictly gated into **Phase 1 (Ingestion PoC & Gate G1)** and **Phase 2 (Post-Gate G1 MVP Completion)** per **PRD Section 17 & 17.1**. **Do not polish the full UI or build insights/backup screens before Gate G1 passes.**
 
 | Phase | Milestone | Focus | Est. Effort | Exit Gate |

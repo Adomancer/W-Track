@@ -8,6 +8,8 @@
 
 ## 1. Initial PoC Provider Targets & Incremental Priority
 
+> **M3a Tooling Readiness (Unit-Verified):** `LocaleNumberParser` (`PAR-12`), `ProviderDateTimeParser`, `SensitiveContentGuard`, `FixtureAnonymizer`, `ProviderCatalog` (`:integration:providers`), and `GateG1Evaluator` (`:app`) are implemented and tested against synthetic fixtures. `ProviderParsers.registered()` intentionally remains `emptySet()` with zero fabricated templates until on-device `iQOO Z10R` verification completes.
+
 The owner has identified **three initial financial application targets** for PoC validation:
 
 | Priority | Provider Target | Category | Implementation Sequence & Gate Rule |

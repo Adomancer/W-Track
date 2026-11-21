@@ -6,10 +6,11 @@
 
 ## 1. Status
 
-**Proposed / Deferred Until Before `EXP-001` (M5)**
+**Implemented in M5 (Unit/Robolectric Verified) — Production KDF Parameter Sign-Off & Physical-Device SAF Verification Pending**
 
 - **Confirmed Direction (PRD v1.4):** User-initiated, versioned, passphrase-encrypted full backup (`DATA-05`, `DATA-10`), atomic restore on a fresh install (`DATA-09`), exclusion of raw notification payloads and `NeedsReview` items, automatic OS backup disabled (`DATA-08`).
-- **Pending Owner Confirmation Before M5 (`SEC-004` / `EXP-001`):** Exact KDF choice & work factors (Argon2id via Bouncy Castle vs PBKDF2-HMAC-SHA256), container binary layout, and CSV export (`DATA-11`, `SHOULD`) priority confirmation.
+- **M5 Implementation Status:** `BackupCryptoContainer` (`WTBK` v1 container with Argon2id via `bcprov-jdk18on` + PBKDF2-HMAC-SHA256 fallback read support, AES-256-GCM with full 66-byte header as AAD, GZIP compression, key array zeroization), `BackupService` (full 13-table + `AppSettings` JSON export with post-write SAF verification `DATA-13`, transactional atomic restore with parent-first category & two-pass refund self-FK handling, post-restore `AllowlistCache` + `ATTENTION` status refresh), `CsvExporter` (`DATA-11` RFC-4180 + formula neutralization), and `WtrackBackupAndDiagnosticsPort` are implemented and verified in JVM/Robolectric tests (`BackupContainerAndRestoreTest`, `CsvExporterTest`).
+- **Pending Owner / Physical-Device Sign-Off:** Final confirmation of Argon2id memory parameter (`65,536 KiB`, `3` iterations) and on-device Storage Access Framework round-trip verification on `iQOO Z10R`.
 
 ---
 

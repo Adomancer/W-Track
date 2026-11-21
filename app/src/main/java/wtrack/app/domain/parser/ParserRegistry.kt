@@ -9,6 +9,7 @@ import wtrack.integration.TransactionParser
  */
 interface ParserRegistry {
     fun resolve(event: NotificationEvent): TransactionParser?
+    fun parserVersionForSource(sourceId: String): Int? = null
 }
 
 class DefaultParserRegistry(
@@ -19,4 +20,10 @@ class DefaultParserRegistry(
             .asSequence()
             .filter { it.sourceId == event.sourceId && it.supports(event) }
             .maxByOrNull { it.version }
+
+    override fun parserVersionForSource(sourceId: String): Int? =
+        parsers
+            .asSequence()
+            .filter { it.sourceId == sourceId }
+            .maxOfOrNull { it.version }
 }

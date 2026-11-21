@@ -5,8 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import dagger.hilt.android.AndroidEntryPoint
-import wtrack.app.core.theme.WtrackTheme
-import wtrack.app.feature.foundation.FoundationShellScreen
+import wtrack.app.feature.root.WtrackApp
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -14,9 +13,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            WtrackTheme {
-                FoundationShellScreen()
-            }
+            WtrackApp()
         }
     }
 }

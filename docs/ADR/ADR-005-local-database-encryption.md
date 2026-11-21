@@ -6,11 +6,12 @@
 
 ## 1. Status
 
-**Proposed — Pending Final Owner Acceptance (MUST Be Accepted Before M1 / First Room Schema Implementation)**
+**Proposed — Implemented in M1 (`sqlcipher-android:4.20.0` + `compileSdk = 37`); Remains Proposed Pending Physical-Device Security Validation on `iQOO Z10R`**
 
-PRD Sections 5, 9.2, 17.1, and 19 require resolving database encryption and key lifecycle **before** creating the first persistent database schema, including during the ingestion proof of concept (no plaintext-to-encrypted migration is permitted).
+PRD Sections 5, 9.2, 17.1, and 19 require resolving database encryption and key lifecycle **before** storing real data, including during the ingestion proof of concept (no plaintext-to-encrypted migration is permitted).
 
-- **Verified Library Evaluation (`4.20.0` vs `4.17.0`):** `net.zetetic:sqlcipher-android:4.20.0` is evaluated below as the latest stable 4.x release (with **SQLCipher 5 beta explicitly excluded** for production and **legacy `android-database-sqlcipher:4.5.4` rejected**). A verified `compileSdk` dependency alignment choice (`Option A` vs `Option B`) is presented for final owner sign-off alongside the locked-screen Keystore key policy.
+- **M1–M5 Implementation Status:** `net.zetetic:sqlcipher-android:4.20.0`, `androidx.sqlite:sqlite:2.7.0`, `AndroidKeyStoreWrappingCipher` (`setUserAuthenticationRequired(false)`, `setUnlockedDeviceRequired(false)`), `WrappedKeyStore`, `DatabaseKeyManager`, `WtrackDatabaseHolder`, `DatabaseLockedScreen` (with encrypted backup restore & double-confirmed wipe), `WipeAllDataUseCase`, and lock-aware `RetentionPurgeWorker` are implemented with `compileSdk = 37` GA / `targetSdk = 36`.
+- **Remaining Validation Gate:** On-device verification of `SqlCipherInstrumentedTest` (`arm64-v8a` native load, non-plaintext header check, reboot reopen, AFU locked-screen capture, and `LOCKED_KEY_MISSING_OR_INVALID` state) on the physical `iQOO Z10R` is pending before marking `ADR-005` `Accepted` for production. **SQLCipher 5 beta** and legacy **`android-database-sqlcipher:4.5.4`** remain prohibited.
 
 ---
 

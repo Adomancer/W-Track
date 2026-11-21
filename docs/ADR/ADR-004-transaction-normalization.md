@@ -6,11 +6,9 @@
 
 ## 1. Status
 
-**Proposed — Core Canonical Model Confirmed; Recommended IDR Exponent `2` (ISO 4217), 1.3/1.4 Classification Details, and G1 Scope Items Pending Confirmation**
+**Proposed — Canonical Model & IDR Exponent `2` (ISO 4217) Confirmed; Gate G1 Conditional Scope Items Pending Gate G1**
 
-- **Confirmed Baseline (PRD v1.4):** Integer minor-unit storage (`Long`, never `Double`/`Float`), `INFLOW`/`OUTFLOW` direction semantics, deterministic `ParseResult` contract (no uncalibrated confidence scores), `NeedsReview` modeled as `NotificationEvent` (not `Transaction`), `posted_at` timestamp fallback (never `received_at`), locale-aware parsing (`PAR-12`) that never guesses ambiguous numbers, and composite 3-tier deduplication (never amount+timestamp alone).
-- **Recommended Monetary Decision (Pending Owner Sign-Off Before M1):**
-  - **IDR Storage Exponent `2` (ISO 4217 standard, `1 IDR = 100 sen`)** — storage, parsing, display, and accounting implications documented below.
+- **Confirmed Baseline (PRD v1.4 & Owner Approval):** Integer minor-unit storage (`Long`, never `Double`/`Float`), **`IDR` storage exponent `2` (`ISO 4217`, `1 IDR = 100 sen`)**, `INFLOW`/`OUTFLOW` direction semantics, deterministic `ParseResult` contract (no uncalibrated confidence scores), `NeedsReview` modeled as `NotificationEvent` (not `Transaction`), `posted_at` timestamp fallback (never `received_at`), locale-aware parsing (`PAR-12`) that never guesses ambiguous numbers, and composite 3-tier deduplication (never amount+timestamp alone).
 - **Confirmed/Proposed Accounting Proposals (PRD 1.3/1.4):** `ADJUSTMENT`, `REFUND` netting, derived transfer fees, unpaired `CASH` classification, `original_json` snapshot vs revision history, void-not-delete.
 - **Decided at Gate G1:** Multi-account per source (`ACC-05`/`PAR-02`/`REV-07`), credit card signed ledger (`ACC-10`), and one-payment-announced-by-two-apps rule (PRD Section 11).
 
