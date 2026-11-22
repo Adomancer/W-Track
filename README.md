@@ -10,6 +10,7 @@
 </p>
 
 <p>
+  <a href="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml"><img src="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/badge/Version-0.2.0--rc1-0B6E63?style=flat-square" alt="Version 0.2.0-rc1" />
   <img src="https://img.shields.io/badge/Android-API%2026%E2%80%9336-064740?style=flat-square" alt="Android API 26-36" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.21-101C1A?style=flat-square" alt="Kotlin 2.2.21" />
@@ -161,6 +162,12 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w -e debug false wtrack.app.test/androidx.test.runner.AndroidJUnitRunner
 adb uninstall wtrack.app.test
 ```
+
+### CI/CD & Releases
+
+- **Continuous Integration ([.github/workflows/ci.yml](.github/workflows/ci.yml)):** Runs automatically on every push/PR to `main` — executes `:integration:api:test`, `:integration:providers:test`, `:app:testDebugUnitTest`, `:app:lintDebug`, and `:app:assembleRelease`, uploads HTML test/lint reports, and uploads a debug APK artifact on `main` pushes.
+- **Automated APK Releases ([.github/workflows/release.yml](.github/workflows/release.yml)):** Pushing a version tag (`git tag -a v0.2.0-rc1 -m "W-Track v0.2.0-rc1" && git push origin v0.2.0-rc1`) runs the full test + lint gate, generates `SHA256SUMS.txt`, and publishes a GitHub Release with APK assets (tags containing `-` are marked prerelease).
+- **Optional Release Signing Secrets:** Add `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` in GitHub Repository Settings → Secrets to produce signed R8 `release` APKs automatically; without them, the workflow publishes an installable `debug` APK plus the R8-minified unsigned `release` APK.
 
 ---
 

@@ -1,0 +1,127 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag name (e.g. v0.2.0-rc1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Validate & Publish GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+
+      - name: Run full test & lint gate before release
+        run: |
+          ./gradlew :integration:api:test :integration:providers:test :app:testDebugUnitTest :app:lintDebug \
+            -Dorg.gradle.jvmargs="-Xmx3072m -Dfile.encoding=UTF-8" \
+            --stacktrace
+
+      - name: Build release APK assets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          TAG="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
+          mkdir -p release-assets
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Release signing secrets detected — building signed release APK..."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > release.keystore
+            cat > keystore.properties <<EOF
+          storeFile=release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+            ./gradlew :app:assembleRelease \
+              -Dorg.gradle.jvmargs="-Xmx3072m -Dfile.encoding=UTF-8" \
+              --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk "release-assets/W-Track-${TAG}-release.apk"
+            echo "SIGNED_RELEASE=true" >> "$GITHUB_ENV"
+          else
+            echo "No release signing secrets configured — building debug (installable) + R8 unsigned release APKs..."
+            ./gradlew :app:assembleRelease :app:assembleDebug \
+              -Dorg.gradle.jvmargs="-Xmx3072m -Dfile.encoding=UTF-8" \
+              --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk "release-assets/W-Track-${TAG}-debug.apk"
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "release-assets/W-Track-${TAG}-release-unsigned.apk"
+            echo "SIGNED_RELEASE=false" >> "$GITHUB_ENV"
+          fi
+
+          (cd release-assets && sha256sum *.apk > SHA256SUMS.txt)
+          ls -lh release-assets
+
+      - name: Clean up temporary signing files
+        if: always()
+        run: |
+          rm -f release.keystore keystore.properties
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="$RELEASE_TAG"
+          PRERELEASE_FLAG=""
+          if [[ "$TAG" == *-* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          NOTES_FILE="$(mktemp)"
+          {
+            echo "## W-Track $TAG"
+            echo ""
+            if [ "$SIGNED_RELEASE" = "true" ]; then
+              echo "- **APK:** \`W-Track-${TAG}-release.apk\` (R8-minified & release-signed)"
+            else
+              echo "- **Install directly on Android:** \`W-Track-${TAG}-debug.apk\`"
+              echo "- **R8-minified unsigned build:** \`W-Track-${TAG}-release-unsigned.apk\` *(requires signing before Android install; configure \`ANDROID_KEYSTORE_*\` secrets for auto-signed releases)*"
+            fi
+            echo ""
+            echo "### Sideload Tip (Android 13–16)"
+            echo "If **Notification Access** appears grayed out after sideloading, open **App Info → ⋮ → Allow restricted settings**, then enable W-Track in Notification Access."
+            echo ""
+            echo "### SHA-256 Checksums"
+            echo '```text'
+            cat release-assets/SHA256SUMS.txt
+            echo '```'
+          } > "$NOTES_FILE"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --clobber
+          else
+            gh release create "$TAG" release-assets/* \
+              --title "W-Track $TAG" \
+              --notes "$(cat "$NOTES_FILE")" \
+              --generate-notes \
+              $PRERELEASE_FLAG
+          fi
