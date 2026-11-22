@@ -1,14 +1,14 @@
 # Database Schema & Entity-Relationship Design — W-Track
 
-**Document Status:** M1 Foundation & M3c Completion Schema Specification (PRD v1.4)  
-**Encryption:** SQLCipher for Android (`net.zetetic:sqlcipher-android`: `4.20.0` evaluated / `4.17.0` strict-API-36 fallback; no 5 beta, no EOL `4.5.4`) from Schema Version 1 (Pending final `ADR-005` owner acceptance)  
-**Last Updated:** 2026-11-21
+**Document Status:** M1 Foundation & Schema v2 Custom Parser Specification (PRD v1.4+)  
+**Encryption:** SQLCipher for Android (`net.zetetic:sqlcipher-android`: `4.20.0` evaluated / `4.17.0` strict-API-36 fallback; no 5 beta, no EOL `4.5.4`) from Schema Version 1 (Schema v2 adds `custom_parser_rules` via `MIGRATION_1_2`)  
+**Last Updated:** 2026-11-22
 
 ---
 
 ## 1. Entity-Relationship Diagram
 
-All 13 entities prescribed in **PRD Section 7.2 & 7.3** plus required foreign keys and cardinalities:
+All 13 entities prescribed in **PRD Section 7.2 & 7.3** plus `custom_parser_rules` (Schema v2) and required foreign keys and cardinalities:
 
 ```mermaid
 erDiagram
@@ -144,6 +144,19 @@ erDiagram
         TEXT period
         INTEGER is_active
     }
+    CUSTOM_PARSER_RULES {
+        INTEGER id PK
+        TEXT source_id
+        TEXT name
+        TEXT title_contains
+        TEXT template_pattern
+        TEXT direction
+        TEXT transaction_type
+        TEXT currency
+        TEXT number_locale
+        TEXT account_hint
+        INTEGER enabled
+    }
 ```
 
 ---
@@ -270,6 +283,25 @@ erDiagram
 - **`transaction_tags`:** composite `PRIMARY KEY (transaction_id, tag_id)`, FKs to `transactions(id) ON DELETE CASCADE` and `tags(id) ON DELETE CASCADE`.
 - **`budgets` (`DASH-07`, `COULD`):** `id` PK, `category_id` (`FK -> categories(id) ON DELETE CASCADE`), `account_id` (`INTEGER NULL`, `FK -> accounts(id) ON DELETE CASCADE`), `limit_minor` (`INTEGER NOT NULL CHECK (limit_minor > 0)`), `period` (`TEXT NOT NULL`, e.g., `MONTHLY`), `is_active` (`INTEGER NOT NULL DEFAULT 1`), `created_at`, `updated_at`.
 
+### 2.10 `custom_parser_rules` (Schema v2 — User-Taught Notification Patterns)
+| Column | SQLite Type | Null | Default | Constraints / Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | NO | AutoInc | `PRIMARY KEY` |
+| `source_id` | `TEXT` | NO | — | `INDEX`; target app package / source identifier |
+| `name` | `TEXT` | NO | — | User-facing rule label |
+| `title_contains` | `TEXT` | YES | `NULL` | Optional case-insensitive notification title filter |
+| `template_pattern` | `TEXT` | NO | — | Safe placeholder template (`{AMOUNT}`, `{MERCHANT}`, `{REF}`, `{IGNORE}`) — never stores raw payloads or raw regex |
+| `direction` | `TEXT` | NO | — | Enum: `INFLOW`, `OUTFLOW` |
+| `transaction_type` | `TEXT` | NO | — | Enum: `PURCHASE`, `TRANSFER`, `FEE`, `REFUND` (`INFLOW` only), `CASH`, `OTHER` |
+| `currency` | `TEXT` | NO | — | ISO 4217 3-letter uppercase code |
+| `number_locale` | `TEXT` | NO | — | Enum: `INDONESIAN`, `ENGLISH` |
+| `account_hint` | `TEXT` | YES | `NULL` | Optional masked account hint to attach to parsed transactions |
+| `enabled` | `INTEGER` | NO | `1` | `1` active, `0` disabled |
+| `created_at` | `INTEGER` | NO | — | UTC epoch millis |
+| `updated_at` | `INTEGER` | NO | — | UTC epoch millis |
+
+> **Privacy Guarantee:** `custom_parser_rules` stores only structural notification templates with placeholders (`{AMOUNT}`, `{MERCHANT}`, `{REF}`, `{IGNORE}`) — never raw notification payloads, amounts, or personal histories — so rules are safely included in encrypted `.wtrackbackup` archives.
+
 ---
 
 ## 3. Complete Index & Constraint Matrix (`PRD Appendix A`)
@@ -295,6 +327,7 @@ erDiagram
 | `transfer_matches` | `(incoming_transaction_id) WHERE status = 'CONFIRMED'` | **Unique Partial Index** | A transaction belongs to at most one confirmed pair (`Appendix A`) |
 | `transfer_matches` | `CHECK (fee_minor >= 0)` | Check | Prevents invalid negative transfer fees (`TRF-04`) |
 | `capture_gaps` | `(started_at, ended_at)` | Index | Overlapping gap lookup for Accounts screen (`ACC-09`) |
+| `custom_parser_rules` | `(source_id)` | Index | Fast lookup of user-taught patterns per notification source |
 
 ---
 
@@ -340,11 +373,11 @@ Stored via `kotlinx.serialization.json` inside SQLCipher-encrypted columns:
 ## 5. Schema Versioning, Migrations & Transactional Boundaries
 
 ### 5.1 Room Schema Versioning Plan
-- **Export Schemas Always Enabled:** `room { schemaDirectory("$projectDir/schemas") }` in `:app` (`exportSchema = true`) so every version generates immutable JSON schema diffs verified in instrumentation tests via `MigrationTestHelper`.
+- **Export Schemas Always Enabled:** `room.schemaLocation = "$projectDir/schemas"` (`exportSchema = true`) in `:app` generates immutable JSON schema snapshots (`1.json`, `2.json`) verified against migrations.
 - **Database Version 1 (M1 — PoC & Gate G1 Foundation):**
-  Includes `accounts`, `transaction_sources`, `account_sources`, `notification_events`, `transactions`, `categories`, `merchants`, `transfer_matches`, and `transaction_rules` (or v1 core tables + seeded system categories `"Uncategorized"` & `"Fees"`). Encrypted with SQLCipher from creation (`ADR-005`).
-- **Database Version 2 (M3c — Completion Additions, if split from M1):**
-  Adds `capture_gaps`, `tags`, `transaction_tags`, `budgets`, and any additional M3a-discovered indexes via explicit `Migration(1, 2)` tested with `MigrationTestHelper` under SQLCipher. *(Note: Including all core tables cleanly in v1 while populating M3c behavior later avoids risky migrations unless M3a reveals structural changes.)*
+  Includes all 13 core tables (`accounts`, `transaction_sources`, `account_sources`, `notification_events`, `transactions`, `categories`, `merchants`, `transaction_rules`, `transfer_matches`, `capture_gaps`, `tags`, `transaction_tags`, `budgets`) encrypted with SQLCipher from creation (`ADR-005`).
+- **Database Version 2 (Implemented — `MIGRATION_1_2`):**
+  Adds `custom_parser_rules` and `index_custom_parser_rules_source_id` via `WtrackDatabase.MIGRATION_1_2`, verified in `WtrackDatabaseConstraintTest.migratesV1DatabaseToV2WithCustomParserRulesTableIntact` against exported `2.json`.
 
 ### 5.2 Required Atomic Database Transactions (`RoomDatabase.withTransaction`)
 1. **Pipeline Commit:** Update `notification_events` (`PROCESSED` + `purge_after`) + upsert `merchants` (if needed) + insert `transactions` + update `last_alive_at` atomically.

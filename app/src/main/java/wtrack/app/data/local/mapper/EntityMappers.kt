@@ -7,6 +7,7 @@ import wtrack.app.data.local.entity.AccountSourceEntity
 import wtrack.app.data.local.entity.BudgetEntity
 import wtrack.app.data.local.entity.CaptureGapEntity
 import wtrack.app.data.local.entity.CategoryEntity
+import wtrack.app.data.local.entity.CustomParserRuleEntity
 import wtrack.app.data.local.entity.MerchantEntity
 import wtrack.app.data.local.entity.NotificationEventEntity
 import wtrack.app.data.local.entity.TagEntity
@@ -22,6 +23,8 @@ import wtrack.app.domain.model.CaptureGap
 import wtrack.app.domain.model.CaptureGapReason
 import wtrack.app.domain.model.Category
 import wtrack.app.domain.model.CategorySource
+import wtrack.app.domain.model.CustomNumberLocale
+import wtrack.app.domain.model.CustomParserRule
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.Merchant
 import wtrack.app.domain.model.NeedsReviewItem
@@ -254,6 +257,10 @@ fun NotificationEventEntity.toNeedsReviewItem(resolvedAccountId: Long? = null): 
         draftAccountId = resolvedAccountId,
         draftProviderReference = draft?.providerReference,
         draftReportedBalanceMinor = draft?.reportedBalanceMinor,
+        payloadTitle = payload?.title?.takeIf { it.isNotBlank() },
+        payloadBody = payload?.let { p ->
+            (p.bigText?.takeIf { it.isNotBlank() } ?: p.text).takeIf { it.isNotBlank() }
+        },
     )
 }
 
@@ -330,6 +337,22 @@ fun BudgetEntity.toDomain(): Budget = Budget(
     limitMinor = limitMinor,
     period = period,
     isActive = isActive,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun CustomParserRuleEntity.toDomain(): CustomParserRule = CustomParserRule(
+    id = id,
+    sourceId = sourceId,
+    name = name,
+    titleContains = titleContains,
+    templatePattern = templatePattern,
+    direction = Direction.valueOf(direction),
+    transactionType = DomainTransactionType.valueOf(transactionType),
+    currency = currency,
+    numberLocale = runCatching { CustomNumberLocale.valueOf(numberLocale) }.getOrDefault(CustomNumberLocale.INDONESIAN),
+    accountHint = accountHint,
+    enabled = enabled,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )

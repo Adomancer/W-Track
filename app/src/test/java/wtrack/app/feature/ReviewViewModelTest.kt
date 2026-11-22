@@ -7,6 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.AccountType
+import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.NeedsReviewItem
 import wtrack.app.domain.usecase.ResolveNeedsReviewUseCase
@@ -39,16 +40,22 @@ class ReviewViewModelTest {
             draftAccountId = null,
             draftProviderReference = null,
             draftReportedBalanceMinor = null,
+            payloadTitle = "Bank",
+            payloadBody = "Paid Rp 75.000",
         )
         val reviewRepo = FakeNeedsReviewRepository(listOf(reviewItem))
         val accRepo = FakeAccountRepository(
             listOf(Account(1L, "Main", "Bank", AccountType.BANK, "IDR", null, null, null, true)),
         )
+        val customParserRepo = FakeCustomParserRuleRepository().apply {
+            autoParsedReturnCount = 2
+        }
         val vm = ReviewViewModel(
             needsReviewRepository = reviewRepo,
             accountRepository = accRepo,
             categoryRepository = FakeCategoryRepository(),
             settingsRepository = FakeSettingsRepository(),
+            customParserRuleRepository = customParserRepo,
             resolveNeedsReviewUseCase = ResolveNeedsReviewUseCase(reviewRepo, accRepo),
             clock = FakeClock(),
         )
@@ -87,6 +94,9 @@ class ReviewViewModelTest {
                 description = "Store purchase",
                 categoryId = 4L,
                 rememberAccountHint = true,
+                rememberPattern = true,
+                customTemplatePattern = "Paid {AMOUNT} at {MERCHANT}",
+                customNumberLocale = CustomNumberLocale.INDONESIAN,
             )
             var afterSave = awaitItem()
             while (afterSave.items.isNotEmpty()) {
@@ -95,6 +105,10 @@ class ReviewViewModelTest {
             assertThat(afterSave.items).isEmpty()
             assertThat(reviewRepo.savedCalls.single().second.amountMinor).isEqualTo(7_500_000L)
             assertThat(reviewRepo.savedCalls.single().second.rememberAccountHint).isTrue()
+            assertThat(customParserRepo.rulesFlow.value).hasSize(1)
+            assertThat(customParserRepo.rulesFlow.value.single().templatePattern).isEqualTo("Paid {AMOUNT} at {MERCHANT}")
+            assertThat(customParserRepo.retriedSources).containsExactly("pkg.bank")
+            assertThat(afterSave.actionMessage).contains("Auto-parsed 2 more")
             cancelAndIgnoreRemainingEvents()
         }
     }

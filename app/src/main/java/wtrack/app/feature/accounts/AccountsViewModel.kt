@@ -19,6 +19,7 @@ import wtrack.app.domain.model.TransactionSource
 import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.CreateAccountRequest
+import wtrack.app.domain.repository.CustomParserRuleRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
 import wtrack.app.domain.repository.SourceAndEventRepository
 import wtrack.app.domain.repository.TransactionRepository
@@ -44,6 +45,7 @@ data class AccountsUiState(
     val archivedAccounts: List<AccountCardUiModel> = emptyList(),
     val sources: List<TransactionSource> = emptyList(),
     val providerCatalog: List<ProviderCatalogEntry> = emptyList(),
+    val customRuleCountsBySource: Map<String, Int> = emptyMap(),
     val nowEpochMillis: Long = 0L,
     val actionMessage: String? = null,
 )
@@ -53,6 +55,7 @@ class AccountsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val sourceRepository: SourceAndEventRepository,
     transactionRepository: TransactionRepository,
+    customParserRuleRepository: CustomParserRuleRepository,
     private val backupPort: BackupAndDiagnosticsPort,
     private val checkpointEvaluator: BalanceCheckpointEvaluator,
     private val correctBalanceUseCase: CorrectBalanceUseCase,
@@ -66,8 +69,19 @@ class AccountsViewModel @Inject constructor(
         accountRepository.accountSources,
         sourceRepository.sources,
         transactionRepository.transactions,
-    ) { accounts, accountSources, sources, transactions ->
-        AccountDataSnapshot(accounts, accountSources, sources, transactions)
+        customParserRuleRepository.rules,
+    ) { accounts, accountSources, sources, transactions, customRules ->
+        AccountDataSnapshot(
+            accounts = accounts,
+            accountSources = accountSources,
+            sources = sources,
+            transactions = transactions,
+            customRuleCountsBySource = customRules
+                .asSequence()
+                .filter { it.enabled }
+                .groupingBy { it.sourceId }
+                .eachCount(),
+        )
     }
 
     val uiState: StateFlow<AccountsUiState> = combine(
@@ -91,6 +105,7 @@ class AccountsViewModel @Inject constructor(
             archivedAccounts = cards.filter { !it.account.isActive },
             sources = snap.sources,
             providerCatalog = backupPort.providerCatalogEntries(),
+            customRuleCountsBySource = snap.customRuleCountsBySource,
             nowEpochMillis = clock.nowEpochMillis(),
             actionMessage = message,
         )
@@ -249,5 +264,6 @@ class AccountsViewModel @Inject constructor(
         val accountSources: List<AccountSource>,
         val sources: List<TransactionSource>,
         val transactions: List<Transaction>,
+        val customRuleCountsBySource: Map<String, Int>,
     )
 }

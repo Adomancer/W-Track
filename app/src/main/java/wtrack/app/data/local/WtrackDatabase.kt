@@ -2,12 +2,14 @@ package wtrack.app.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import wtrack.app.data.local.dao.AccountDao
 import wtrack.app.data.local.dao.AccountSourceDao
 import wtrack.app.data.local.dao.BudgetDao
 import wtrack.app.data.local.dao.CaptureGapDao
 import wtrack.app.data.local.dao.CategoryDao
+import wtrack.app.data.local.dao.CustomParserRuleDao
 import wtrack.app.data.local.dao.MerchantDao
 import wtrack.app.data.local.dao.NotificationEventDao
 import wtrack.app.data.local.dao.TagDao
@@ -20,6 +22,7 @@ import wtrack.app.data.local.entity.AccountSourceEntity
 import wtrack.app.data.local.entity.BudgetEntity
 import wtrack.app.data.local.entity.CaptureGapEntity
 import wtrack.app.data.local.entity.CategoryEntity
+import wtrack.app.data.local.entity.CustomParserRuleEntity
 import wtrack.app.data.local.entity.MerchantEntity
 import wtrack.app.data.local.entity.NotificationEventEntity
 import wtrack.app.data.local.entity.TagEntity
@@ -44,6 +47,7 @@ import wtrack.app.data.local.entity.TransferMatchEntity
         TagEntity::class,
         TransactionTagEntity::class,
         BudgetEntity::class,
+        CustomParserRuleEntity::class,
     ],
     version = WtrackDatabase.SCHEMA_VERSION,
     exportSchema = true,
@@ -61,10 +65,41 @@ abstract class WtrackDatabase : RoomDatabase() {
     abstract fun captureGapDao(): CaptureGapDao
     abstract fun tagDao(): TagDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun customParserRuleDao(): CustomParserRuleDao
 
     companion object {
         const val DATABASE_NAME = "wtrack.db"
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `custom_parser_rules` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `source_id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `title_contains` TEXT,
+                        `template_pattern` TEXT NOT NULL,
+                        `direction` TEXT NOT NULL,
+                        `transaction_type` TEXT NOT NULL,
+                        `currency` TEXT NOT NULL,
+                        `number_locale` TEXT NOT NULL,
+                        `account_hint` TEXT,
+                        `enabled` INTEGER NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        `updated_at` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS `index_custom_parser_rules_source_id`
+                    ON `custom_parser_rules` (`source_id`)
+                    """.trimIndent(),
+                )
+            }
+        }
 
         const val SYSTEM_KEY_UNCATEGORIZED = "UNCATEGORIZED"
         const val SYSTEM_KEY_FEES = "FEES"

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import wtrack.app.data.local.entity.BudgetEntity
 import wtrack.app.data.local.entity.CaptureGapEntity
 import wtrack.app.data.local.entity.CategoryEntity
+import wtrack.app.data.local.entity.CustomParserRuleEntity
 import wtrack.app.data.local.entity.MerchantEntity
 import wtrack.app.data.local.entity.TagEntity
 import wtrack.app.data.local.entity.TransactionRuleEntity
@@ -227,5 +228,38 @@ interface BudgetDao {
     suspend fun deleteById(id: Long)
 
     @Query("DELETE FROM budgets")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface CustomParserRuleDao {
+    @Query("SELECT * FROM custom_parser_rules ORDER BY updated_at DESC, id DESC")
+    fun observeAll(): Flow<List<CustomParserRuleEntity>>
+
+    @Query("SELECT * FROM custom_parser_rules ORDER BY id ASC")
+    suspend fun getAllOnce(): List<CustomParserRuleEntity>
+
+    @Query("SELECT * FROM custom_parser_rules WHERE enabled = 1 ORDER BY updated_at DESC, id DESC")
+    suspend fun getEnabledOnce(): List<CustomParserRuleEntity>
+
+    @Query("SELECT * FROM custom_parser_rules WHERE id = :id")
+    suspend fun getById(id: Long): CustomParserRuleEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(entity: CustomParserRuleEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<CustomParserRuleEntity>)
+
+    @Update
+    suspend fun update(entity: CustomParserRuleEntity)
+
+    @Query("UPDATE custom_parser_rules SET enabled = :enabled, updated_at = :updatedAt WHERE id = :id")
+    suspend fun setEnabled(id: Long, enabled: Boolean, updatedAt: Long)
+
+    @Query("DELETE FROM custom_parser_rules WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM custom_parser_rules")
     suspend fun deleteAll()
 }

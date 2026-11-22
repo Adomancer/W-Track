@@ -7,6 +7,7 @@ import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.AllowlistCache
 import wtrack.app.data.ingestion.CaptureStatusTracker
+import wtrack.app.data.ingestion.CustomParserRuleCache
 import wtrack.app.data.ingestion.IngestionPipeline
 import wtrack.app.data.local.entity.TransactionEntity
 import wtrack.app.data.local.mapper.LocalJson
@@ -50,6 +51,7 @@ class WtrackBackupAndDiagnosticsPort(
     private val ingestionPipeline: IngestionPipeline,
     private val clock: Clock,
     private val captureStatusTracker: CaptureStatusTracker? = null,
+    private val customParserRuleCache: CustomParserRuleCache? = null,
 ) : BackupAndDiagnosticsPort {
 
     override suspend fun exportEncryptedBackup(
@@ -76,6 +78,8 @@ class WtrackBackupAndDiagnosticsPort(
         logger.clearAll()
         allowlistCache.startObserving()
         allowlistCache.refreshSnapshotNow()
+        customParserRuleCache?.startObserving()
+        customParserRuleCache?.refreshSnapshotNow()
     }
 
     override fun readDiagnosticLogLines(limit: Int): List<String> = logger.readRecentLines(limit)

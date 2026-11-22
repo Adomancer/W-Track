@@ -81,3 +81,8 @@ enum class ThemeMode {
     LIGHT,
     DARK,
 }
+
+enum class CustomNumberLocale {
+    INDONESIAN,
+    ENGLISH,
+}

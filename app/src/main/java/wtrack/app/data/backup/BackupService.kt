@@ -10,12 +10,14 @@ import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.AllowlistCache
 import wtrack.app.data.ingestion.CaptureStatusTracker
+import wtrack.app.data.ingestion.CustomParserRuleCache
 import wtrack.app.data.local.WtrackDatabase
 import wtrack.app.data.local.entity.AccountEntity
 import wtrack.app.data.local.entity.AccountSourceEntity
 import wtrack.app.data.local.entity.BudgetEntity
 import wtrack.app.data.local.entity.CaptureGapEntity
 import wtrack.app.data.local.entity.CategoryEntity
+import wtrack.app.data.local.entity.CustomParserRuleEntity
 import wtrack.app.data.local.entity.MerchantEntity
 import wtrack.app.data.local.entity.NotificationEventEntity
 import wtrack.app.data.local.entity.TagEntity
@@ -29,6 +31,7 @@ import wtrack.app.domain.exception.BackupRestoreException
 import wtrack.app.domain.model.AccountType
 import wtrack.app.domain.model.AppSettings
 import wtrack.app.domain.model.CaptureGapReason
+import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.DatabaseHealthState
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.NotificationEventStatus
@@ -60,6 +63,24 @@ data class BackupSnapshotV1(
     val captureGaps: List<CaptureGapDto>,
     val budgets: List<BudgetDto>,
     val eventIdentities: List<EventIdentityDto>,
+    val customParserRules: List<CustomParserRuleDto> = emptyList(),
+)
+
+@Serializable
+data class CustomParserRuleDto(
+    val id: Long,
+    val sourceId: String,
+    val name: String,
+    val titleContains: String? = null,
+    val templatePattern: String,
+    val direction: String,
+    val transactionType: String,
+    val currency: String,
+    val numberLocale: String,
+    val accountHint: String? = null,
+    val enabled: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
 )
 
 @Serializable
@@ -235,6 +256,7 @@ class BackupService(
     private val clock: Clock,
     private val logger: WtrackLogger,
     private val cryptoConfig: BackupCryptoConfig = BackupCryptoConfig(),
+    private val customParserRuleCache: CustomParserRuleCache? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = false
@@ -263,6 +285,7 @@ class BackupService(
             val allTransfers = db.transferMatchDao().getAllOnce()
             val allGaps = db.captureGapDao().getAllOnce()
             val allBudgets = db.budgetDao().getAllOnce()
+            val allCustomParserRules = db.customParserRuleDao().getAllOnce()
             // Exclude NEEDS_REVIEW and unfinished (RECEIVED/PROCESSING/FAILED) rows plus all raw
             // payloads/drafts strictly per DATA-05 / section 8.1 / ADR-006.
             val preservedEvents = db.notificationEventDao().getAllOnce()
@@ -325,6 +348,13 @@ class BackupService(
                         it.id, it.sourceId, it.packageName, it.stableEventKey, it.notificationKey,
                         it.notificationId, it.notificationTag, it.postedAt, it.processingStatus,
                         it.attemptCount, it.failureReason, it.receivedAt, it.processedAt, it.updatedAt,
+                    )
+                },
+                customParserRules = allCustomParserRules.map {
+                    CustomParserRuleDto(
+                        it.id, it.sourceId, it.name, it.titleContains, it.templatePattern,
+                        it.direction, it.transactionType, it.currency, it.numberLocale,
+                        it.accountHint, it.enabled, it.createdAt, it.updatedAt,
                     )
                 },
             )
@@ -404,6 +434,7 @@ class BackupService(
             db.transactionDao().deleteAll()
             db.notificationEventDao().deleteAll()
             db.transactionRuleDao().deleteAll()
+            db.customParserRuleDao().deleteAll()
             db.accountSourceDao().deleteAll()
             db.tagDao().deleteAllTags()
             db.merchantDao().deleteAll()
@@ -523,6 +554,25 @@ class BackupService(
                     TransferMatchEntity(it.id, it.outgoingTransactionId, it.incomingTransactionId, it.origin, it.confidence, it.status, it.feeMinor, it.createdAt)
                 },
             )
+            db.customParserRuleDao().insertAll(
+                snapshot.customParserRules.map {
+                    CustomParserRuleEntity(
+                        id = it.id,
+                        sourceId = it.sourceId,
+                        name = it.name,
+                        titleContains = it.titleContains,
+                        templatePattern = it.templatePattern,
+                        direction = it.direction,
+                        transactionType = it.transactionType,
+                        currency = it.currency,
+                        numberLocale = it.numberLocale,
+                        accountHint = it.accountHint,
+                        enabled = it.enabled,
+                        createdAt = it.createdAt,
+                        updatedAt = it.updatedAt,
+                    )
+                },
+            )
         }
 
         settingsStore.replaceAll(
@@ -545,6 +595,7 @@ class BackupService(
             ),
         )
         allowlistCache.refreshSnapshotNow()
+        customParserRuleCache?.refreshSnapshotNow()
         captureStatusTracker.onPermissionStateChecked()
         logger.logEvent("BACKUP", "RESTORE_COMPLETED", mapOf("count" to snapshot.transactions.size.toString()))
 
@@ -595,6 +646,20 @@ class BackupService(
         }
         snapshot.budgets.forEach { budget ->
             if (budget.limitMinor <= 0L) throw BackupRestoreException("Backup contains non-positive budget limit.")
+        }
+        snapshot.customParserRules.forEach { rule ->
+            if (rule.sourceId.isBlank() || rule.templatePattern.isBlank()) {
+                throw BackupRestoreException("Backup contains invalid custom parser rule.")
+            }
+            runCatching { Direction.valueOf(rule.direction) }.getOrElse {
+                throw BackupRestoreException("Backup contains invalid custom rule direction: ${rule.direction}")
+            }
+            runCatching { DomainTransactionType.valueOf(rule.transactionType) }.getOrElse {
+                throw BackupRestoreException("Backup contains invalid custom rule type: ${rule.transactionType}")
+            }
+            runCatching { CustomNumberLocale.valueOf(rule.numberLocale) }.getOrElse {
+                throw BackupRestoreException("Backup contains invalid custom rule locale: ${rule.numberLocale}")
+            }
         }
     }
 

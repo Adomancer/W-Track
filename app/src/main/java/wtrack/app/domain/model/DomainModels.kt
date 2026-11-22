@@ -100,6 +100,24 @@ data class NeedsReviewItem(
     val draftAccountId: Long?,
     val draftProviderReference: String?,
     val draftReportedBalanceMinor: Long?,
+    val payloadTitle: String? = null,
+    val payloadBody: String? = null,
+)
+
+data class CustomParserRule(
+    val id: Long,
+    val sourceId: String,
+    val name: String,
+    val titleContains: String?,
+    val templatePattern: String,
+    val direction: Direction,
+    val transactionType: DomainTransactionType,
+    val currency: String,
+    val numberLocale: CustomNumberLocale,
+    val accountHint: String?,
+    val enabled: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
 )
 
 data class TransactionSource(

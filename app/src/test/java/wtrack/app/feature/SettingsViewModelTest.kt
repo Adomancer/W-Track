@@ -29,6 +29,7 @@ class SettingsViewModelTest {
             ruleRepository = FakeRuleRepository(),
             captureStatusRepository = FakeCaptureStatusRepository(),
             needsReviewRepository = FakeNeedsReviewRepository(),
+            customParserRuleRepository = FakeCustomParserRuleRepository(),
             backupPort = backupPort,
             gateG1Evaluator = GateG1Evaluator(),
             clock = FakeClock(),

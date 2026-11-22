@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Rule
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -68,6 +69,7 @@ fun SettingsScreen(
     onOpenRules: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onOpenCustomParsers: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
@@ -227,6 +229,48 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             CaptureStatusPill(state.captureSummary.appStatus)
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = ext.mutedText,
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ext.divider)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenCustomParsers)
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Column {
+                                Text("Notification Parsers", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = "Custom patterns for new banks & e-wallets",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ext.mutedText,
+                                )
+                            }
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("${state.customParserRuleCount}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                                 contentDescription = null,

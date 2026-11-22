@@ -1,7 +1,7 @@
 # Architecture — W-Track
 
-**Document Status:** Planning Baseline (aligned to PRD v1.4, frozen for ingestion PoC)  
-**Last Updated:** 2026-11-21
+**Document Status:** Active Architecture Baseline (aligned to PRD v1.4 + Custom Pattern Parsing)  
+**Last Updated:** 2026-11-22
 
 ---
 
@@ -33,9 +33,9 @@ flowchart TD
     D -- "Yes" --> E["Lightweight Envelope Extraction & Coroutine Handoff"]
     E --> F["Persist NotificationEvent (RECEIVED) in Encrypted Room DB"]
     F --> G["Ingestion Pipeline (Serialized IO Queue)"]
-    G --> H{"Compatible Parser Registered?"}
-    H -- "No (ING-13)" --> I["Mark IGNORED (NO_PARSER) & Purge Payload Immediately"]
-    H -- "Yes" --> J["TransactionParser.parse() (:integration:providers)"]
+    G --> H{"Parser Resolved? (SmartParserRegistry)"}
+    H -- "No (DefaultParserRegistry ING-13)" --> I["Mark IGNORED (NO_PARSER) & Purge Payload Immediately"]
+    H -- "Yes (Built-In → Custom Rule → Generic Fallback)" --> J["TransactionParser.parse() (:integration:providers)"]
     J --> K{"ParseResult"}
     K -- "NotTransaction" --> L["Mark IGNORED & Purge Payload Immediately"]
     K -- "NeedsReview" --> M["Mark NEEDS_REVIEW + partial draft (Retain <= 30d)"]
@@ -60,7 +60,7 @@ W-Track/
 ├── build-logic/                  # Gradle convention plugins (Android app/lib, JVM, Compose, Hilt)
 ├── integration/
 │   ├── api/                      # Pure Kotlin JVM: TransactionParser, ParseResult, NotificationEvent, Enums
-│   └── providers/                # Pure Kotlin JVM: Provider parsers, locale/number helpers, anonymized fixtures
+│   └── providers/                # Pure Kotlin JVM: Provider parsers, generic fallback, safe template engine & fixtures
 ├── app/                          # Android Application module
 │   └── src/main/java/wtrack/app/
 │       ├── core/                 # M3 theme, currency specs, clock abstraction, logging redaction, DI qualifiers

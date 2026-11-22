@@ -9,6 +9,8 @@ import wtrack.app.domain.model.Budget
 import wtrack.app.domain.model.CaptureGap
 import wtrack.app.domain.model.CaptureHealthSummary
 import wtrack.app.domain.model.Category
+import wtrack.app.domain.model.CustomNumberLocale
+import wtrack.app.domain.model.CustomParserRule
 import wtrack.app.domain.model.DatabaseHealthState
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.Merchant
@@ -220,4 +222,67 @@ interface SettingsRepository {
 interface DatabaseHealthRepository {
     val state: Flow<DatabaseHealthState>
     suspend fun wipeAllDataAndReset()
+}
+
+data class UpsertCustomParserRuleRequest(
+    val id: Long? = null,
+    val sourceId: String,
+    val name: String,
+    val titleContains: String? = null,
+    val templatePattern: String,
+    val direction: Direction,
+    val transactionType: DomainTransactionType,
+    val currency: String = "IDR",
+    val numberLocale: CustomNumberLocale = CustomNumberLocale.INDONESIAN,
+    val accountHint: String? = null,
+    val enabled: Boolean = true,
+)
+
+data class GeneratedParserTemplate(
+    val templatePattern: String,
+    val currency: String,
+    val numberLocale: CustomNumberLocale,
+    val detectedMerchant: String?,
+    val detectedAmountMinor: Long?,
+)
+
+sealed interface CustomParserTestOutcome {
+    data class Matched(
+        val amountMinor: Long,
+        val currency: String,
+        val direction: Direction,
+        val transactionType: DomainTransactionType,
+        val merchantRaw: String?,
+        val description: String?,
+    ) : CustomParserTestOutcome
+
+    data class Rejected(val reason: String) : CustomParserTestOutcome
+
+    data class NotMatched(val detail: String) : CustomParserTestOutcome
+}
+
+interface CustomParserRuleRepository {
+    val rules: Flow<List<CustomParserRule>>
+    suspend fun getEnabledOnce(): List<CustomParserRule>
+    suspend fun upsertRule(request: UpsertCustomParserRuleRequest): Long
+    suspend fun setEnabled(id: Long, enabled: Boolean)
+    suspend fun delete(id: Long)
+    fun generateTemplateFromSample(
+        sampleBody: String,
+        merchantOrDescHint: String? = null,
+        defaultCurrency: String = "IDR",
+    ): GeneratedParserTemplate?
+
+    fun testRuleAgainstSample(
+        templatePattern: String,
+        titleContains: String?,
+        direction: Direction,
+        transactionType: DomainTransactionType,
+        currency: String,
+        numberLocale: CustomNumberLocale,
+        sampleTitle: String?,
+        sampleBody: String,
+    ): CustomParserTestOutcome
+
+    suspend fun retryPendingReviewForSource(sourceId: String): Int
 }

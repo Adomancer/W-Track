@@ -12,6 +12,7 @@ import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.di.ApplicationScope
 import wtrack.app.data.ingestion.AllowlistCache
 import wtrack.app.data.ingestion.CaptureStatusTracker
+import wtrack.app.data.ingestion.CustomParserRuleCache
 import wtrack.app.data.ingestion.EventRecoveryCoordinator
 import wtrack.app.data.ingestion.HeartbeatMonitor
 import wtrack.app.data.worker.RetentionPurgeRunner
@@ -22,6 +23,7 @@ class WtrackApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var allowlistCache: AllowlistCache
+    @Inject lateinit var customParserRuleCache: CustomParserRuleCache
     @Inject lateinit var captureStatusTracker: CaptureStatusTracker
     @Inject lateinit var heartbeatMonitor: HeartbeatMonitor
     @Inject lateinit var recoveryCoordinator: EventRecoveryCoordinator
@@ -38,6 +40,7 @@ class WtrackApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         allowlistCache.startObserving()
+        customParserRuleCache.startObserving()
         RetentionPurgeWorker.scheduleDaily(this)
         applicationScope.launch(dispatcherProvider.io) {
             retentionPurgeRunner.run()

@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Rule
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Archive
@@ -82,6 +83,7 @@ import wtrack.app.feature.common.isValidMoneyInput
 fun AccountsScreen(
     viewModel: AccountsViewModel,
     onOpenDiagnostics: () -> Unit,
+    onOpenCustomParsers: (String?) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     val ext = WtrackTheme.colors
@@ -324,6 +326,14 @@ fun AccountsScreen(
                                                 },
                                             )
                                             DropdownMenuItem(
+                                                text = { Text("Parser rules") },
+                                                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Rule, contentDescription = null) },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    onOpenCustomParsers(item.linkedSources.firstOrNull()?.link?.sourceId)
+                                                },
+                                            )
+                                            DropdownMenuItem(
                                                 text = { Text("Capture diagnostics") },
                                                 leadingIcon = { Icon(Icons.Outlined.Shield, contentDescription = null) },
                                                 onClick = {
@@ -391,12 +401,26 @@ fun AccountsScreen(
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                     shape = RoundedCornerShape(10.dp),
                                 ) {
-                                    Text(
-                                        text = "No built-in parser for this linked package yet. Record manually or enable 14-day encrypted M3a sample collection below.",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = "Auto-detect fallback active: alerts go to Needs Review pre-filled. Teach a pattern once to auto-parse future alerts.",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        TextButton(
+                                            onClick = { onOpenCustomParsers(item.linkedSources.firstOrNull()?.link?.sourceId) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        ) {
+                                            Text("Teach Pattern", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
                                 }
                             }
 
@@ -461,8 +485,15 @@ fun AccountsScreen(
                                                 overflow = TextOverflow.Ellipsis,
                                             )
                                             if (src != null) {
+                                                val customCount = state.customRuleCountsBySource[src.id] ?: 0
+                                                val statusText = buildString {
+                                                    append(if (src.isAllowlisted) "Allowlisted" else "Paused")
+                                                    if (customCount > 0) {
+                                                        append(" · $customCount custom pattern(s)")
+                                                    }
+                                                }
                                                 Text(
-                                                    text = if (src.isAllowlisted) "Allowlisted" else "Paused",
+                                                    text = statusText,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = ext.mutedText,
                                                 )
@@ -803,6 +834,38 @@ fun AccountsScreen(
                                 label = { Text("${target.displayName}: $candidatePkg") },
                             )
                         }
+                    }
+                }
+                Text(
+                    text = "Other common Indonesian banks & e-wallets (auto-detect fallback ready):",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ext.mutedText,
+                )
+                val otherIndonesianApps = remember {
+                    listOf(
+                        "GoPay / Gojek" to "com.gojek.app",
+                        "OVO" to "ovo.id",
+                        "Shopee" to "com.shopee.id",
+                        "SeaBank" to "id.co.seabank.id",
+                        "blu" to "com.bcadigital.blu",
+                        "Livin'" to "id.bmri.livin",
+                        "BRImo" to "id.co.bri.brimo",
+                        "wondr BNI" to "id.co.bni.wondr",
+                    )
+                }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    otherIndonesianApps.forEach { (appLabel, appPkg) ->
+                        FilterChip(
+                            selected = pkg == appPkg,
+                            onClick = {
+                                pkg = appPkg
+                                label = appLabel
+                            },
+                            label = { Text(appLabel) },
+                        )
                     }
                 }
                 OutlinedTextField(

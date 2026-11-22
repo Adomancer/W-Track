@@ -57,10 +57,10 @@ W-Track automatically collects transaction notifications from explicitly allowli
 ```mermaid
 flowchart LR
     A["Allowlisted Bank & E-Wallet Notifications"] --> B["WtrackNotificationListenerService (Sync Allowlist + 3-Tier Dedup)"]
-    B --> C["Isolated Provider Parsers (Bank Jago · DANA · myBCA)"]
-    C -->|"High-Confidence Match"| D["Encrypted Room / SQLCipher Ledger"]
-    C -->|"Unseen Template / Redacted"| E["Needs Review Queue (Re-parsable)"]
-    D --> F["Material 3 UI (Dashboard · Accounts · Activity · Insights)"]
+    B --> C["SmartParserRegistry (Built-In · User Custom Patterns · Generic Fallback)"]
+    C -->|"Built-In / Custom Pattern Match"| D["Encrypted Room / SQLCipher Ledger"]
+    C -->|"Unseen Format / Redacted (Pre-filled)"| E["Needs Review Queue (1-Tap Confirm & Learn Pattern)"]
+    D --> F["Material 3 UI (Dashboard · Accounts · Activity · Insights · Parsers)"]
     D --> G["Encrypted .wtrackbackup (WTBK v1) & Safe CSV Export"]
 ```
 
@@ -77,7 +77,7 @@ Verified on `iQOO Z10R` (`Android 16`):
 | **3** | **myBCA** | `com.bca.mybca.omni.android` (`v2.23.0`) | `BcaTransactionParser` **v1** | Financial Diary received & spent pushes and Android 16 group summaries. *(BCA mobile `com.bca` v4.9.5 is verified installed; zero Financial Diary pushes observed from `com.bca`.)* |
 
 > [!TIP]
-> Any notification template not yet covered (such as QRIS payments, outgoing DANA transfers, refunds, or failed attempts) automatically routes to **Needs Review** without guessing fields and can be re-parsed later as parsers expand.
+> **Any new bank or e-wallet works immediately without exporting JSON or rebuilding the APK:** `SmartParserRegistry` resolves in 3 tiers (`Built-In Parser → User Custom Pattern Rules → Generic Fallback Parser`). Unseen monetary notifications automatically land in **Needs Review** pre-filled (while still filtering OTPs, promos, failed attempts, and non-monetary pushes). Checking **"Remember this notification pattern"** in Needs Review — or pasting a sample in **Settings / Accounts → Notification Parsers** — teaches W-Track a reusable local pattern (`{AMOUNT}`, `{MERCHANT}`, `{REF}`, `{IGNORE}`) so future alerts auto-parse straight into your ledger.
 
 ---
 
@@ -86,11 +86,11 @@ Verified on `iQOO Z10R` (`Android 16`):
 | Milestone | Scope & Implemented Features | Verification Status |
 | :--- | :--- | :--- |
 | **M0: Foundation** | 3-module Gradle setup (`:app`, `:integration:api`, `:integration:providers`) + `build-logic` conventions (`isMinifyEnabled` + `isShrinkResources` + optional `keystore.properties` release signing), Hilt `2.60.1` DI, Material 3 Light/Dark/System themes, pure-Kotlin boundary tests. | **Complete & R8-verified** (`33.0 MB` debug → `11.0 MB` release APK) |
-| **M1: Encrypted Data Foundation** | Room Schema v1 + SQLCipher `4.20.0` + `DatabaseKeyManager` (KEK/DEK lifecycle + `LOCKED_KEY_MISSING_OR_INVALID` lock screen recovery). | **Hardware-verified** on `iQOO Z10R` (`SqlCipherInstrumentedTest`: TEE Keystore audit, header & key-loss byte preservation) |
+| **M1: Encrypted Data Foundation** | Room Schema v2 (`MIGRATION_1_2`, 14 tables including `custom_parser_rules`) + SQLCipher `4.20.0` + `DatabaseKeyManager` (KEK/DEK lifecycle + `LOCKED_KEY_MISSING_OR_INVALID` lock screen recovery). | **Hardware-verified** on `iQOO Z10R` (`SqlCipherInstrumentedTest`) + `MIGRATION_1_2` unit-verified |
 | **M2: Notification Ingestion** | Provider-agnostic `WtrackNotificationListenerService`, synchronous allowlist filter, `activeNotifications` catch-up, 3-tier deduplication, `ING-08`/`ING-10` capture self-check & App Info guidance, `ING-12`/`13`/`14` recovery & heartbeat, M3a sample capture protection, anonymized JSON export, purge, and `PAR-11` guarded re-parse proposals. | **Hardware-verified** on `iQOO Z10R` (`IngestionAndLedgerInstrumentedTest`) & live on daily driver |
-| **M3: Providers & Domain Engines** | Production parsers for Bank Jago (`v2`), myBCA (`v1`), and DANA (`v1`); 16-row Section 4.6 aggregate engine + `DASH-08` merchant trends; balance correction & checkpoints; manual transfer pairing with derived fees; auto-categorization rules with backfill; `TX-06` tags & filtering; `GateG1Evaluator`. | **Hardware-verified** against anonymized captures & `iQOO Z10R` SQLCipher ledger invariants |
-| **M4: Material 3 UI** | Onboarding + Capture Self-Check + Notification Access/battery/restricted-settings guidance, Dashboard, Accounts (grouped IDR/USD/JPY input & balance correction), Activity (tag filtering, edit, void, transfer linking), Needs Review, Rules, Insights (merchant trends), Settings (`DATA-12` reminder threshold chips & `DATA-14` SAF backup folder config), and `DatabaseLockedScreen`. | **Theme & Lock UI verified** on `iQOO Z10R` (`ComposeThemeAndLockedUiInstrumentedTest`) |
-| **M5: Reliability & Safety** | Encrypted `.wtrackbackup` (`WTBK` v1 Argon2id `65,536 KiB` / `3` iter + PBKDF2 fallback + AES-256-GCM AAD) export/verify/atomic restore, scheduled backup reminder evaluator (`EXP-006`/`DATA-14`), CSV export with unencrypted warning & formula neutralization, `RetentionPurgeWorker`, and complete data wipe. | **Hardware-verified** on `iQOO Z10R` (`BackupAndRetentionInstrumentedTest`: `encryptMs=9879`, `decryptMs=8943`, 13-table atomic restore, retention & CSV safety) |
+| **M3: Providers & Domain Engines** | Production parsers for Bank Jago (`v2`), myBCA (`v1`), and DANA (`v1`); `GenericNotificationFallbackParser` + `NotificationTemplateEngine` (`CompositeSourceParser` & `SmartParserRegistry`) for zero-rebuild custom patterns; 16-row Section 4.6 aggregate engine + `DASH-08` merchant trends; balance correction & checkpoints; manual transfer pairing with derived fees; auto-categorization rules with backfill; `TX-06` tags & filtering; `GateG1Evaluator`. | **Unit & Robolectric-verified** (`35` `:integration:providers` + `86` `:app` tests) & hardware-verified core parsers |
+| **M4: Material 3 UI** | Onboarding + Capture Self-Check + Notification Access/battery/restricted-settings guidance, Dashboard, Accounts (grouped IDR/USD/JPY input, balance correction, & Indonesian bank/wallet quick-links), Activity (tag filtering, edit, void, transfer linking), Needs Review (with 1-tap **"Remember this notification pattern"**), **Notification Parsers** (*Paste & Test* live pattern editor), Rules, Insights (merchant trends), Settings (`DATA-12` reminder threshold chips & `DATA-14` SAF backup folder config), and `DatabaseLockedScreen`. | **Theme & Lock UI verified** on `iQOO Z10R` (`ComposeThemeAndLockedUiInstrumentedTest`) |
+| **M5: Reliability & Safety** | Encrypted `.wtrackbackup` (`WTBK` v1 Argon2id `65,536 KiB` / `3` iter + PBKDF2 fallback + AES-256-GCM AAD) export/verify/atomic 14-table restore (including `custom_parser_rules`, excluding raw payloads), scheduled backup reminder evaluator (`EXP-006`/`DATA-14`), CSV export with unencrypted warning & formula neutralization, `RetentionPurgeWorker`, and complete data wipe. | **Hardware-verified** (`BackupAndRetentionInstrumentedTest`) + schema v2 backup round-trip unit-verified |
 
 ---
 
@@ -123,7 +123,7 @@ W-Track/
 ├── app/                     # Android app: Compose Material 3 UI, domain use-cases, Room/SQLCipher data, WorkManager, NLS ingestion
 ├── integration/
 │   ├── api/                 # Pure Kotlin parser contracts (TransactionParser, ParseResult, NotificationEvent, ParsedTransaction)
-│   └── providers/           # Isolated provider parsers (jago, dana, bca), shared locale/date helpers, catalog & anonymized fixtures
+│   └── providers/           # Isolated provider parsers (jago, dana, bca), generic fallback, safe template engine & fixtures
 ├── build-logic/             # Shared Gradle convention plugins
 └── docs/                    # PRD, Architecture, Technical Spec, Database ERD, Security, ADRs, Provider & Device checklists
 ```

@@ -17,6 +17,7 @@ import wtrack.app.data.local.entity.AccountEntity
 import wtrack.app.data.local.entity.AccountSourceEntity
 import wtrack.app.data.local.entity.BudgetEntity
 import wtrack.app.data.local.entity.CategoryEntity
+import wtrack.app.data.local.entity.CustomParserRuleEntity
 import wtrack.app.data.local.entity.TagEntity
 import wtrack.app.data.local.entity.TransactionEntity
 import wtrack.app.data.local.entity.TransactionRuleEntity
@@ -164,6 +165,22 @@ class BackupContainerAndRestoreTest {
             ),
         )
         db.budgetDao().insert(BudgetEntity(categoryId = childCatId, accountId = acc1, limitMinor = 100_00L, period = "MONTHLY", isActive = true, createdAt = now, updatedAt = now))
+        db.customParserRuleDao().insert(
+            CustomParserRuleEntity(
+                sourceId = "id.co.seabank.id",
+                name = "SeaBank Out",
+                titleContains = null,
+                templatePattern = "Pembayaran {AMOUNT} ke {MERCHANT} berhasil",
+                direction = Direction.OUTFLOW.name,
+                transactionType = "PURCHASE",
+                currency = "IDR",
+                numberLocale = "INDONESIAN",
+                accountHint = null,
+                enabled = true,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
 
         val sourceBackupService = BackupService(
             sourceHarness.holder, sourceHarness.settingsStore, sourceHarness.allowlistCache,
@@ -212,6 +229,9 @@ class BackupContainerAndRestoreTest {
         assertThat(restoreHarness.allowlistCache.isAllowlisted(srcId)).isTrue()
         assertThat(restoreDb.transactionDao().getById(refundTxId)?.relatedTransactionId).isEqualTo(capturedTx.id)
         assertThat(restoreDb.notificationEventDao().getAllOnce().single().payloadJson).isNull()
+        assertThat(restoreDb.customParserRuleDao().getAllOnce()).hasSize(1)
+        assertThat(restoreDb.customParserRuleDao().getAllOnce().single().templatePattern)
+            .isEqualTo("Pembayaran {AMOUNT} ke {MERCHANT} berhasil")
 
         // Replaying the exact notification in shade after restore MUST NOT create a duplicate transaction!
         val restoredPipeline = restoreHarness.pipeline(parser)

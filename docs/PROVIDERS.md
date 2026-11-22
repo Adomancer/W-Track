@@ -48,6 +48,10 @@ Verified directly against installed packages on the physical `vivo / iQOO Z10R` 
 3. **Sample Collection & Anonymization (`PRD Section 11`, `SECURITY.md §6.2`):**
    - Raw M3a sample collection is **off by default**, toggled explicitly per single source (max 14 days inside SQLCipher DB, excluded from backups).
    - Real account hints, names, references, and personal histories must be replaced with synthetic placeholders before committing fixtures to `:integration:providers/src/test/resources/`.
+4. **Simplified Onboarding for New Banks & E-Wallets (`SmartParserRegistry`):**
+   - For day-to-day additions (e.g., GoPay, OVO, SeaBank, blu, Livin', BRImo, BNI) — or unseen formats on existing built-in providers — `SmartParserRegistry` resolves in 3 tiers: **Built-In Parser → User Custom Pattern Rules (`custom_parser_rules`) → `GenericNotificationFallbackParser`**.
+   - `GenericNotificationFallbackParser` filters group summaries, OTP/PIN/security notices, promos, failed attempts, and non-monetary pushes, and routes monetary candidates to **Needs Review** pre-filled (`ReviewReason.UNKNOWN_FORMAT`, never auto-confirmed).
+   - Users can teach reusable patterns in one tap via **"Remember this notification pattern"** in Needs Review or via **Paste & Test** in **Notification Parsers** (`{AMOUNT}`, `{MERCHANT}`, `{REF}`, `{IGNORE}` placeholders, no raw regex). Newly saved rules automatically retry pending `NeedsReview` events for that source. M3a JSON sample export remains available in Diagnostics for developer fixture capture.
 
 ---
 

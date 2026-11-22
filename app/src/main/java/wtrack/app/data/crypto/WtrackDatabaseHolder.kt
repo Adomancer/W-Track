@@ -77,6 +77,7 @@ class WtrackDatabaseHolder(
                             databaseName,
                         )
                             .openHelperFactory(helperFactoryProvider.create(access.dek.copyOf()))
+                            .addMigrations(WtrackDatabase.MIGRATION_1_2)
                             .addCallback(WtrackDatabase.createCallback())
                             .build()
                         // Force SQLCipher decryption & schema verification before exposing instance.

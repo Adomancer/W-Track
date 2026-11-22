@@ -24,6 +24,7 @@ import wtrack.app.domain.model.TransactionRule
 import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CategoryRepository
+import wtrack.app.domain.repository.CustomParserRuleRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
 import wtrack.app.domain.repository.ReparseProposal
@@ -53,6 +54,7 @@ data class SettingsUiState(
     val providerCatalog: List<ProviderCatalogEntry> = emptyList(),
     val gateG1Report: GateG1Report? = null,
     val retainedSampleCount: Int = 0,
+    val customParserRuleCount: Int = 0,
     val reparseProposals: List<ReparseProposal> = emptyList(),
     val isBusy: Boolean = false,
     val actionMessage: String? = null,
@@ -65,6 +67,7 @@ class SettingsViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val captureStatusRepository: CaptureStatusRepository,
     private val needsReviewRepository: NeedsReviewRepository,
+    customParserRuleRepository: CustomParserRuleRepository,
     private val backupPort: BackupAndDiagnosticsPort,
     private val gateG1Evaluator: GateG1Evaluator,
     private val clock: Clock,
@@ -113,9 +116,10 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = combine(
         repoSnapshot,
         auxiliarySignals,
+        customParserRuleRepository.rules,
         isBusyFlow,
         actionMessage,
-    ) { snap, aux, busy, message ->
+    ) { snap, aux, customParserRules, busy, message ->
         SettingsUiState(
             settings = snap.settings,
             categories = snap.categories,
@@ -128,6 +132,7 @@ class SettingsViewModel @Inject constructor(
             providerCatalog = backupPort.providerCatalogEntries(),
             gateG1Report = aux.report,
             retainedSampleCount = aux.retainedSampleCount,
+            customParserRuleCount = customParserRules.size,
             reparseProposals = aux.reparseProposals,
             isBusy = busy,
             actionMessage = message,

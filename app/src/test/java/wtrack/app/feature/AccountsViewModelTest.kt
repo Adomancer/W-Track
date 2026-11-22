@@ -22,12 +22,14 @@ class AccountsViewModelTest {
         val accRepo = FakeAccountRepository()
         val txRepo = FakeTransactionRepository()
         val sourceRepo = FakeSourceAndEventRepository()
+        val customParserRepo = FakeCustomParserRuleRepository()
         val clock = FakeClock()
 
         val vm = AccountsViewModel(
             accountRepository = accRepo,
             sourceRepository = sourceRepo,
             transactionRepository = txRepo,
+            customParserRuleRepository = customParserRepo,
             backupPort = FakeBackupAndDiagnosticsPort(),
             checkpointEvaluator = BalanceCheckpointEvaluator(),
             correctBalanceUseCase = CorrectBalanceUseCase(accRepo, txRepo, clock),

@@ -12,14 +12,18 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.Category
+import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.NeedsReviewItem
 import wtrack.app.domain.repository.AccountRepository
 import wtrack.app.domain.repository.CategoryRepository
+import wtrack.app.domain.repository.CustomParserRuleRepository
+import wtrack.app.domain.repository.GeneratedParserTemplate
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.SaveReviewItemRequest
 import wtrack.app.domain.repository.SettingsRepository
+import wtrack.app.domain.repository.UpsertCustomParserRuleRequest
 import wtrack.app.domain.time.Clock
 import wtrack.app.domain.usecase.ResolveNeedsReviewUseCase
 import wtrack.integration.Direction
@@ -38,6 +42,7 @@ class ReviewViewModel @Inject constructor(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     settingsRepository: SettingsRepository,
+    private val customParserRuleRepository: CustomParserRuleRepository,
     private val resolveNeedsReviewUseCase: ResolveNeedsReviewUseCase,
     private val clock: Clock,
 ) : ViewModel() {
@@ -64,6 +69,27 @@ class ReviewViewModel @Inject constructor(
         initialValue = ReviewUiState(),
     )
 
+    fun generatePatternSuggestion(
+        item: NeedsReviewItem,
+        descriptionHint: String?,
+        currency: String,
+    ): GeneratedParserTemplate? {
+        val sampleBody = item.payloadBody
+            ?: item.payloadText?.let { text ->
+                if (!item.payloadTitle.isNullOrBlank() && text.startsWith(item.payloadTitle)) {
+                    text.removePrefix(item.payloadTitle).trim()
+                } else {
+                    text
+                }
+            }
+            ?: return null
+        return customParserRuleRepository.generateTemplateFromSample(
+            sampleBody = sampleBody,
+            merchantOrDescHint = item.draftMerchantRaw ?: descriptionHint,
+            defaultCurrency = currency.trim().uppercase().ifEmpty { uiState.value.defaultCurrency },
+        )
+    }
+
     fun saveResolved(
         item: NeedsReviewItem,
         accountId: Long,
@@ -74,6 +100,9 @@ class ReviewViewModel @Inject constructor(
         description: String?,
         categoryId: Long?,
         rememberAccountHint: Boolean,
+        rememberPattern: Boolean = false,
+        customTemplatePattern: String? = null,
+        customNumberLocale: CustomNumberLocale = CustomNumberLocale.INDONESIAN,
     ) {
         viewModelScope.launch {
             val normalizedCurrency = currency.trim().uppercase().ifEmpty { uiState.value.defaultCurrency }
@@ -99,7 +128,38 @@ class ReviewViewModel @Inject constructor(
                     ),
                 )
             }.onSuccess {
-                actionMessage.value = "Transaction confirmed and saved."
+                if (rememberPattern && !customTemplatePattern.isNullOrBlank()) {
+                    val ruleOutcome = runCatching {
+                        val ruleName = "${item.packageName.substringAfterLast('.')} ${direction.name.lowercase()}"
+                        customParserRuleRepository.upsertRule(
+                            UpsertCustomParserRuleRequest(
+                                sourceId = item.sourceId,
+                                name = ruleName,
+                                titleContains = null,
+                                templatePattern = customTemplatePattern,
+                                direction = direction,
+                                transactionType = type,
+                                currency = normalizedCurrency,
+                                numberLocale = customNumberLocale,
+                                accountHint = item.draftAccountHint?.takeIf { rememberAccountHint },
+                                enabled = true,
+                            ),
+                        )
+                        customParserRuleRepository.retryPendingReviewForSource(item.sourceId)
+                    }
+                    ruleOutcome.onSuccess { autoParsedOthers ->
+                        actionMessage.value = buildString {
+                            append("Transaction saved & pattern remembered.")
+                            if (autoParsedOthers > 0) {
+                                append(" Auto-parsed $autoParsedOthers more pending notification(s).")
+                            }
+                        }
+                    }.onFailure { err ->
+                        actionMessage.value = "Transaction saved, but pattern was not saved: ${err.message}"
+                    }
+                } else {
+                    actionMessage.value = "Transaction confirmed and saved."
+                }
             }.onFailure { err ->
                 actionMessage.value = err.message ?: "Failed to save transaction."
             }

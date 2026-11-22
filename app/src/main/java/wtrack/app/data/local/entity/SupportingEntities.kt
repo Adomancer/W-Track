@@ -228,3 +228,34 @@ data class BudgetEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 )
+
+@Entity(
+    tableName = "custom_parser_rules",
+    indices = [
+        Index(value = ["source_id"]),
+    ],
+)
+data class CustomParserRuleEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    @ColumnInfo(name = "source_id")
+    val sourceId: String,
+    val name: String,
+    @ColumnInfo(name = "title_contains")
+    val titleContains: String?,
+    @ColumnInfo(name = "template_pattern")
+    val templatePattern: String,
+    val direction: String,
+    @ColumnInfo(name = "transaction_type")
+    val transactionType: String,
+    val currency: String,
+    @ColumnInfo(name = "number_locale")
+    val numberLocale: String,
+    @ColumnInfo(name = "account_hint")
+    val accountHint: String?,
+    val enabled: Boolean = true,
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long,
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long,
+)

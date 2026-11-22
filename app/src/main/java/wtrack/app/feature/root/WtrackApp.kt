@@ -1,6 +1,7 @@
 package wtrack.app.feature.root
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +62,8 @@ import wtrack.app.feature.insights.InsightsViewModel
 import wtrack.app.feature.review.ReviewScreen
 import wtrack.app.feature.review.ReviewViewModel
 import wtrack.app.feature.settings.CategoriesScreen
+import wtrack.app.feature.settings.CustomParsersScreen
+import wtrack.app.feature.settings.CustomParsersViewModel
 import wtrack.app.feature.settings.DiagnosticsScreen
 import wtrack.app.feature.settings.RulesScreen
 import wtrack.app.feature.settings.SettingsScreen
@@ -76,6 +79,7 @@ private sealed class WtrackRoute(val route: String, val label: String, val icon:
     data object Rules : WtrackRoute("rules", "Rules")
     data object Categories : WtrackRoute("categories", "Categories")
     data object Diagnostics : WtrackRoute("diagnostics", "Diagnostics")
+    data object CustomParsers : WtrackRoute("custom_parsers?sourceId={sourceId}", "Parsers")
     data object TransactionDetail : WtrackRoute("transaction_detail/{txId}", "Detail")
 }
 
@@ -272,6 +276,14 @@ private fun WtrackMainScaffold(
                     AccountsScreen(
                         viewModel = accountsVm,
                         onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
+                        onOpenCustomParsers = { sourceId ->
+                            val target = if (sourceId.isNullOrBlank()) {
+                                "custom_parsers"
+                            } else {
+                                "custom_parsers?sourceId=${Uri.encode(sourceId)}"
+                            }
+                            navController.navigate(target)
+                        },
                     )
                 }
                 composable(WtrackRoute.Insights.route) {
@@ -290,6 +302,25 @@ private fun WtrackMainScaffold(
                         onOpenRules = { navController.navigate(WtrackRoute.Rules.route) },
                         onOpenCategories = { navController.navigate(WtrackRoute.Categories.route) },
                         onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
+                        onOpenCustomParsers = { navController.navigate("custom_parsers") },
+                    )
+                }
+                composable(
+                    route = WtrackRoute.CustomParsers.route,
+                    arguments = listOf(
+                        navArgument("sourceId") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+                ) { entry ->
+                    val customParsersVm: CustomParsersViewModel = hiltViewModel()
+                    val initialSourceId = entry.arguments?.getString("sourceId")
+                    CustomParsersScreen(
+                        viewModel = customParsersVm,
+                        initialSourceId = initialSourceId,
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable(WtrackRoute.Rules.route) {

@@ -9,11 +9,8 @@ import javax.inject.Singleton
 import wtrack.app.core.coroutines.DefaultDispatcherProvider
 import wtrack.app.core.coroutines.DispatcherProvider
 import wtrack.app.core.time.SystemClock
-import wtrack.app.domain.parser.DefaultParserRegistry
-import wtrack.app.domain.parser.ParserRegistry
 import wtrack.app.domain.time.Clock
 import wtrack.integration.TransactionParser
-import wtrack.integration.providers.ProviderParsers
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -25,12 +22,6 @@ object CoreModule {
     @Provides
     @Singleton
     fun provideDispatcherProvider(): DispatcherProvider = DefaultDispatcherProvider()
-
-    @Provides
-    @Singleton
-    fun provideParserRegistry(
-        boundParsers: Set<@JvmSuppressWildcards TransactionParser>,
-    ): ParserRegistry = DefaultParserRegistry(ProviderParsers.registered() + boundParsers)
 }
 
 @Module

@@ -24,6 +24,8 @@ import wtrack.app.domain.model.CaptureHealthSummary
 import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.domain.model.Category
 import wtrack.app.domain.model.CategorySource
+import wtrack.app.domain.model.CustomNumberLocale
+import wtrack.app.domain.model.CustomParserRule
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.NeedsReviewItem
 import wtrack.app.domain.model.NotificationEventRecord
@@ -45,6 +47,9 @@ import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CategoryRepository
 import wtrack.app.domain.repository.CreateAccountRequest
 import wtrack.app.domain.repository.CreateManualTransactionRequest
+import wtrack.app.domain.repository.CustomParserRuleRepository
+import wtrack.app.domain.repository.CustomParserTestOutcome
+import wtrack.app.domain.repository.GeneratedParserTemplate
 import wtrack.app.domain.repository.LinkTransferRequest
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
@@ -60,6 +65,7 @@ import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.repository.TransferRepository
 import wtrack.app.domain.repository.UpdateAccountRequest
 import wtrack.app.domain.repository.UpdateTransactionRequest
+import wtrack.app.domain.repository.UpsertCustomParserRuleRequest
 import wtrack.app.domain.time.Clock
 import wtrack.integration.Direction
 
@@ -424,4 +430,71 @@ class FakeBudgetRepository : BudgetRepository {
     override val budgets: Flow<List<Budget>> = budgetsFlow
     override suspend fun upsertBudget(categoryId: Long, accountId: Long?, limitMinor: Long, period: String): Long = 1L
     override suspend fun deleteBudget(id: Long) {}
+}
+
+class FakeCustomParserRuleRepository : CustomParserRuleRepository {
+    val rulesFlow = MutableStateFlow<List<CustomParserRule>>(emptyList())
+    val retriedSources = mutableListOf<String>()
+    var autoParsedReturnCount = 0
+    private var nextId = 1L
+
+    override val rules: Flow<List<CustomParserRule>> = rulesFlow
+    override suspend fun getEnabledOnce(): List<CustomParserRule> = rulesFlow.value.filter { it.enabled }
+
+    override suspend fun upsertRule(request: UpsertCustomParserRuleRequest): Long {
+        val id = request.id ?: nextId++
+        val rule = CustomParserRule(
+            id = id,
+            sourceId = request.sourceId,
+            name = request.name,
+            titleContains = request.titleContains,
+            templatePattern = request.templatePattern,
+            direction = request.direction,
+            transactionType = request.transactionType,
+            currency = request.currency,
+            numberLocale = request.numberLocale,
+            accountHint = request.accountHint,
+            enabled = request.enabled,
+            createdAt = 1_000L,
+            updatedAt = 1_000L,
+        )
+        rulesFlow.value = rulesFlow.value.filterNot { it.id == id } + rule
+        return id
+    }
+
+    override suspend fun setEnabled(id: Long, enabled: Boolean) {
+        rulesFlow.value = rulesFlow.value.map { if (it.id == id) it.copy(enabled = enabled) else it }
+    }
+
+    override suspend fun delete(id: Long) {
+        rulesFlow.value = rulesFlow.value.filterNot { it.id == id }
+    }
+
+    override fun generateTemplateFromSample(
+        sampleBody: String,
+        merchantOrDescHint: String?,
+        defaultCurrency: String,
+    ): GeneratedParserTemplate? = GeneratedParserTemplate(
+        templatePattern = "Paid {AMOUNT} at {MERCHANT}",
+        currency = defaultCurrency,
+        numberLocale = CustomNumberLocale.INDONESIAN,
+        detectedMerchant = merchantOrDescHint,
+        detectedAmountMinor = 7_500_000L,
+    )
+
+    override fun testRuleAgainstSample(
+        templatePattern: String,
+        titleContains: String?,
+        direction: Direction,
+        transactionType: DomainTransactionType,
+        currency: String,
+        numberLocale: CustomNumberLocale,
+        sampleTitle: String?,
+        sampleBody: String,
+    ): CustomParserTestOutcome = CustomParserTestOutcome.NotMatched("Preview stub")
+
+    override suspend fun retryPendingReviewForSource(sourceId: String): Int {
+        retriedSources += sourceId
+        return autoParsedReturnCount
+    }
 }

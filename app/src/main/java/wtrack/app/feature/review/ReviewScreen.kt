@@ -43,12 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.providerBrandStyle
 import wtrack.app.core.theme.tabularNums
+import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.NeedsReviewItem
@@ -346,6 +348,18 @@ fun ReviewScreen(
         var description by remember(item.id) { mutableStateOf(item.draftDescription ?: item.draftMerchantRaw.orEmpty()) }
         var categoryId by remember(item.id) { mutableStateOf<Long?>(null) }
         var rememberHint by remember(item.id) { mutableStateOf(!item.draftAccountHint.isNullOrBlank()) }
+        val patternSuggestion = remember(item.id, currencyInput) {
+            viewModel.generatePatternSuggestion(item, item.draftMerchantRaw ?: description, currencyInput)
+        }
+        var rememberPattern by remember(item.id) {
+            mutableStateOf(item.reviewReason == ReviewReason.UNKNOWN_FORMAT && patternSuggestion != null)
+        }
+        var patternInput by remember(item.id) {
+            mutableStateOf(patternSuggestion?.templatePattern.orEmpty())
+        }
+        var patternLocale by remember(item.id) {
+            mutableStateOf(patternSuggestion?.numberLocale ?: CustomNumberLocale.INDONESIAN)
+        }
 
         ModalBottomSheet(
             onDismissRequest = { resolvingItem = null },
@@ -403,7 +417,16 @@ fun ReviewScreen(
                 Text("Direction", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Direction.entries.forEach { d ->
-                        FilterChip(selected = direction == d, onClick = { direction = d }, label = { Text(d.name) })
+                        FilterChip(
+                            selected = direction == d,
+                            onClick = {
+                                direction = d
+                                if (d == Direction.OUTFLOW && type == DomainTransactionType.REFUND) {
+                                    type = DomainTransactionType.OTHER
+                                }
+                            },
+                            label = { Text(d.name) },
+                        )
                     }
                 }
 
@@ -412,9 +435,12 @@ fun ReviewScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    DomainTransactionType.entries.filter { it != DomainTransactionType.ADJUSTMENT }.forEach { t ->
-                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.name) })
-                    }
+                    DomainTransactionType.entries
+                        .filter { it != DomainTransactionType.ADJUSTMENT }
+                        .filter { it != DomainTransactionType.REFUND || direction == Direction.INFLOW }
+                        .forEach { t ->
+                            FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.name) })
+                        }
                 }
 
                 OutlinedTextField(
@@ -450,6 +476,73 @@ fun ReviewScreen(
                     }
                 }
 
+                if (item.payloadBody != null || item.payloadText != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ext.cardBorder),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = rememberPattern,
+                                    onCheckedChange = { checked ->
+                                        rememberPattern = checked
+                                        if (checked && patternInput.isBlank() && patternSuggestion != null) {
+                                            patternInput = patternSuggestion.templatePattern
+                                            patternLocale = patternSuggestion.numberLocale
+                                        }
+                                    },
+                                )
+                                Column {
+                                    Text(
+                                        text = "Remember this notification pattern",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Text(
+                                        text = "Auto-parse future matching notifications from ${item.packageName}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ext.mutedText,
+                                    )
+                                }
+                            }
+                            if (rememberPattern) {
+                                OutlinedTextField(
+                                    value = patternInput,
+                                    onValueChange = { patternInput = it },
+                                    label = { Text("Pattern template") },
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    FilterChip(
+                                        selected = patternLocale == CustomNumberLocale.INDONESIAN,
+                                        onClick = { patternLocale = CustomNumberLocale.INDONESIAN },
+                                        label = { Text("ID (50.000)") },
+                                    )
+                                    FilterChip(
+                                        selected = patternLocale == CustomNumberLocale.ENGLISH,
+                                        onClick = { patternLocale = CustomNumberLocale.ENGLISH },
+                                        label = { Text("EN (50,000.00)") },
+                                    )
+                                }
+                                Text(
+                                    text = "Placeholders: {AMOUNT} (required), {MERCHANT}, {REF}, {IGNORE}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ext.mutedText,
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -462,7 +555,8 @@ fun ReviewScreen(
                         shape = RoundedCornerShape(12.dp),
                     ) { Text("Cancel") }
                     Button(
-                        enabled = isValidMoneyInput(amountInput, currencyInput),
+                        enabled = isValidMoneyInput(amountInput, currencyInput) &&
+                            (!rememberPattern || patternInput.isNotBlank()),
                         onClick = {
                             resolvingItem = null
                             viewModel.saveResolved(
@@ -475,6 +569,9 @@ fun ReviewScreen(
                                 description = description,
                                 categoryId = categoryId,
                                 rememberAccountHint = rememberHint,
+                                rememberPattern = rememberPattern,
+                                customTemplatePattern = patternInput.takeIf { rememberPattern },
+                                customNumberLocale = patternLocale,
                             )
                         },
                         modifier = Modifier.weight(1f),

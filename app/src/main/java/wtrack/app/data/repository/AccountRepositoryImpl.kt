@@ -13,6 +13,7 @@ import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.local.entity.AccountEntity
 import wtrack.app.data.local.entity.AccountSourceEntity
 import wtrack.app.data.local.entity.CaptureGapEntity
+import wtrack.app.data.local.entity.CustomParserRuleEntity
 import wtrack.app.data.local.entity.NotificationEventEntity
 import wtrack.app.data.local.entity.TransactionEntity
 import wtrack.app.data.local.entity.TransactionSourceEntity
@@ -50,6 +51,7 @@ class AccountRepositoryImpl(
     private data class HealthEventSnapshot(
         val gapRows: List<CaptureGapEntity>,
         val eventRows: List<NotificationEventEntity>,
+        val customRuleRows: List<CustomParserRuleEntity>,
         val listenerConnected: Boolean,
     )
 
@@ -68,12 +70,18 @@ class AccountRepositoryImpl(
             val healthSignals = combine(
                 db.captureGapDao().observeAll(),
                 db.notificationEventDao().observeAll(),
+                db.customParserRuleDao().observeAll(),
                 listenerConnectedFlow,
-            ) { gapRows, eventRows, listenerConnected ->
-                HealthEventSnapshot(gapRows, eventRows, listenerConnected)
+            ) { gapRows, eventRows, customRuleRows, listenerConnected ->
+                HealthEventSnapshot(gapRows, eventRows, customRuleRows, listenerConnected)
             }
             combine(ledgerSources, healthSignals) { ledger, health ->
                 val sourcesById = ledger.sourceRows.associateBy { it.id }
+                val enabledCustomSources = health.customRuleRows
+                    .asSequence()
+                    .filter { it.enabled }
+                    .map { it.sourceId }
+                    .toSet()
                 val granted = permissionGrantedProvider()
                 val since30d = clock.nowEpochMillis() - NO_PARSER_WINDOW_MILLIS
                 val unparsedBySource = health.eventRows
@@ -104,7 +112,9 @@ class AccountRepositoryImpl(
                     val derivedStatus = when {
                         linkedSources.isEmpty() || allowlistedLinkedSources.isEmpty() -> CaptureStatus.ATTENTION
                         allowlistedLinkedSources.any { src ->
-                            src.parserVersion == null && parserRegistry?.parserVersionForSource(src.id) == null
+                            src.parserVersion == null &&
+                                parserRegistry?.parserVersionForSource(src.id) == null &&
+                                src.id !in enabledCustomSources
                         } -> CaptureStatus.UNSUPPORTED
                         !granted -> CaptureStatus.ATTENTION
                         !health.listenerConnected -> CaptureStatus.DISCONNECTED

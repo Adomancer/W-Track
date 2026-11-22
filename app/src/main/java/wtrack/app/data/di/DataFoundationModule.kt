@@ -25,15 +25,18 @@ import wtrack.app.data.crypto.WrappedKeyStore
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.AllowlistCache
 import wtrack.app.data.ingestion.CaptureStatusTracker
+import wtrack.app.data.ingestion.CustomParserRuleCache
 import wtrack.app.data.ingestion.EventRecoveryCoordinator
 import wtrack.app.data.ingestion.HeartbeatMonitor
 import wtrack.app.data.ingestion.IngestionPipeline
+import wtrack.app.data.ingestion.SmartParserRegistry
 import wtrack.app.data.local.WtrackDatabase
 import wtrack.app.data.local.preferences.AppSettingsDataStore
 import wtrack.app.data.repository.AccountRepositoryImpl
 import wtrack.app.data.repository.BudgetRepositoryImpl
 import wtrack.app.data.repository.CaptureStatusRepositoryImpl
 import wtrack.app.data.repository.CategoryRepositoryImpl
+import wtrack.app.data.repository.CustomParserRuleRepositoryImpl
 import wtrack.app.data.repository.DatabaseHealthRepositoryImpl
 import wtrack.app.data.repository.MerchantRepositoryImpl
 import wtrack.app.data.repository.NeedsReviewRepositoryImpl
@@ -50,6 +53,7 @@ import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.BudgetRepository
 import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CategoryRepository
+import wtrack.app.domain.repository.CustomParserRuleRepository
 import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.MerchantRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
@@ -60,6 +64,8 @@ import wtrack.app.domain.repository.TagRepository
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.repository.TransferRepository
 import wtrack.app.domain.time.Clock
+import wtrack.integration.TransactionParser
+import wtrack.integration.providers.ProviderParsers
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -126,6 +132,25 @@ object DataFoundationModule {
         holder: WtrackDatabaseHolder,
         @ApplicationScope applicationScope: CoroutineScope,
     ): AllowlistCache = AllowlistCache(holder = holder, scope = applicationScope)
+
+    @Provides
+    @Singleton
+    fun provideCustomParserRuleCache(
+        holder: WtrackDatabaseHolder,
+        @ApplicationScope applicationScope: CoroutineScope,
+    ): CustomParserRuleCache = CustomParserRuleCache(holder = holder, scope = applicationScope)
+
+    @Provides
+    @Singleton
+    fun provideParserRegistry(
+        boundParsers: Set<@JvmSuppressWildcards TransactionParser>,
+        customParserRuleCache: CustomParserRuleCache,
+    ): ParserRegistry = SmartParserRegistry(
+        builtInParsers = ProviderParsers.registered() + boundParsers,
+        customRulesProvider = { sourceId -> customParserRuleCache.rulesForSource(sourceId) },
+        customSourceIdsProvider = { customParserRuleCache.enabledSourceIds() },
+        enableGenericFallback = true,
+    )
 
     @Provides
     @Singleton
@@ -272,6 +297,20 @@ object DataFoundationModule {
 
     @Provides
     @Singleton
+    fun provideCustomParserRuleRepository(
+        holder: WtrackDatabaseHolder,
+        customParserRuleCache: CustomParserRuleCache,
+        clock: Clock,
+        pipelineLazy: Lazy<IngestionPipeline>,
+    ): CustomParserRuleRepository = CustomParserRuleRepositoryImpl(
+        holder = holder,
+        ruleCache = customParserRuleCache,
+        clock = clock,
+        onRetryEvent = { eventId -> pipelineLazy.get().processEvent(eventId) },
+    )
+
+    @Provides
+    @Singleton
     fun provideTagRepository(
         holder: WtrackDatabaseHolder,
         clock: Clock,
@@ -326,6 +365,7 @@ object DataFoundationModule {
         captureStatusTracker: CaptureStatusTracker,
         clock: Clock,
         logger: WtrackLogger,
+        customParserRuleCache: CustomParserRuleCache,
     ): BackupService = BackupService(
         holder = holder,
         settingsStore = settingsStore,
@@ -333,6 +373,7 @@ object DataFoundationModule {
         captureStatusTracker = captureStatusTracker,
         clock = clock,
         logger = logger,
+        customParserRuleCache = customParserRuleCache,
     )
 
     @Provides
@@ -360,6 +401,7 @@ object DataFoundationModule {
         ingestionPipeline: IngestionPipeline,
         clock: Clock,
         captureStatusTracker: CaptureStatusTracker,
+        customParserRuleCache: CustomParserRuleCache,
     ): BackupAndDiagnosticsPort = WtrackBackupAndDiagnosticsPort(
         holder = holder,
         backupService = backupService,
@@ -375,5 +417,6 @@ object DataFoundationModule {
         ingestionPipeline = ingestionPipeline,
         clock = clock,
         captureStatusTracker = captureStatusTracker,
+        customParserRuleCache = customParserRuleCache,
     )
 }
