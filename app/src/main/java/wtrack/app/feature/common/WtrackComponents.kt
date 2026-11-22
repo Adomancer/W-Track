@@ -33,9 +33,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
+import wtrack.app.R
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.providerBrandStyle
 import wtrack.app.core.theme.tabularNums
@@ -90,27 +91,12 @@ fun WtrackBrandMark(
             .background(Brush.linearGradient(listOf(ext.heroGradientStart, ext.heroGradientEnd))),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(size * 0.6f)) {
-            val w = this.size.width
-            val h = this.size.height
-            val path = Path().apply {
-                moveTo(0f, 0.14f * h)
-                lineTo(0.18f * w, 0.14f * h)
-                lineTo(0.30f * w, 0.62f * h)
-                lineTo(0.43f * w, 0.14f * h)
-                lineTo(0.57f * w, 0.14f * h)
-                lineTo(0.70f * w, 0.62f * h)
-                lineTo(0.82f * w, 0.14f * h)
-                lineTo(w, 0.14f * h)
-                lineTo(0.79f * w, 0.86f * h)
-                lineTo(0.62f * w, 0.86f * h)
-                lineTo(0.50f * w, 0.41f * h)
-                lineTo(0.38f * w, 0.86f * h)
-                lineTo(0.21f * w, 0.86f * h)
-                close()
-            }
-            drawPath(path = path, color = Color.White)
-        }
+        Icon(
+            painter = painterResource(id = R.drawable.ic_wtrack_mark_mono),
+            contentDescription = "W-Track",
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.72f),
+        )
     }
 }
 
