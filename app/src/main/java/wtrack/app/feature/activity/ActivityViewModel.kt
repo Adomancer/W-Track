@@ -35,6 +35,8 @@ import wtrack.app.domain.usecase.CreateRuleWithBackfillUseCase
 import wtrack.app.domain.usecase.DeleteManualTransactionUseCase
 import wtrack.app.domain.usecase.LinkRefundUseCase
 import wtrack.app.domain.usecase.LinkTransferUseCase
+import wtrack.app.domain.usecase.TransferSuggestion
+import wtrack.app.domain.usecase.TransferSuggestionEngine
 import wtrack.app.domain.usecase.UnlinkTransferUseCase
 import wtrack.app.domain.usecase.UpdateTransactionUseCase
 import wtrack.app.domain.usecase.VoidRestoreTransactionUseCase
@@ -69,10 +71,17 @@ data class ActivityTransactionItem(
     val tags: List<Tag> = emptyList(),
 )
 
+data class ActivityTransferSuggestionItem(
+    val suggestion: TransferSuggestion,
+    val outgoingAccountName: String,
+    val incomingAccountName: String,
+)
+
 data class ActivityUiState(
     val filter: ActivityFilterState = ActivityFilterState(),
     val items: List<ActivityTransactionItem> = emptyList(),
     val allItems: List<ActivityTransactionItem> = emptyList(),
+    val transferSuggestions: List<ActivityTransferSuggestionItem> = emptyList(),
     val derivedFees: List<DerivedFeeRow> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
@@ -86,7 +95,7 @@ class ActivityViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
-    transferRepository: TransferRepository,
+    private val transferRepository: TransferRepository,
     private val tagRepository: TagRepository,
     settingsRepository: SettingsRepository,
     private val aggregateCalculator: AggregateCalculator,
@@ -103,6 +112,7 @@ class ActivityViewModel @Inject constructor(
 
     private val filterState = MutableStateFlow(ActivityFilterState())
     private val actionMessage = MutableStateFlow<String?>(null)
+    private val transferSuggestionEngine = TransferSuggestionEngine()
 
     private val dataSnapshot = combine(
         transactionRepository.transactions,
@@ -199,10 +209,23 @@ class ActivityViewModel @Inject constructor(
             accountIdFilter = filter.accountId,
         )
 
+        val suggestions = transferSuggestionEngine
+            .findSuggestions(snapshot.transactions, snapshot.pairs)
+            .map { suggestion ->
+                ActivityTransferSuggestionItem(
+                    suggestion = suggestion,
+                    outgoingAccountName = accountMap[suggestion.outgoing.accountId]?.name
+                        ?: "Account #${suggestion.outgoing.accountId}",
+                    incomingAccountName = accountMap[suggestion.incoming.accountId]?.name
+                        ?: "Account #${suggestion.incoming.accountId}",
+                )
+            }
+
         ActivityUiState(
             filter = filter,
             items = filtered,
             allItems = allMapped,
+            transferSuggestions = suggestions,
             derivedFees = summary.derivedFees,
             accounts = snapshot.accounts.filter { it.isActive },
             categories = snapshot.categories.filter { !it.isArchived },
@@ -381,6 +404,22 @@ class ActivityViewModel @Inject constructor(
             runCatching { unlinkTransferUseCase(pairId) }
                 .onSuccess { actionMessage.value = "Transfer pair unlinked." }
                 .onFailure { actionMessage.value = it.message ?: "Failed to unlink transfer." }
+        }
+    }
+
+    fun confirmTransferSuggestion(suggestion: TransferSuggestion) {
+        viewModelScope.launch {
+            runCatching { linkTransferUseCase(suggestion.outgoing.id, suggestion.incoming.id) }
+                .onSuccess { actionMessage.value = "Suggested transfer linked." }
+                .onFailure { actionMessage.value = it.message ?: "Failed to link suggested transfer." }
+        }
+    }
+
+    fun dismissTransferSuggestion(outgoingId: Long, incomingId: Long) {
+        viewModelScope.launch {
+            runCatching { transferRepository.dismissSuggestedPair(outgoingId, incomingId) }
+                .onSuccess { actionMessage.value = "Transfer suggestion dismissed." }
+                .onFailure { actionMessage.value = it.message ?: "Failed to dismiss suggestion." }
         }
     }
 

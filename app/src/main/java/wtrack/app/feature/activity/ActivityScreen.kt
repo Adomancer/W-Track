@@ -356,6 +356,74 @@ fun ActivityScreen(
                 )
             }
 
+            // Auto-suggested inter-account transfer pairs
+            if (state.transferSuggestions.isNotEmpty()) {
+                item {
+                    WtrackCard(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                text = "Possible Transfers (${state.transferSuggestions.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            state.transferSuggestions.forEachIndexed { idx, item ->
+                                if (idx > 0) {
+                                    HorizontalDivider(color = ext.divider)
+                                }
+                                val s = item.suggestion
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onOpenTransaction(s.outgoing.id) },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    ) {
+                                        Text(
+                                            text = "${item.outgoingAccountName} → ${item.incomingAccountName}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        val feeNote = if (s.estimatedFeeMinor > 0L) {
+                                            " · Fee ${formatCurrency(s.estimatedFeeMinor, s.outgoing.currency)}"
+                                        } else {
+                                            ""
+                                        }
+                                        Text(
+                                            text = "${formatCurrency(s.incoming.amountMinor, s.incoming.currency)}$feeNote · ${UiDateHelper.formatDateTime(s.outgoing.occurredAt)}",
+                                            style = MaterialTheme.typography.bodySmall.tabularNums(),
+                                            color = ext.mutedText,
+                                        )
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        TextButton(
+                                            onClick = { viewModel.dismissTransferSuggestion(s.outgoing.id, s.incoming.id) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        ) {
+                                            Text("Dismiss")
+                                        }
+                                        Button(
+                                            onClick = { viewModel.confirmTransferSuggestion(s) },
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        ) {
+                                            Text("Link")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Read-only derived transfer fee rows (TRF-04)
             if (state.derivedFees.isNotEmpty()) {
                 item {

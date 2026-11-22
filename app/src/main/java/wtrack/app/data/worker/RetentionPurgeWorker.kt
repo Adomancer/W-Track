@@ -13,8 +13,12 @@ import java.util.concurrent.TimeUnit
 import wtrack.app.core.logging.WtrackLogger
 import wtrack.app.data.crypto.WtrackDatabaseHolder
 import wtrack.app.data.ingestion.HeartbeatMonitor
+import wtrack.app.data.local.preferences.AppSettingsDataStore
 import wtrack.app.domain.model.DatabaseHealthState
+import wtrack.app.domain.repository.BackupReminderEvaluator
+import wtrack.app.domain.repository.NoOpStatusAlertNotifier
 import wtrack.app.domain.repository.SourceAndEventRepository
+import wtrack.app.domain.repository.StatusAlertNotifier
 import wtrack.app.domain.time.Clock
 
 class RetentionPurgeRunner(
@@ -23,6 +27,8 @@ class RetentionPurgeRunner(
     private val heartbeatMonitor: HeartbeatMonitor,
     private val logger: WtrackLogger,
     private val clock: Clock,
+    private val settingsStore: AppSettingsDataStore? = null,
+    private val statusAlertNotifier: StatusAlertNotifier = NoOpStatusAlertNotifier,
 ) {
     suspend fun run(): Int {
         logger.pruneOlderThan()
@@ -39,6 +45,15 @@ class RetentionPurgeRunner(
             logger.logEvent("RETENTION", "PAYLOADS_PURGED", mapOf("count" to purged.toString()))
         }
         heartbeatMonitor.checkAndRecordStaleGap()
+        val store = settingsStore
+        if (store != null) {
+            val isBackupDue = runCatching {
+                BackupReminderEvaluator.shouldShowReminder(store.current(), clock.nowEpochMillis())
+            }.getOrDefault(false)
+            if (isBackupDue) {
+                runCatching { statusAlertNotifier.notifyBackupReminderDue() }
+            }
+        }
         return purged
     }
 }
@@ -56,6 +71,8 @@ class RetentionPurgeWorker @AssistedInject constructor(
     private val heartbeatMonitor: HeartbeatMonitor,
     private val logger: WtrackLogger,
     private val clock: Clock,
+    private val settingsStore: AppSettingsDataStore,
+    private val statusAlertNotifier: StatusAlertNotifier,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result = runCatching {
@@ -65,6 +82,8 @@ class RetentionPurgeWorker @AssistedInject constructor(
             heartbeatMonitor = heartbeatMonitor,
             logger = logger,
             clock = clock,
+            settingsStore = settingsStore,
+            statusAlertNotifier = statusAlertNotifier,
         ).run()
         Result.success()
     }.getOrElse {

@@ -115,4 +115,66 @@ class ActivityViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun surfacesConfirmsAndDismissesAutoSuggestedTransferPairs() = runTest {
+        val accRepo = FakeAccountRepository(
+            listOf(
+                Account(1L, "Jago", "Bank Jago", AccountType.BANK, "IDR", null, null, null, true),
+                Account(2L, "DANA", "DANA", AccountType.EWALLET, "IDR", null, null, null, true),
+                Account(3L, "BCA", "myBCA", AccountType.BANK, "IDR", null, null, null, true),
+            ),
+        )
+        val txRepo = FakeTransactionRepository()
+        val transferRepo = FakeTransferRepository()
+        val vm = ActivityViewModel(
+            transactionRepository = txRepo,
+            accountRepository = accRepo,
+            categoryRepository = FakeCategoryRepository(),
+            transferRepository = transferRepo,
+            tagRepository = FakeTagRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            aggregateCalculator = AggregateCalculator(),
+            createManualTransactionUseCase = CreateManualTransactionUseCase(txRepo),
+            updateTransactionUseCase = UpdateTransactionUseCase(txRepo, transferRepo),
+            voidRestoreTransactionUseCase = VoidRestoreTransactionUseCase(txRepo),
+            deleteManualTransactionUseCase = DeleteManualTransactionUseCase(txRepo),
+            linkTransferUseCase = LinkTransferUseCase(txRepo, transferRepo),
+            unlinkTransferUseCase = UnlinkTransferUseCase(transferRepo),
+            linkRefundUseCase = LinkRefundUseCase(txRepo),
+            createRuleWithBackfillUseCase = CreateRuleWithBackfillUseCase(FakeRuleRepository(), txRepo),
+            clock = FakeClock(),
+        )
+
+        vm.uiState.test {
+            awaitItem()
+            vm.createManualTransaction(1L, "102500", Direction.OUTFLOW, DomainTransactionType.TRANSFER, null, "Jago out", null, occurredAtMillis = 10_000_000L)
+            vm.createManualTransaction(2L, "100000", Direction.INFLOW, DomainTransactionType.TRANSFER, null, "DANA in", null, occurredAtMillis = 10_060_000L)
+            vm.createManualTransaction(3L, "50000", Direction.OUTFLOW, DomainTransactionType.TRANSFER, null, "BCA out", null, occurredAtMillis = 20_000_000L)
+            vm.createManualTransaction(2L, "50000", Direction.INFLOW, DomainTransactionType.TRANSFER, null, "DANA in 2", null, occurredAtMillis = 20_030_000L)
+
+            var withSuggestions = awaitItem()
+            while (withSuggestions.transferSuggestions.size < 2) {
+                withSuggestions = awaitItem()
+            }
+            val firstSuggestion = withSuggestions.transferSuggestions.first { it.outgoingAccountName == "BCA" }
+            vm.confirmTransferSuggestion(firstSuggestion.suggestion)
+
+            var afterConfirm = awaitItem()
+            while (afterConfirm.transferSuggestions.size != 1) {
+                afterConfirm = awaitItem()
+            }
+            val remaining = afterConfirm.transferSuggestions.single()
+            assertThat(remaining.outgoingAccountName).isEqualTo("Jago")
+            assertThat(remaining.suggestion.estimatedFeeMinor).isEqualTo(250_000L)
+
+            vm.dismissTransferSuggestion(remaining.suggestion.outgoing.id, remaining.suggestion.incoming.id)
+            var afterDismiss = awaitItem()
+            while (afterDismiss.transferSuggestions.isNotEmpty()) {
+                afterDismiss = awaitItem()
+            }
+            assertThat(afterDismiss.transferSuggestions).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

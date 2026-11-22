@@ -11,7 +11,7 @@
 
 <p>
   <a href="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml"><img src="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/Version-0.2.0--rc1-0B6E63?style=flat-square" alt="Version 0.2.0-rc1" />
+  <img src="https://img.shields.io/badge/Version-0.3.0--rc1-0B6E63?style=flat-square" alt="Version 0.3.0-rc1" />
   <img src="https://img.shields.io/badge/Android-API%2026%E2%80%9336-064740?style=flat-square" alt="Android API 26-36" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.21-101C1A?style=flat-square" alt="Kotlin 2.2.21" />
   <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-0B6E63?style=flat-square" alt="Jetpack Compose Material 3" />
@@ -37,7 +37,7 @@
 W-Track automatically collects transaction notifications from explicitly allowlisted Indonesian banking and e-wallet apps, normalizes them into a single encrypted local ledger, routes uncertain alerts to **Needs Review**, and helps you track balances, transfers, categories, and cash flow without uploading financial data or storing banking credentials.
 
 > [!NOTE]
-> **Current Status:** All PRD v1.4 features are implemented (`M0`–`M5`) with `7/7` hardware instrumented test suites and R8 release builds verified (`0.2.0-rc1`, `versionCode 2`, `minSdk 26 · targetSdk 36 · compileSdk 37`). Currently in active **Gate G1** daily-driver soak on `iQOO Z10R (Android 16)`.
+> **Current Status:** All PRD v1.4 features (`M0`–`M5`) plus daily-driver release hardening (`0.3.0-rc1`, `versionCode 3`, `minSdk 26 · targetSdk 36 · compileSdk 37`) are implemented — including biometric/device-credential App Lock, auto-suggested transfer pairing, opt-in local status alerts, and zero-rebuild notification pattern rules. Currently in active **Gate G1** verification on `iQOO Z10R (Android 16)`.
 
 ---
 
@@ -47,9 +47,10 @@ W-Track automatically collects transaction notifications from explicitly allowli
 | :--- | :--- |
 | **100% Local-First & Offline** | No cloud account, no telemetry, and no mandatory backend. All parsing, categorization, and reporting run on-device. |
 | **Zero Banking Credentials** | Never asks for or stores bank logins, passwords, PINs, OTPs, or CVVs. |
-| **No Screen Scraping or Accessibility** | Reads only standard Android `NotificationListenerService` events from apps you explicitly enable in the allowlist. |
+| **No Screen Scraping or Accessibility** | Reads only standard Android `NotificationListenerService` events from apps you explicitly enable in the allowlist (and always ignores `wtrack.app`'s own local alerts before allowlist lookup). |
+| **Biometric & Device-Credential App Lock** | Optional lock screen (`androidx.biometric`) with configurable inactivity re-lock (`Immediate`, `1 min`, `5 min`) protecting the ledger UI when returning from background. |
 | **Encrypted Storage & Backups** | Local SQLite database is encrypted with `sqlcipher-android` (`4.20.0`) + Android Keystore AES-GCM key wrapping; `.wtrackbackup` archives (`WTBK` v1) use Argon2id + AES-256-GCM. |
-| **Safe Failure Handling** | Unseen notification formats or Android-redacted security alerts never guess amounts or directions — they route cleanly to **Needs Review** (or discard payloads for `SECURITY_NOTICE`). |
+| **Safe Failure Handling & Privacy-Safe Alerts** | Unseen notification formats or Android-redacted security alerts never guess amounts or directions — they route cleanly to **Needs Review**. Optional local status alerts never display amounts, merchant names, or raw notification text. |
 
 ---
 
@@ -89,9 +90,9 @@ Verified on `iQOO Z10R` (`Android 16`):
 | **M0: Foundation** | 3-module Gradle setup (`:app`, `:integration:api`, `:integration:providers`) + `build-logic` conventions (`isMinifyEnabled` + `isShrinkResources` + optional `keystore.properties` release signing), Hilt `2.60.1` DI, Material 3 Light/Dark/System themes, pure-Kotlin boundary tests. | **Complete & R8-verified** (`33.0 MB` debug → `11.0 MB` release APK) |
 | **M1: Encrypted Data Foundation** | Room Schema v2 (`MIGRATION_1_2`, 14 tables including `custom_parser_rules`) + SQLCipher `4.20.0` + `DatabaseKeyManager` (KEK/DEK lifecycle + `LOCKED_KEY_MISSING_OR_INVALID` lock screen recovery). | **Hardware-verified** on `iQOO Z10R` (`SqlCipherInstrumentedTest`) + `MIGRATION_1_2` unit-verified |
 | **M2: Notification Ingestion** | Provider-agnostic `WtrackNotificationListenerService`, synchronous allowlist filter, `activeNotifications` catch-up, 3-tier deduplication, `ING-08`/`ING-10` capture self-check & App Info guidance, `ING-12`/`13`/`14` recovery & heartbeat, M3a sample capture protection, anonymized JSON export, purge, and `PAR-11` guarded re-parse proposals. | **Hardware-verified** on `iQOO Z10R` (`IngestionAndLedgerInstrumentedTest`) & live on daily driver |
-| **M3: Providers & Domain Engines** | Production parsers for Bank Jago (`v2`), myBCA (`v1`), and DANA (`v1`); `GenericNotificationFallbackParser` + `NotificationTemplateEngine` (`CompositeSourceParser` & `SmartParserRegistry`) for zero-rebuild custom patterns; 16-row Section 4.6 aggregate engine + `DASH-08` merchant trends; balance correction & checkpoints; manual transfer pairing with derived fees; auto-categorization rules with backfill; `TX-06` tags & filtering; `GateG1Evaluator`. | **Unit & Robolectric-verified** (`35` `:integration:providers` + `86` `:app` tests) & hardware-verified core parsers |
-| **M4: Material 3 UI** | Onboarding + Capture Self-Check + Notification Access/battery/restricted-settings guidance, Dashboard, Accounts (grouped IDR/USD/JPY input, balance correction, & Indonesian bank/wallet quick-links), Activity (tag filtering, edit, void, transfer linking), Needs Review (with 1-tap **"Remember this notification pattern"**), **Notification Parsers** (*Paste & Test* live pattern editor), Rules, Insights (merchant trends), Settings (`DATA-12` reminder threshold chips & `DATA-14` SAF backup folder config), and `DatabaseLockedScreen`. | **Theme & Lock UI verified** on `iQOO Z10R` (`ComposeThemeAndLockedUiInstrumentedTest`) |
-| **M5: Reliability & Safety** | Encrypted `.wtrackbackup` (`WTBK` v1 Argon2id `65,536 KiB` / `3` iter + PBKDF2 fallback + AES-256-GCM AAD) export/verify/atomic 14-table restore (including `custom_parser_rules`, excluding raw payloads), scheduled backup reminder evaluator (`EXP-006`/`DATA-14`), CSV export with unencrypted warning & formula neutralization, `RetentionPurgeWorker`, and complete data wipe. | **Hardware-verified** (`BackupAndRetentionInstrumentedTest`) + schema v2 backup round-trip unit-verified |
+| **M3: Providers & Domain Engines** | Production parsers for Bank Jago (`v2`), myBCA (`v1`), and DANA (`v1`); `GenericNotificationFallbackParser` + `NotificationTemplateEngine` (`CompositeSourceParser` & `SmartParserRegistry`) for zero-rebuild custom patterns; 16-row Section 4.6 aggregate engine + `DASH-08` merchant trends; balance correction & checkpoints; manual & **auto-suggested inter-account transfer pairing** (`TransferSuggestionEngine`) with derived fees; auto-categorization rules with backfill; `TX-06` tags & filtering; `GateG1Evaluator`. | **Unit & Robolectric-verified** & hardware-verified core parsers |
+| **M4: Material 3 UI** | Onboarding + Capture Self-Check + Notification Access/battery/restricted-settings guidance, Dashboard, Accounts (grouped IDR/USD/JPY input, balance correction, & Indonesian bank/wallet quick-links), Activity (tag filtering, edit, void, possible transfer suggestions, manual transfer linking), Needs Review (with 1-tap **"Remember this notification pattern"**), **Notification Parsers** (*Paste & Test* live pattern editor), Rules, Insights (merchant trends), Settings (Security App Lock, opt-in Local Status Alerts, `DATA-12` thresholds & `DATA-14` SAF backup folder config), and `DatabaseLockedScreen`. | **Theme & Lock UI verified** on `iQOO Z10R` (`ComposeThemeAndLockedUiInstrumentedTest`) |
+| **M5: Reliability & Safety** | Biometric / device-credential App Lock (`AppLockStateMachine` + `AppLockOverlay`), opt-in privacy-safe `AndroidStatusAlertNotifier` + self-notification drop guard, encrypted `.wtrackbackup` (`WTBK` v1 Argon2id `65,536 KiB` / `3` iter + PBKDF2 fallback + AES-256-GCM AAD) export/verify/atomic 14-table restore (including `custom_parser_rules`, excluding raw payloads), scheduled backup reminder evaluator (`EXP-006`/`DATA-14`), CSV export with unencrypted warning & formula neutralization, `RetentionPurgeWorker`, and complete data wipe. | **Hardware-verified** (`BackupAndRetentionInstrumentedTest`) + schema v2 backup round-trip unit-verified |
 
 ---
 
@@ -166,8 +167,8 @@ adb uninstall wtrack.app.test
 ### CI/CD & Releases
 
 - **Continuous Integration ([.github/workflows/ci.yml](.github/workflows/ci.yml)):** Runs automatically on every push/PR to `main` — executes `:integration:api:test`, `:integration:providers:test`, `:app:testDebugUnitTest`, `:app:lintDebug`, and `:app:assembleRelease`, uploads HTML test/lint reports, and uploads a debug APK artifact on `main` pushes.
-- **Automated APK Releases ([.github/workflows/release.yml](.github/workflows/release.yml)):** Pushing a version tag (`git tag -a v0.2.0-rc1 -m "W-Track v0.2.0-rc1" && git push origin v0.2.0-rc1`) runs the full test + lint gate, generates `SHA256SUMS.txt`, and publishes a GitHub Release with APK assets (tags containing `-` are marked prerelease).
-- **Optional Release Signing Secrets:** Add `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` in GitHub Repository Settings → Secrets to produce signed R8 `release` APKs automatically; without them, the workflow publishes an installable `debug` APK plus the R8-minified unsigned `release` APK.
+- **Automated APK Releases ([.github/workflows/release.yml](.github/workflows/release.yml)):** Pushing a version tag (`git tag -a v0.3.0-rc1 -m "W-Track v0.3.0-rc1" && git push origin v0.3.0-rc1`) computes semver `-Pwtrack.versionCode` / `-Pwtrack.versionName`, runs the full test + lint gate, generates `SHA256SUMS.txt`, and publishes a GitHub Release with APK assets (tags containing `-` are marked prerelease).
+- **Optional Release Signing Secrets:** Run `./scripts/setup-release-keystore.sh` (or manually add `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` in GitHub Repository Settings → Secrets) to produce signed R8 `release` APKs automatically; without them, the workflow publishes an installable `debug` APK plus the R8-minified unsigned `release` APK.
 
 ---
 

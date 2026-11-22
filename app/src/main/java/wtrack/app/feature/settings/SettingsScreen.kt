@@ -1,11 +1,15 @@
 package wtrack.app.feature.settings
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -499,6 +503,43 @@ fun SettingsScreen(
                                     label = { Text("${hours}h") },
                                 )
                             }
+                        }
+                        HorizontalDivider(color = ext.divider)
+                        val alertsPermissionLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.RequestPermission(),
+                        ) { granted ->
+                            viewModel.setLocalAlertsEnabled(granted)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Local Status Alerts", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = "Opt-in privacy-safe device alerts for Needs Review, capture pause, and overdue backups (never includes amounts or merchants).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ext.mutedText,
+                                )
+                            }
+                            Switch(
+                                checked = state.settings.localAlertsEnabled,
+                                onCheckedChange = { enable ->
+                                    if (!enable) {
+                                        viewModel.setLocalAlertsEnabled(false)
+                                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.POST_NOTIFICATIONS,
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        alertsPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else {
+                                        viewModel.setLocalAlertsEnabled(true)
+                                    }
+                                },
+                            )
                         }
                     }
                 }

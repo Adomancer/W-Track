@@ -21,6 +21,8 @@ import wtrack.app.domain.model.NotificationEventStatus
 import wtrack.app.domain.model.OriginalTransactionSnapshot
 import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.domain.parser.ParserRegistry
+import wtrack.app.domain.repository.NoOpStatusAlertNotifier
+import wtrack.app.domain.repository.StatusAlertNotifier
 import wtrack.app.domain.time.Clock
 import wtrack.app.domain.usecase.AccountResolutionResult
 import wtrack.app.domain.usecase.AccountResolver
@@ -55,6 +57,7 @@ class IngestionPipeline(
     private val accountResolver: AccountResolver = AccountResolver(),
     private val deduplicationEngine: DeduplicationEngine = DeduplicationEngine(),
     private val ruleMatcher: CategoryRuleMatcher = CategoryRuleMatcher(),
+    private val statusAlertNotifier: StatusAlertNotifier = NoOpStatusAlertNotifier,
 ) {
     private val pipelineMutex = Mutex()
 
@@ -518,6 +521,8 @@ class IngestionPipeline(
                 "reason" to reason.name,
             ),
         )
+        val pendingCount = runCatching { db.notificationEventDao().countNeedsReview() }.getOrDefault(1)
+        runCatching { statusAlertNotifier.notifyNeedsReview(event.sourceId, pendingCount) }
     }
 
     private suspend fun escalateToPipelineError(

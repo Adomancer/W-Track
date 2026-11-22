@@ -228,6 +228,10 @@ class FakeTransferRepository : TransferRepository {
     }
     override suspend fun updateFee(pairId: Long, feeMinor: Long) {}
     override suspend fun unlink(pairId: Long) { pairsFlow.value = pairsFlow.value.filterNot { it.id == pairId } }
+    override suspend fun dismissSuggestedPair(outgoingTransactionId: Long, incomingTransactionId: Long) {
+        val id = nextId++
+        pairsFlow.value = pairsFlow.value + TransferPair(id, outgoingTransactionId, incomingTransactionId, TransferOrigin.AUTO, null, TransferStatus.REJECTED, 0L, 1_000L)
+    }
 }
 
 class FakeCategoryRepository : CategoryRepository {
@@ -356,6 +360,9 @@ class FakeSettingsRepository(initial: AppSettings = AppSettings(onboardingComple
             appLockEnabled = enabled,
             appLockTimeoutSeconds = timeoutSeconds.coerceIn(0, 3600),
         )
+    }
+    override suspend fun setLocalAlertsEnabled(enabled: Boolean) {
+        settingsFlow.value = settingsFlow.value.copy(localAlertsEnabled = enabled)
     }
 }
 

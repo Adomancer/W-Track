@@ -131,5 +131,9 @@ class TransferAndEditInvariantTest {
         }
         override suspend fun updateFee(pairId: Long, feeMinor: Long) {}
         override suspend fun unlink(pairId: Long) { items.removeAll { it.id == pairId } }
+        override suspend fun dismissSuggestedPair(outgoingTransactionId: Long, incomingTransactionId: Long) {
+            val id = nextId++
+            items += TransferPair(id, outgoingTransactionId, incomingTransactionId, TransferOrigin.AUTO, null, TransferStatus.REJECTED, 0L, 1000L)
+        }
     }
 }

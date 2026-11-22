@@ -62,3 +62,9 @@
 - [x] Lock Gate G1 thresholds in `ADR-003` **before** measured capture starts. *(Locked `Coverage >= 90%`, `Completeness >= 95%`, `0` wrong amounts/directions across `com.jago.digitalBanking`, `id.dana`, and `com.bca.mybca.omni.android` / `com.bca`.)*
 - [ ] Run ≥ 7–14 consecutive days, ≥ 30 statement transactions per evaluated provider.
 - [ ] Record Appendix C ground-truth metrics in `docs/PROVIDERS.md` (`Coverage >= 90%`, `Completeness >= 95%`, `0` unexplained wrong amounts/directions).
+
+## 8. Phase 4 Pre-v1.0.0 Daily-Driver Release QA (`0.3.0-rc1`)
+- [ ] Verify signed `0.3.0-rc1` (`versionCode=3`) or upgraded APK installs cleanly over existing daily-driver `wtrack.app` data without wiping Room/Keystore state.
+- [ ] Verify **Biometric / Device-Credential App Lock**: enable in Settings (`Immediate` and `1 min`), background/reopen app, confirm `BiometricPrompt` unlocks ledger and timeout prevents nuisance prompts during short switches.
+- [ ] Verify **Auto-Suggest Transfer Pairing**: verify matching outflow + inflow pair across accounts surfaces in Activity `"Possible Transfers"`, test 1-tap `Link` (including fee computation) and `Dismiss` persistence.
+- [ ] Verify **Opt-In Local Status Alerts & Anti-Loop Guard**: grant `POST_NOTIFICATIONS` on Android 16, enable **Local Status Alerts** in Settings, trigger Needs Review & listener pause/reconnect, confirm privacy-safe generic notification appears and `WtrackNotificationListenerService` drops `wtrack.app` self-notifications with zero re-ingestion loop.

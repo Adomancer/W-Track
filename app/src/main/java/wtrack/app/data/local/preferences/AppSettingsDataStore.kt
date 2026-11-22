@@ -95,6 +95,12 @@ class AppSettingsDataStore internal constructor(
         }
     }
 
+    suspend fun setLocalAlertsEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_LOCAL_ALERTS_ENABLED] = enabled
+        }
+    }
+
     suspend fun replaceAll(restored: AppSettings) {
         dataStore.edit { prefs ->
             prefs[KEY_THEME_MODE] = restored.themeMode.name
@@ -118,6 +124,7 @@ class AppSettingsDataStore internal constructor(
             prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] = restored.scheduledBackupIntervalDays.coerceIn(1, 90)
             prefs[KEY_APP_LOCK_ENABLED] = restored.appLockEnabled
             prefs[KEY_APP_LOCK_TIMEOUT_SECONDS] = restored.appLockTimeoutSeconds.coerceIn(0, 3600)
+            prefs[KEY_LOCAL_ALERTS_ENABLED] = restored.localAlertsEnabled
         }
     }
 
@@ -145,6 +152,7 @@ class AppSettingsDataStore internal constructor(
         scheduledBackupIntervalDays = (prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] ?: 7).coerceIn(1, 90),
         appLockEnabled = prefs[KEY_APP_LOCK_ENABLED] ?: false,
         appLockTimeoutSeconds = (prefs[KEY_APP_LOCK_TIMEOUT_SECONDS] ?: 60).coerceIn(0, 3600),
+        localAlertsEnabled = prefs[KEY_LOCAL_ALERTS_ENABLED] ?: false,
     )
 
     private companion object {
@@ -164,5 +172,6 @@ class AppSettingsDataStore internal constructor(
         val KEY_SCHEDULED_BACKUP_INTERVAL_DAYS = intPreferencesKey("scheduled_backup_interval_days")
         val KEY_APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         val KEY_APP_LOCK_TIMEOUT_SECONDS = intPreferencesKey("app_lock_timeout_seconds")
+        val KEY_LOCAL_ALERTS_ENABLED = booleanPreferencesKey("local_alerts_enabled")
     }
 }

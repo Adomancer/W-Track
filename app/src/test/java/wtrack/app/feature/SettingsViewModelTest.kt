@@ -57,6 +57,10 @@ class SettingsViewModelTest {
             assertThat(withAppLock.settings.appLockEnabled).isTrue()
             assertThat(withAppLock.settings.appLockTimeoutSeconds).isEqualTo(300)
 
+            vm.setLocalAlertsEnabled(true)
+            val withAlerts = awaitItem()
+            assertThat(withAlerts.settings.localAlertsEnabled).isTrue()
+
             val proposal = ReparseProposal(
                 eventId = 10L,
                 transactionId = 20L,

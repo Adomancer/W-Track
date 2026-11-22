@@ -234,6 +234,7 @@ data class AppSettings(
     val scheduledBackupIntervalDays: Int = 7,
     val appLockEnabled: Boolean = false,
     val appLockTimeoutSeconds: Int = 60,
+    val localAlertsEnabled: Boolean = false,
 )
 
 sealed interface DatabaseHealthState {

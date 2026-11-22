@@ -32,6 +32,7 @@ import wtrack.app.data.ingestion.IngestionPipeline
 import wtrack.app.data.ingestion.SmartParserRegistry
 import wtrack.app.data.local.WtrackDatabase
 import wtrack.app.data.local.preferences.AppSettingsDataStore
+import wtrack.app.data.notification.AndroidStatusAlertNotifier
 import wtrack.app.data.repository.AccountRepositoryImpl
 import wtrack.app.data.repository.BudgetRepositoryImpl
 import wtrack.app.data.repository.CaptureStatusRepositoryImpl
@@ -60,6 +61,7 @@ import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.RuleRepository
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.repository.SourceAndEventRepository
+import wtrack.app.domain.repository.StatusAlertNotifier
 import wtrack.app.domain.repository.TagRepository
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.repository.TransferRepository
@@ -182,6 +184,13 @@ object DataFoundationModule {
 
     @Provides
     @Singleton
+    fun provideStatusAlertNotifier(
+        @ApplicationContext context: Context,
+        settingsStore: AppSettingsDataStore,
+    ): StatusAlertNotifier = AndroidStatusAlertNotifier(context = context, settingsStore = settingsStore)
+
+    @Provides
+    @Singleton
     fun provideIngestionPipeline(
         holder: WtrackDatabaseHolder,
         allowlistCache: AllowlistCache,
@@ -190,6 +199,7 @@ object DataFoundationModule {
         heartbeatMonitor: HeartbeatMonitor,
         clock: Clock,
         logger: WtrackLogger,
+        statusAlertNotifier: StatusAlertNotifier,
     ): IngestionPipeline = IngestionPipeline(
         holder = holder,
         allowlistCache = allowlistCache,
@@ -198,6 +208,7 @@ object DataFoundationModule {
         heartbeatMonitor = heartbeatMonitor,
         clock = clock,
         logger = logger,
+        statusAlertNotifier = statusAlertNotifier,
     )
 
     @Provides
@@ -222,12 +233,16 @@ object DataFoundationModule {
         heartbeatMonitor: HeartbeatMonitor,
         logger: WtrackLogger,
         clock: Clock,
+        settingsStore: AppSettingsDataStore,
+        statusAlertNotifier: StatusAlertNotifier,
     ): RetentionPurgeRunner = RetentionPurgeRunner(
         holder = holder,
         sourceAndEventRepository = sourceAndEventRepository,
         heartbeatMonitor = heartbeatMonitor,
         logger = logger,
         clock = clock,
+        settingsStore = settingsStore,
+        statusAlertNotifier = statusAlertNotifier,
     )
 
     @Provides

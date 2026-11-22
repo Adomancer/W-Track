@@ -303,12 +303,14 @@ class BackupContainerAndRestoreTest {
         assertThat(restored.scheduledBackupIntervalDays).isEqualTo(7)
         assertThat(restored.appLockEnabled).isFalse()
         assertThat(restored.appLockTimeoutSeconds).isEqualTo(60)
+        assertThat(restored.localAlertsEnabled).isFalse()
     }
 
     @Test
     fun appLockSettingsPersistThroughEncryptedBackupAndRestore() = runTest {
         sourceHarness.db()
         sourceHarness.settingsStore.setAppLock(enabled = true, timeoutSeconds = 300)
+        sourceHarness.settingsStore.setLocalAlertsEnabled(true)
         val out = ByteArrayOutputStream()
         val service = BackupService(
             sourceHarness.holder, sourceHarness.settingsStore, sourceHarness.allowlistCache,
@@ -325,5 +327,6 @@ class BackupContainerAndRestoreTest {
         val restored = restoreHarness.settingsStore.current()
         assertThat(restored.appLockEnabled).isTrue()
         assertThat(restored.appLockTimeoutSeconds).isEqualTo(300)
+        assertThat(restored.localAlertsEnabled).isTrue()
     }
 }

@@ -139,6 +139,7 @@ interface TransferRepository {
     suspend fun link(request: LinkTransferRequest, feeMinor: Long): Long
     suspend fun updateFee(pairId: Long, feeMinor: Long)
     suspend fun unlink(pairId: Long)
+    suspend fun dismissSuggestedPair(outgoingTransactionId: Long, incomingTransactionId: Long)
 }
 
 interface CategoryRepository {
@@ -218,6 +219,21 @@ interface SettingsRepository {
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int)
     suspend fun setAppLock(enabled: Boolean, timeoutSeconds: Int)
+    suspend fun setLocalAlertsEnabled(enabled: Boolean)
+}
+
+interface StatusAlertNotifier {
+    suspend fun notifyNeedsReview(sourceId: String, pendingCount: Int)
+    suspend fun notifyCaptureDisconnected()
+    suspend fun cancelCaptureDisconnected()
+    suspend fun notifyBackupReminderDue()
+}
+
+object NoOpStatusAlertNotifier : StatusAlertNotifier {
+    override suspend fun notifyNeedsReview(sourceId: String, pendingCount: Int) = Unit
+    override suspend fun notifyCaptureDisconnected() = Unit
+    override suspend fun cancelCaptureDisconnected() = Unit
+    override suspend fun notifyBackupReminderDue() = Unit
 }
 
 interface DatabaseHealthRepository {

@@ -191,6 +191,17 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setLocalAlertsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setLocalAlertsEnabled(enabled)
+            actionMessage.value = if (enabled) {
+                "Local status alerts enabled."
+            } else {
+                "Local status alerts disabled."
+            }
+        }
+    }
+
     fun createCategory(name: String, directionScope: Direction?) {
         viewModelScope.launch {
             runCatching { categoryRepository.create(name, directionScope) }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import wtrack.app.core.coroutines.DispatcherProvider
 import wtrack.app.core.logging.WtrackLogger
+import wtrack.app.domain.repository.StatusAlertNotifier
 
 /**
  * Provider-agnostic Android NotificationListenerService (ING-01..ING-09).
@@ -29,6 +30,7 @@ class WtrackNotificationListenerService : NotificationListenerService() {
     @Inject lateinit var recoveryCoordinator: EventRecoveryCoordinator
     @Inject lateinit var heartbeatMonitor: HeartbeatMonitor
     @Inject lateinit var captureStatusTracker: CaptureStatusTracker
+    @Inject lateinit var statusAlertNotifier: StatusAlertNotifier
     @Inject lateinit var dispatcherProvider: DispatcherProvider
     @Inject lateinit var logger: WtrackLogger
 
@@ -44,8 +46,8 @@ class WtrackNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val statusBarNotification = sbn ?: return
         val pkg = statusBarNotification.packageName ?: return
-        // O(1) in-memory allowlist check: disallowed packages never allocate or hit disk (ING-04).
-        if (!allowlistCache.isAllowlisted(pkg)) return
+        // Always drop W-Track's own notifications before allowlist evaluation, then O(1) allowlist check (ING-04).
+        if (!shouldAcceptPackage(pkg, packageName, allowlistCache::isAllowlisted)) return
 
         val envelope = NotificationEnvelopeExtractor.extract(statusBarNotification)
         serviceScope.launch {
@@ -58,6 +60,7 @@ class WtrackNotificationListenerService : NotificationListenerService() {
         serviceScope.launch {
             allowlistCache.refreshSnapshotNow()
             captureStatusTracker.onListenerConnected()
+            runCatching { statusAlertNotifier.cancelCaptureDisconnected() }
             heartbeatMonitor.checkAndRecordStaleGap()
             runCatchUpScan()
             recoveryCoordinator.recoverUnfinished()
@@ -71,6 +74,7 @@ class WtrackNotificationListenerService : NotificationListenerService() {
         heartbeatJob = null
         serviceScope.launch {
             captureStatusTracker.onListenerDisconnected()
+            runCatching { statusAlertNotifier.notifyCaptureDisconnected() }
         }
         runCatching {
             requestRebind(ComponentName(this, WtrackNotificationListenerService::class.java))
@@ -87,7 +91,7 @@ class WtrackNotificationListenerService : NotificationListenerService() {
 
     private suspend fun runCatchUpScan() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
-        val allowlisted = active.filter { allowlistCache.isAllowlisted(it.packageName) }
+        val allowlisted = active.filter { shouldAcceptPackage(it.packageName, packageName, allowlistCache::isAllowlisted) }
         if (allowlisted.isNotEmpty()) {
             logger.logEvent("LISTENER", "CATCH_UP_SCAN", mapOf("count" to allowlisted.size.toString()))
         }
@@ -105,5 +109,15 @@ class WtrackNotificationListenerService : NotificationListenerService() {
                 heartbeatMonitor.recordAlive()
             }
         }
+    }
+
+    internal companion object {
+        internal fun shouldAcceptPackage(
+            postedPackage: String?,
+            selfPackage: String,
+            isAllowlisted: (String) -> Boolean,
+        ): Boolean = !postedPackage.isNullOrBlank() &&
+            postedPackage != selfPackage &&
+            isAllowlisted(postedPackage)
     }
 }

@@ -20,6 +20,9 @@ interface NotificationEventDao {
     @Query("SELECT COUNT(*) FROM notification_events WHERE processing_status = 'NEEDS_REVIEW'")
     fun observeNeedsReviewCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM notification_events WHERE processing_status = 'NEEDS_REVIEW'")
+    suspend fun countNeedsReview(): Int
+
     @Query("SELECT * FROM notification_events ORDER BY id ASC")
     suspend fun getAllOnce(): List<NotificationEventEntity>
 

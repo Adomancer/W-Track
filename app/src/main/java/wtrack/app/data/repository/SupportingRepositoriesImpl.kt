@@ -306,6 +306,20 @@ class TransferRepositoryImpl(
     override suspend fun unlink(pairId: Long) {
         holder.requireDatabase().transferMatchDao().deleteById(pairId)
     }
+
+    override suspend fun dismissSuggestedPair(outgoingTransactionId: Long, incomingTransactionId: Long) {
+        holder.requireDatabase().transferMatchDao().insert(
+            TransferMatchEntity(
+                outgoingTransactionId = outgoingTransactionId,
+                incomingTransactionId = incomingTransactionId,
+                origin = TransferOrigin.AUTO.name,
+                confidence = null,
+                status = TransferStatus.REJECTED.name,
+                feeMinor = 0L,
+                createdAt = clock.nowEpochMillis(),
+            ),
+        )
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -666,6 +680,9 @@ class SettingsRepositoryImpl(
 
     override suspend fun setAppLock(enabled: Boolean, timeoutSeconds: Int) =
         settingsStore.setAppLock(enabled, timeoutSeconds)
+
+    override suspend fun setLocalAlertsEnabled(enabled: Boolean) =
+        settingsStore.setLocalAlertsEnabled(enabled)
 }
 
 class DatabaseHealthRepositoryImpl(
