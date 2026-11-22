@@ -21,16 +21,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Accept Android SDK licenses
         run: |
@@ -51,7 +51,25 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           TAG="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          VERSION_NAME="${TAG#v}"
+          if [[ "$VERSION_NAME" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z]+)([0-9]+))? ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            PRE_NUM="${BASH_REMATCH[6]:-}"
+            if [[ -n "$PRE_NUM" ]]; then
+              SLOT=$(( PRE_NUM > 98 ? 98 : PRE_NUM ))
+            elif [[ -n "${BASH_REMATCH[4]}" ]]; then
+              SLOT=1
+            else
+              SLOT=99
+            fi
+            VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH * 100 + SLOT ))
+          else
+            VERSION_CODE=3
+          fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "Computed Android versionName=$VERSION_NAME versionCode=$VERSION_CODE"
 
           mkdir -p release-assets
           if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
@@ -64,6 +82,8 @@ jobs:
           keyPassword=$ANDROID_KEY_PASSWORD
           EOF
             ./gradlew :app:assembleRelease \
+              -Pwtrack.versionCode="$VERSION_CODE" \
+              -Pwtrack.versionName="$VERSION_NAME" \
               -Dorg.gradle.jvmargs="-Xmx3072m -Dfile.encoding=UTF-8" \
               --stacktrace
             cp app/build/outputs/apk/release/app-release.apk "release-assets/W-Track-${TAG}-release.apk"
@@ -71,6 +91,8 @@ jobs:
           else
             echo "No release signing secrets configured — building debug (installable) + R8 unsigned release APKs..."
             ./gradlew :app:assembleRelease :app:assembleDebug \
+              -Pwtrack.versionCode="$VERSION_CODE" \
+              -Pwtrack.versionName="$VERSION_NAME" \
               -Dorg.gradle.jvmargs="-Xmx3072m -Dfile.encoding=UTF-8" \
               --stacktrace
             cp app/build/outputs/apk/debug/app-debug.apk "release-assets/W-Track-${TAG}-debug.apk"
