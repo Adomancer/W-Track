@@ -10,6 +10,7 @@ import org.junit.Test
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.LockedReason
 import wtrack.app.domain.model.ThemeMode
+import wtrack.app.feature.root.AppLockOverlay
 import wtrack.app.feature.root.DatabaseLockedScreen
 import wtrack.app.feature.root.RootUiState
 
@@ -65,5 +66,18 @@ class ComposeThemeAndLockedUiInstrumentedTest {
         composeRule.onNodeWithText("Wrapped Key Missing").assertIsDisplayed()
         composeRule.onNodeWithText("Restore from Encrypted Backup (.wtrackbackup)").assertIsDisplayed()
         composeRule.onNodeWithText("Erase Local Data & Start Fresh").assertIsDisplayed()
+    }
+
+    @Test
+    fun rendersAppLockOverlayCleanly() {
+        composeRule.setContent {
+            WtrackTheme(themeMode = ThemeMode.DARK) {
+                AppLockOverlay(onUnlocked = {})
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("W-Track is Locked").assertIsDisplayed()
+        composeRule.onNodeWithText("Unlock W-Track").assertIsDisplayed()
     }
 }

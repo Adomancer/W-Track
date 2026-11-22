@@ -3,7 +3,7 @@
 **Primary Physical Test Device:** `vivo` / `iQOO` `iQOO Z10R` (`I2505`), Android `16` (`API 36`), Build `PD2512LF_EX_A_16.1.20.0.W20`, Security patch `2026-10-01`, CPU ABI `arm64-v8a`  
 **Host Environment:** Fedora Linux + ADB  
 **Other Devices / OEMs:** Explicitly **UNVERIFIED**  
-**Status:** Hardware Instrumented Suite & R8 Release Build Verified (`0.2.0-rc1`); Daily-Driver Gate G1 & Manual OS Scenarios Active
+**Status:** Hardware Instrumented Suite (`OK (11 tests)`) & In-Place `0.3.0-rc1` Upgrade Verified on `iQOO Z10R`; Daily-Driver Gate G1 & Manual Tap-Through Checks Active
 
 ---
 
@@ -16,7 +16,7 @@
 ---
 
 ## 1. APK Installation, ABI & Launch Verification
-- [x] Install debug/release APK cleanly via ADB onto `iQOO Z10R (I2505)`. *(Debug APK `0.2.0-rc1` [`versionCode=2`, `33,021,954` bytes] installed cleanly via wireless `adb install -r`; R8-shrunk unsigned release APK built cleanly [`11,021,272` bytes, `allowBackup="false"`, non-debuggable]; signed release install pending local `keystore.properties`.)*
+- [x] Install debug/release APK cleanly via ADB onto `iQOO Z10R (I2505)`. *(Upgraded in-place via wireless `adb install -r` from `0.2.0-rc1` `versionCode=2` to `0.3.0-rc1` `versionCode=3` cleanly with `wtrack.db` [`245,760` bytes] and `files/keystore/db_key.bin` [`88` bytes] preserved, zero `AndroidRuntime` crashes on cold launch [`2409` ms], and `WtrackNotificationListenerService` bound; R8-shrunk unsigned release APK verified in build + CI; signed release install pending local `keystore.properties`.)*
 - [x] Verify `arm64-v8a` native library loading (`System.loadLibrary("sqlcipher")` succeeds without `UnsatisfiedLinkError` or 16KB ELF alignment faults). *(Verified via `SqlCipherInstrumentedTest`, `dumpsys package wtrack.app` showing `primaryCpuAbi=arm64-v8a`, & live `wtrack.db`.)*
 - [ ] Verify app launches cleanly in System, Light, and Dark modes without crashes. *(`WtrackTheme` System, Light, and Dark rendering verified on `iQOO Z10R` via `ComposeThemeAndLockedUiInstrumentedTest`; manual full-app toggle audit pending.)*
 
@@ -64,7 +64,7 @@
 - [ ] Record Appendix C ground-truth metrics in `docs/PROVIDERS.md` (`Coverage >= 90%`, `Completeness >= 95%`, `0` unexplained wrong amounts/directions).
 
 ## 8. Phase 4 Pre-v1.0.0 Daily-Driver Release QA (`0.3.0-rc1`)
-- [ ] Verify signed `0.3.0-rc1` (`versionCode=3`) or upgraded APK installs cleanly over existing daily-driver `wtrack.app` data without wiping Room/Keystore state.
-- [ ] Verify **Biometric / Device-Credential App Lock**: enable in Settings (`Immediate` and `1 min`), background/reopen app, confirm `BiometricPrompt` unlocks ledger and timeout prevents nuisance prompts during short switches.
-- [ ] Verify **Auto-Suggest Transfer Pairing**: verify matching outflow + inflow pair across accounts surfaces in Activity `"Possible Transfers"`, test 1-tap `Link` (including fee computation) and `Dismiss` persistence.
-- [ ] Verify **Opt-In Local Status Alerts & Anti-Loop Guard**: grant `POST_NOTIFICATIONS` on Android 16, enable **Local Status Alerts** in Settings, trigger Needs Review & listener pause/reconnect, confirm privacy-safe generic notification appears and `WtrackNotificationListenerService` drops `wtrack.app` self-notifications with zero re-ingestion loop.
+- [x] Verify `0.3.0-rc1` (`versionCode=3`) upgraded APK installs cleanly over existing daily-driver `wtrack.app` (`0.2.0-rc1`) data without wiping Room/Keystore state. *(Verified on `iQOO Z10R`: in-place `adb install -r`, `dumpsys package wtrack.app` confirmed `versionCode=3` / `0.3.0-rc1`, `POST_NOTIFICATIONS` + `USE_BIOMETRIC: granted=true`, live `wtrack.db` & `db_key.bin` preserved, `WtrackNotificationListenerService` remained bound, and isolated 11-test hardware suite `OK (11 tests)` in `63,961` ms including `DailyDriverFeaturesInstrumentedTest` and `ComposeThemeAndLockedUiInstrumentedTest`; signed release APK upgrade still pending local `keystore.properties`.)*
+- [ ] Verify **Biometric / Device-Credential App Lock**: enable in Settings (`Immediate` and `1 min`), background/reopen app, confirm `BiometricPrompt` unlocks ledger and timeout prevents nuisance prompts during short switches. *(Device `BiometricManager` probe & Compose `AppLockOverlay` verified on `iQOO Z10R` in automated hardware tests; interactive `BiometricPrompt` tap-through pending manual confirmation.)*
+- [x] Verify **Auto-Suggest Transfer Pairing**: verify matching outflow + inflow pair across accounts surfaces in Activity `"Possible Transfers"`, test 1-tap `Link` (including fee computation) and `Dismiss` persistence. *(SQLCipher hardware integration verified on `iQOO Z10R` in `DailyDriverFeaturesInstrumentedTest.transferSuggestionsAndDismissPersistUnderRealSqlCipher`: exact + fee-adjusted detection, `REJECTED` dismiss persistence, and `CONFIRMED` fee derivation.)*
+- [ ] Verify **Opt-In Local Status Alerts & Anti-Loop Guard**: grant `POST_NOTIFICATIONS` on Android 16, enable **Local Status Alerts** in Settings, trigger Needs Review & listener pause/reconnect, confirm privacy-safe generic notification appears and `WtrackNotificationListenerService` drops `wtrack.app` self-notifications with zero re-ingestion loop. *(Anti-self-notification drop guard `shouldAcceptPackage("wtrack.app", ...)` and `AndroidStatusAlertNotifier` verified on Android 16 hardware in `DailyDriverFeaturesInstrumentedTest`; interactive `POST_NOTIFICATIONS` dialog & Settings switch tap-through pending manual check.)*
