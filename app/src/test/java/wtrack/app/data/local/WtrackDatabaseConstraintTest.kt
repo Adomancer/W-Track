@@ -202,6 +202,13 @@ class WtrackDatabaseConstraintTest {
                                 "CREATE INDEX IF NOT EXISTS `index_transaction_tags_tag_id` ON `transaction_tags` (`tag_id`)",
                                 "CREATE INDEX IF NOT EXISTS `index_budgets_category_id` ON `budgets` (`category_id`)",
                                 "CREATE INDEX IF NOT EXISTS `index_budgets_account_id` ON `budgets` (`account_id`)",
+                                // Live v1 installs partial unique indexes via onCreate/onOpen callback;
+                                // verify MIGRATION_1_2 handles them cleanly before Room schema validation.
+                                "CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_event_id_unique ON transactions(event_id) WHERE event_id IS NOT NULL",
+                                "CREATE UNIQUE INDEX IF NOT EXISTS idx_account_sources_source_hint ON account_sources(source_id, account_hint) WHERE account_hint IS NOT NULL",
+                                "CREATE UNIQUE INDEX IF NOT EXISTS idx_account_sources_source_null_hint ON account_sources(source_id) WHERE account_hint IS NULL",
+                                "CREATE UNIQUE INDEX IF NOT EXISTS idx_transfer_matches_outgoing_confirmed ON transfer_matches(outgoing_transaction_id) WHERE status = 'CONFIRMED'",
+                                "CREATE UNIQUE INDEX IF NOT EXISTS idx_transfer_matches_incoming_confirmed ON transfer_matches(incoming_transaction_id) WHERE status = 'CONFIRMED'",
                                 "INSERT INTO accounts VALUES (1, 'Existing', 'Bank', 'BANK', 'IDR', NULL, NULL, NULL, 1, 1000, 1000)",
                             ).forEach { sql -> db.execSQL(sql) }
                         }
@@ -216,6 +223,7 @@ class WtrackDatabaseConstraintTest {
             val migrated = Room.databaseBuilder(context, WtrackDatabase::class.java, dbName)
                 .allowMainThreadQueries()
                 .addMigrations(WtrackDatabase.MIGRATION_1_2)
+                .addCallback(WtrackDatabase.createCallback())
                 .build()
             try {
                 assertThat(migrated.accountDao().getAllOnce().single().name).isEqualTo("Existing")
@@ -236,6 +244,22 @@ class WtrackDatabaseConstraintTest {
                     ),
                 )
                 assertThat(id).isGreaterThan(0L)
+                val restoredIndexes = buildList {
+                    migrated.openHelper.readableDatabase
+                        .query("SELECT name FROM sqlite_master WHERE type = 'index'")
+                        .use { cursor ->
+                            while (cursor.moveToNext()) {
+                                add(cursor.getString(0))
+                            }
+                        }
+                }
+                assertThat(restoredIndexes).containsAtLeast(
+                    "idx_transactions_event_id_unique",
+                    "idx_account_sources_source_hint",
+                    "idx_account_sources_source_null_hint",
+                    "idx_transfer_matches_outgoing_confirmed",
+                    "idx_transfer_matches_incoming_confirmed",
+                )
             } finally {
                 migrated.close()
             }

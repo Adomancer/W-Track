@@ -98,6 +98,9 @@ abstract class WtrackDatabase : RoomDatabase() {
                     ON `custom_parser_rules` (`source_id`)
                     """.trimIndent(),
                 )
+                // Drop non-Room partial unique indexes before Room's post-migration schema
+                // validation runs; createCallback().onOpen() immediately re-installs them.
+                dropPartialUniqueIndexes(db)
             }
         }
 
@@ -118,6 +121,18 @@ abstract class WtrackDatabase : RoomDatabase() {
                 // Ensure partial unique indexes and triggers remain installed across restores.
                 installPartialUniqueIndexes(db)
                 installIntegrityTriggers(db)
+            }
+        }
+
+        private fun dropPartialUniqueIndexes(db: SupportSQLiteDatabase) {
+            listOf(
+                "idx_transactions_event_id_unique",
+                "idx_account_sources_source_hint",
+                "idx_account_sources_source_null_hint",
+                "idx_transfer_matches_outgoing_confirmed",
+                "idx_transfer_matches_incoming_confirmed",
+            ).forEach { indexName ->
+                db.execSQL("DROP INDEX IF EXISTS `$indexName`")
             }
         }
 
