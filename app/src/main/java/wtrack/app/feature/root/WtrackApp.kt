@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -94,11 +95,19 @@ private val topLevelTabs = listOf(
 fun WtrackApp(rootViewModel: MainRootViewModel = hiltViewModel()) {
     val rootState by rootViewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = LocalActivity.current
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, activity) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                rootViewModel.refreshCaptureStatus()
+            when (event) {
+                Lifecycle.Event.ON_START -> rootViewModel.onAppForegrounded()
+                Lifecycle.Event.ON_RESUME -> rootViewModel.refreshCaptureStatus()
+                Lifecycle.Event.ON_STOP -> {
+                    if (activity?.isChangingConfigurations != true) {
+                        rootViewModel.onAppBackgrounded()
+                    }
+                }
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -106,42 +115,53 @@ fun WtrackApp(rootViewModel: MainRootViewModel = hiltViewModel()) {
     }
 
     val themeMode = (rootState as? RootUiState.Ready)?.themeMode ?: ThemeMode.SYSTEM
+    val showAppLockOverlay = when (val state = rootState) {
+        is RootUiState.Ready -> state.isAppLocked
+        is RootUiState.Onboarding -> state.isAppLocked
+        else -> false
+    }
 
     WtrackTheme(themeMode = themeMode) {
-        when (val state = rootState) {
-            is RootUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (val state = rootState) {
+                is RootUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                is RootUiState.Locked -> {
+                    DatabaseLockedScreen(
+                        state = state,
+                        onRestoreBackup = rootViewModel::restoreFromBackup,
+                        onWipeAllData = rootViewModel::wipeAllDataFromLocked,
+                        onClearMessage = rootViewModel::clearMessage,
+                    )
+                }
+
+                is RootUiState.Onboarding -> {
+                    OnboardingScreen(
+                        state = state,
+                        onSelectBaseCurrency = rootViewModel::selectBaseCurrency,
+                        onCreateFirstAccount = rootViewModel::createInitialAccount,
+                        onRestoreBackup = rootViewModel::restoreFromBackup,
+                        onRunSelfCheck = rootViewModel::runCaptureSelfCheck,
+                        onFinish = rootViewModel::finishOnboarding,
+                        onClearMessage = rootViewModel::clearMessage,
+                    )
+                }
+
+                is RootUiState.Ready -> {
+                    WtrackMainScaffold(
+                        pendingReviewCount = state.pendingReviewCount,
+                        showPostRestorePermissionPrompt = state.showPostRestorePermissionPrompt,
+                        onDismissPostRestorePrompt = rootViewModel::dismissPostRestorePrompt,
+                    )
                 }
             }
 
-            is RootUiState.Locked -> {
-                DatabaseLockedScreen(
-                    state = state,
-                    onRestoreBackup = rootViewModel::restoreFromBackup,
-                    onWipeAllData = rootViewModel::wipeAllDataFromLocked,
-                    onClearMessage = rootViewModel::clearMessage,
-                )
-            }
-
-            is RootUiState.Onboarding -> {
-                OnboardingScreen(
-                    state = state,
-                    onSelectBaseCurrency = rootViewModel::selectBaseCurrency,
-                    onCreateFirstAccount = rootViewModel::createInitialAccount,
-                    onRestoreBackup = rootViewModel::restoreFromBackup,
-                    onRunSelfCheck = rootViewModel::runCaptureSelfCheck,
-                    onFinish = rootViewModel::finishOnboarding,
-                    onClearMessage = rootViewModel::clearMessage,
-                )
-            }
-
-            is RootUiState.Ready -> {
-                WtrackMainScaffold(
-                    pendingReviewCount = state.pendingReviewCount,
-                    showPostRestorePermissionPrompt = state.showPostRestorePermissionPrompt,
-                    onDismissPostRestorePrompt = rootViewModel::dismissPostRestorePrompt,
-                )
+            if (showAppLockOverlay) {
+                AppLockOverlay(onUnlocked = rootViewModel::unlockApp)
             }
         }
     }

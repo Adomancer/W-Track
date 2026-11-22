@@ -60,6 +60,7 @@ import wtrack.app.feature.common.CaptureStatusPill
 import wtrack.app.feature.common.SegmentedOptionRow
 import wtrack.app.feature.common.WtrackCard
 import wtrack.app.feature.common.WtrackTopBar
+import wtrack.app.feature.root.canUseDeviceAppLock
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -386,6 +387,74 @@ fun SettingsScreen(
                                         selected = state.settings.baseCurrency == cur,
                                         onClick = { viewModel.setBaseCurrency(cur) },
                                         label = { Text(cur) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // SECURITY & PRIVACY
+            item(key = "sec-security") {
+                SettingsGroupLabel("SECURITY")
+            }
+            item(key = "security-card") {
+                val lockSupported = remember(context) { canUseDeviceAppLock(context) }
+                var lockUnavailableHint by remember { mutableStateOf(false) }
+                WtrackCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(15.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Biometric & Device App Lock", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = "Require fingerprint, face, or device PIN/pattern before viewing ledger data.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ext.mutedText,
+                                )
+                            }
+                            Switch(
+                                checked = state.settings.appLockEnabled,
+                                onCheckedChange = { enable ->
+                                    if (enable && !lockSupported) {
+                                        lockUnavailableHint = true
+                                    } else {
+                                        lockUnavailableHint = false
+                                        viewModel.setAppLock(enable, state.settings.appLockTimeoutSeconds)
+                                    }
+                                },
+                            )
+                        }
+                        if (lockUnavailableHint || (!lockSupported && state.settings.appLockEnabled)) {
+                            Text(
+                                text = "Configure a screen lock PIN, pattern, or biometric in Android Settings to enable App Lock.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        if (state.settings.appLockEnabled) {
+                            HorizontalDivider(color = ext.divider)
+                            Text("Re-lock after leaving app", style = MaterialTheme.typography.labelLarge)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                listOf(
+                                    0 to "Immediate",
+                                    60 to "1 min",
+                                    300 to "5 min",
+                                ).forEach { (seconds, label) ->
+                                    FilterChip(
+                                        selected = state.settings.appLockTimeoutSeconds == seconds,
+                                        onClick = { viewModel.setAppLock(true, seconds) },
+                                        label = { Text(label) },
                                     )
                                 }
                             }

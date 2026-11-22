@@ -351,6 +351,12 @@ class FakeSettingsRepository(initial: AppSettings = AppSettings(onboardingComple
             scheduledBackupIntervalDays = intervalDays.coerceIn(1, 90),
         )
     }
+    override suspend fun setAppLock(enabled: Boolean, timeoutSeconds: Int) {
+        settingsFlow.value = settingsFlow.value.copy(
+            appLockEnabled = enabled,
+            appLockTimeoutSeconds = timeoutSeconds.coerceIn(0, 3600),
+        )
+    }
 }
 
 class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {

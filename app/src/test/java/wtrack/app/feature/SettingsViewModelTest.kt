@@ -52,6 +52,11 @@ class SettingsViewModelTest {
             assertThat(withFolder.settings.scheduledBackupEnabled).isTrue()
             assertThat(withFolder.settings.scheduledBackupIntervalDays).isEqualTo(14)
 
+            vm.setAppLock(enabled = true, timeoutSeconds = 300)
+            val withAppLock = awaitItem()
+            assertThat(withAppLock.settings.appLockEnabled).isTrue()
+            assertThat(withAppLock.settings.appLockTimeoutSeconds).isEqualTo(300)
+
             val proposal = ReparseProposal(
                 eventId = 10L,
                 transactionId = 20L,

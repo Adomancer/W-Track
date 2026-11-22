@@ -53,8 +53,9 @@ dependencies {
     implementation(libs.androidx.sqlite)
     implementation(libs.androidx.sqlite.framework)
 
-    // Background Maintenance, Preferences & Backup Cryptography
+    // Background Maintenance, Preferences, Biometric Lock & Backup Cryptography
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.biometric)
     implementation(libs.datastore.preferences)
     implementation(libs.bouncycastle.bcprov)
 

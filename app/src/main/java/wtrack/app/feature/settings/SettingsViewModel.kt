@@ -180,6 +180,17 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setAppLock(enabled: Boolean, timeoutSeconds: Int) {
+        viewModelScope.launch {
+            settingsRepository.setAppLock(enabled, timeoutSeconds)
+            actionMessage.value = if (enabled) {
+                "App Lock enabled."
+            } else {
+                "App Lock disabled."
+            }
+        }
+    }
+
     fun createCategory(name: String, directionScope: Direction?) {
         viewModelScope.launch {
             runCatching { categoryRepository.create(name, directionScope) }

@@ -301,5 +301,29 @@ class BackupContainerAndRestoreTest {
         assertThat(restored.scheduledBackupEnabled).isFalse()
         assertThat(restored.scheduledBackupFolderUri).isNull()
         assertThat(restored.scheduledBackupIntervalDays).isEqualTo(7)
+        assertThat(restored.appLockEnabled).isFalse()
+        assertThat(restored.appLockTimeoutSeconds).isEqualTo(60)
+    }
+
+    @Test
+    fun appLockSettingsPersistThroughEncryptedBackupAndRestore() = runTest {
+        sourceHarness.db()
+        sourceHarness.settingsStore.setAppLock(enabled = true, timeoutSeconds = 300)
+        val out = ByteArrayOutputStream()
+        val service = BackupService(
+            sourceHarness.holder, sourceHarness.settingsStore, sourceHarness.allowlistCache,
+            sourceHarness.captureStatusTracker, sourceHarness.clock, sourceHarness.logger, fastArgonConfig,
+        )
+        service.exportEncryptedBackup("strong-lock-passphrase", out, verifyStreamOpener = { ByteArrayInputStream(out.toByteArray()) })
+
+        restoreHarness.db()
+        val restoreService = BackupService(
+            restoreHarness.holder, restoreHarness.settingsStore, restoreHarness.allowlistCache,
+            restoreHarness.captureStatusTracker, restoreHarness.clock, restoreHarness.logger, fastArgonConfig,
+        )
+        restoreService.restoreEncryptedBackup("strong-lock-passphrase", ByteArrayInputStream(out.toByteArray()))
+        val restored = restoreHarness.settingsStore.current()
+        assertThat(restored.appLockEnabled).isTrue()
+        assertThat(restored.appLockTimeoutSeconds).isEqualTo(300)
     }
 }

@@ -62,3 +62,6 @@
 -keep class wtrack.integration.** { *; }
 -keep class wtrack.app.domain.parser.** { *; }
 
+# AndroidX Biometric prompt & CryptoObject callbacks
+-keep class androidx.biometric.** { *; }
+

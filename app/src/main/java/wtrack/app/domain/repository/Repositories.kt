@@ -217,6 +217,7 @@ interface SettingsRepository {
     suspend fun setBackupReminderThresholds(days: Int, txCount: Int)
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int)
+    suspend fun setAppLock(enabled: Boolean, timeoutSeconds: Int)
 }
 
 interface DatabaseHealthRepository {

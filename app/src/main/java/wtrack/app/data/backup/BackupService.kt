@@ -95,6 +95,8 @@ data class AppSettingsDto(
     val scheduledBackupFolderUri: String? = null,
     val scheduledBackupEnabled: Boolean = false,
     val scheduledBackupIntervalDays: Int = 7,
+    val appLockEnabled: Boolean = false,
+    val appLockTimeoutSeconds: Int = 60,
 )
 
 @Serializable
@@ -309,6 +311,8 @@ class BackupService(
                     scheduledBackupFolderUri = settings.scheduledBackupFolderUri,
                     scheduledBackupEnabled = settings.scheduledBackupEnabled,
                     scheduledBackupIntervalDays = settings.scheduledBackupIntervalDays,
+                    appLockEnabled = settings.appLockEnabled,
+                    appLockTimeoutSeconds = settings.appLockTimeoutSeconds,
                 ),
                 transactionSources = allSources.map {
                     TransactionSourceDto(it.id, it.packageName, it.displayName, it.isAllowlisted, it.parserVersion, it.createdAt, it.updatedAt)
@@ -592,6 +596,8 @@ class BackupService(
                 scheduledBackupEnabled = snapshot.appSettings.scheduledBackupEnabled &&
                     !snapshot.appSettings.scheduledBackupFolderUri.isNullOrBlank(),
                 scheduledBackupIntervalDays = snapshot.appSettings.scheduledBackupIntervalDays,
+                appLockEnabled = snapshot.appSettings.appLockEnabled,
+                appLockTimeoutSeconds = snapshot.appSettings.appLockTimeoutSeconds,
             ),
         )
         allowlistCache.refreshSnapshotNow()

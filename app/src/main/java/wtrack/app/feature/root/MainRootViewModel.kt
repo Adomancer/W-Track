@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,6 +33,7 @@ import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.time.Clock
+import wtrack.app.domain.usecase.AppLockStateMachine
 
 sealed interface RootUiState {
     data object Loading : RootUiState
@@ -50,6 +52,7 @@ sealed interface RootUiState {
         val isBusy: Boolean = false,
         val actionMessage: String? = null,
         val selfCheckResult: CaptureSelfCheckResult? = null,
+        val isAppLocked: Boolean = false,
     ) : RootUiState
 
     data class Ready(
@@ -59,6 +62,7 @@ sealed interface RootUiState {
         val captureSummary: CaptureHealthSummary,
         val showPostRestorePermissionPrompt: Boolean = false,
         val actionMessage: String? = null,
+        val isAppLocked: Boolean = false,
     ) : RootUiState
 }
 
@@ -79,6 +83,9 @@ class MainRootViewModel @Inject constructor(
     private val actionMessage = MutableStateFlow<String?>(null)
     private val postRestorePrompt = MutableStateFlow(false)
     private val selfCheckFlow = MutableStateFlow<CaptureSelfCheckResult?>(null)
+    private val appLockStateMachine = AppLockStateMachine()
+    private val isAppLockedFlow = MutableStateFlow(false)
+    private var latestObservedSettings = AppSettings()
 
     private val operationalSignals = combine(
         settingsRepository.settings,
@@ -87,6 +94,19 @@ class MainRootViewModel @Inject constructor(
         accountRepository.accounts,
     ) { settings, capture, pendingCount, accounts ->
         OperationalSnapshot(settings, capture, pendingCount, accounts.isNotEmpty())
+    }.onEach { ops ->
+        latestObservedSettings = ops.settings
+        isAppLockedFlow.value = appLockStateMachine.onSettingsObserved(ops.settings)
+    }
+
+    private val readyAuxFlow = combine(
+        isBusy,
+        actionMessage,
+        postRestorePrompt,
+        selfCheckFlow,
+        isAppLockedFlow,
+    ) { busy, message, restorePrompt, selfCheck, isAppLocked ->
+        ReadyAuxState(busy, message, restorePrompt, selfCheck, isAppLocked)
     }
 
     val uiState: StateFlow<RootUiState> = databaseHealthRepository.state
@@ -103,19 +123,17 @@ class MainRootViewModel @Inject constructor(
 
                 is DatabaseHealthState.Ready -> combine(
                     operationalSignals,
-                    isBusy,
-                    actionMessage,
-                    postRestorePrompt,
-                    selfCheckFlow,
-                ) { ops, busy, message, restorePrompt, selfCheck ->
+                    readyAuxFlow,
+                ) { ops, aux ->
                     if (!ops.settings.onboardingCompleted) {
                         RootUiState.Onboarding(
                             settings = ops.settings,
                             captureSummary = ops.captureSummary,
                             hasAccounts = ops.hasAccounts,
-                            isBusy = busy,
-                            actionMessage = message,
-                            selfCheckResult = selfCheck,
+                            isBusy = aux.isBusy,
+                            actionMessage = aux.actionMessage,
+                            selfCheckResult = aux.selfCheckResult,
+                            isAppLocked = aux.isAppLocked,
                         )
                     } else {
                         RootUiState.Ready(
@@ -123,8 +141,9 @@ class MainRootViewModel @Inject constructor(
                             baseCurrency = ops.settings.baseCurrency,
                             pendingReviewCount = ops.pendingReviewCount,
                             captureSummary = ops.captureSummary,
-                            showPostRestorePermissionPrompt = restorePrompt && !ops.captureSummary.isPermissionGranted,
-                            actionMessage = message,
+                            showPostRestorePermissionPrompt = aux.showPostRestorePrompt && !ops.captureSummary.isPermissionGranted,
+                            actionMessage = aux.actionMessage,
+                            isAppLocked = aux.isAppLocked,
                         )
                     }
                 }
@@ -139,6 +158,24 @@ class MainRootViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { captureStatusRepository.refreshStatus() }
         }
+    }
+
+    fun onAppBackgrounded() {
+        isAppLockedFlow.value = appLockStateMachine.onAppBackgrounded(
+            nowMillis = clock.nowEpochMillis(),
+            settings = latestObservedSettings,
+        )
+    }
+
+    fun onAppForegrounded() {
+        isAppLockedFlow.value = appLockStateMachine.onAppForegrounded(
+            nowMillis = clock.nowEpochMillis(),
+            settings = latestObservedSettings,
+        )
+    }
+
+    fun unlockApp() {
+        isAppLockedFlow.value = appLockStateMachine.onUnlocked()
     }
 
     fun runCaptureSelfCheck() {
@@ -265,5 +302,13 @@ class MainRootViewModel @Inject constructor(
         val captureSummary: CaptureHealthSummary,
         val pendingReviewCount: Int,
         val hasAccounts: Boolean,
+    )
+
+    private data class ReadyAuxState(
+        val isBusy: Boolean,
+        val actionMessage: String?,
+        val showPostRestorePrompt: Boolean,
+        val selfCheckResult: CaptureSelfCheckResult?,
+        val isAppLocked: Boolean,
     )
 }

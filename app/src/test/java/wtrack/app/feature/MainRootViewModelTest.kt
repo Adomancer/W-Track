@@ -25,6 +25,7 @@ import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
 import wtrack.app.domain.repository.SaveReviewItemRequest
 import wtrack.app.domain.repository.UpdateAccountRequest
+import wtrack.app.domain.time.Clock
 import wtrack.app.feature.root.MainRootViewModel
 import wtrack.app.feature.root.RootUiState
 
@@ -159,6 +160,63 @@ class MainRootViewModelTest {
             }
             assertThat(checked.selfCheckResult?.dryRunParserPassed).isTrue()
             assertThat(checked.selfCheckResult?.registeredParserCount).isEqualTo(3)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun appLockEnforcesColdStartAndTimeoutReLockInMainRootViewModel() = runTest {
+        val healthRepo = object : DatabaseHealthRepository {
+            override val state: Flow<DatabaseHealthState> = MutableStateFlow(DatabaseHealthState.Ready)
+            override suspend fun wipeAllDataAndReset() {}
+        }
+        val mutableClock = object : Clock {
+            var now = 10_000L
+            override fun nowEpochMillis(): Long = now
+        }
+        val vm = MainRootViewModel(
+            databaseHealthRepository = healthRepo,
+            settingsRepository = FakeSettingsRepository(
+                AppSettings(
+                    onboardingCompleted = true,
+                    appLockEnabled = true,
+                    appLockTimeoutSeconds = 60,
+                ),
+            ),
+            captureStatusRepository = FakeCaptureStatusRepository(),
+            needsReviewRepository = FakeNeedsReviewRepository(),
+            accountRepository = FakeAccountRepository(),
+            backupPort = FakeBackupAndDiagnosticsPort(),
+            clock = mutableClock,
+            dispatcherProvider = TestDispatcherProvider(mainDispatcherRule.dispatcher),
+        )
+
+        vm.uiState.test {
+            var current = awaitItem()
+            while (current !is RootUiState.Ready) {
+                current = awaitItem()
+            }
+            assertThat(current.isAppLocked).isTrue()
+
+            vm.unlockApp()
+            var unlocked = awaitItem() as RootUiState.Ready
+            while (unlocked.isAppLocked) {
+                unlocked = awaitItem() as RootUiState.Ready
+            }
+            assertThat(unlocked.isAppLocked).isFalse()
+
+            // Return before 60s -> stays unlocked
+            vm.onAppBackgrounded()
+            mutableClock.now = 40_000L
+            vm.onAppForegrounded()
+            expectNoEvents()
+
+            // Background and return after >= 60s -> locks again
+            vm.onAppBackgrounded()
+            mutableClock.now = 110_000L
+            vm.onAppForegrounded()
+            val relocked = awaitItem() as RootUiState.Ready
+            assertThat(relocked.isAppLocked).isTrue()
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -88,6 +88,13 @@ class AppSettingsDataStore internal constructor(
         }
     }
 
+    suspend fun setAppLock(enabled: Boolean, timeoutSeconds: Int) {
+        dataStore.edit { prefs ->
+            prefs[KEY_APP_LOCK_ENABLED] = enabled
+            prefs[KEY_APP_LOCK_TIMEOUT_SECONDS] = timeoutSeconds.coerceIn(0, 3600)
+        }
+    }
+
     suspend fun replaceAll(restored: AppSettings) {
         dataStore.edit { prefs ->
             prefs[KEY_THEME_MODE] = restored.themeMode.name
@@ -109,6 +116,8 @@ class AppSettingsDataStore internal constructor(
             }
             prefs[KEY_SCHEDULED_BACKUP_ENABLED] = restored.scheduledBackupEnabled && cleanedFolder != null
             prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] = restored.scheduledBackupIntervalDays.coerceIn(1, 90)
+            prefs[KEY_APP_LOCK_ENABLED] = restored.appLockEnabled
+            prefs[KEY_APP_LOCK_TIMEOUT_SECONDS] = restored.appLockTimeoutSeconds.coerceIn(0, 3600)
         }
     }
 
@@ -134,6 +143,8 @@ class AppSettingsDataStore internal constructor(
         scheduledBackupEnabled = (prefs[KEY_SCHEDULED_BACKUP_ENABLED] ?: false) &&
             !prefs[KEY_SCHEDULED_BACKUP_FOLDER_URI].isNullOrBlank(),
         scheduledBackupIntervalDays = (prefs[KEY_SCHEDULED_BACKUP_INTERVAL_DAYS] ?: 7).coerceIn(1, 90),
+        appLockEnabled = prefs[KEY_APP_LOCK_ENABLED] ?: false,
+        appLockTimeoutSeconds = (prefs[KEY_APP_LOCK_TIMEOUT_SECONDS] ?: 60).coerceIn(0, 3600),
     )
 
     private companion object {
@@ -145,11 +156,13 @@ class AppSettingsDataStore internal constructor(
         val KEY_BACKUP_REMINDER_DAYS = intPreferencesKey("backup_reminder_days")
         val KEY_BACKUP_REMINDER_TX_COUNT = intPreferencesKey("backup_reminder_tx_count")
         val KEY_LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
-        val KEY_TX_COUNT_SINCE_BACKUP = intPreferencesKey("tx_count_since_last_backup")
+        val KEY_TX_COUNT_SINCE_BACKUP = intPreferencesKey("tx_count_since_backup")
         val KEY_BACKUP_REMINDER_DISMISSED_AT = longPreferencesKey("backup_reminder_dismissed_at")
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val KEY_SCHEDULED_BACKUP_FOLDER_URI = stringPreferencesKey("scheduled_backup_folder_uri")
         val KEY_SCHEDULED_BACKUP_ENABLED = booleanPreferencesKey("scheduled_backup_enabled")
         val KEY_SCHEDULED_BACKUP_INTERVAL_DAYS = intPreferencesKey("scheduled_backup_interval_days")
+        val KEY_APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+        val KEY_APP_LOCK_TIMEOUT_SECONDS = intPreferencesKey("app_lock_timeout_seconds")
     }
 }

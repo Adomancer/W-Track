@@ -663,6 +663,9 @@ class SettingsRepositoryImpl(
     override suspend fun setOnboardingCompleted(completed: Boolean) = settingsStore.setOnboardingCompleted(completed)
     override suspend fun setScheduledBackupConfig(folderUri: String?, enabled: Boolean, intervalDays: Int) =
         settingsStore.setScheduledBackupConfig(folderUri, enabled, intervalDays)
+
+    override suspend fun setAppLock(enabled: Boolean, timeoutSeconds: Int) =
+        settingsStore.setAppLock(enabled, timeoutSeconds)
 }
 
 class DatabaseHealthRepositoryImpl(
