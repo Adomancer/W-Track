@@ -1,17 +1,17 @@
 # Implementation Plan & Engineering Backlog — W-Track
 
-**Document Status:** Master Engineering Plan (PRD v1.4 — Frozen for Ingestion PoC)  
+**Document Status:** Master Engineering Plan & v1.0.0 Release Baseline  
 **Total MVP Estimate:** **50–77 working days** (1 full-time developer, excludes unexpected OEM anomalies; calendar time includes 7–14 day Gate G1 capture window)  
-**Last Updated:** 2026-11-21
+**Last Updated:** 2026-11-22
 
 ---
 
 ## 1. Executive Phasing Overview
 
 > [!NOTE]
-> **Implementation Status Summary (Pre-Physical-Device Verification):**
-> - **Implemented & Automated-Verified (`M0`–`M5`):** `:integration:api`, `:integration:providers` (`LocaleNumberParser`, `ProviderDateTimeParser`, `SensitiveContentGuard`, `FixtureAnonymizer`, `ProviderCatalog`, test-only synthetic parsers), Room Schema v1 + SQLCipher `4.20.0` wrapper + Keystore KEK/DEK lifecycle (`DatabaseKeyManager`, `WtrackDatabaseHolder`), provider-agnostic `WtrackNotificationListenerService` + 16-step `IngestionPipeline` + 3-tier deduplication + `ING-12`/`13`/`14` recovery & heartbeat, complete `M3c` domain engines (16-row Section 4.6 `AggregateCalculator`, derived fees, `CorrectBalanceUseCase`, `BalanceCheckpointEvaluator`, `LinkTransferUseCase`, rule backfill, `GateG1Evaluator`), complete `M4` Material 3 Compose UI & ViewModels, and `M5` (`RetentionPurgeWorker`, `WTBK` v1 Argon2id + PBKDF2-fallback + AES-256-GCM AAD `BackupService`, `CsvExporter`, `WipeAllDataUseCase`).
-> - **Pending Physical Device Testing (`iQOO Z10R I2505`):** On-device `SqlCipherInstrumentedTest` + AFU locked-screen capture (`ADR-005`), default OriginOS battery/Doze lifecycle testing (`TEST-003`), ADB package discovery and real notification parsers for **Bank Jago**, **DANA**, and **BCA** (`docs/PROVIDERS.md`), and live 7–14 day Gate G1 measurement (`Appendix C`).
+> **Implementation Status Summary (`v1.0.0` Release):**
+> - **Implemented & Automated-Verified (`M0`–`M5` + Daily-Driver Hardening):** `:integration:api`, `:integration:providers` (`JagoTransactionParser` v2, `DanaTransactionParser` v1, `BcaTransactionParser` v1, `GenericNotificationFallbackParser`, `NotificationTemplateEngine` + `SmartParserRegistry`), Room Schema v2 + `MIGRATION_1_2` + SQLCipher `4.20.0` + Keystore KEK/DEK lifecycle (`DatabaseKeyManager`, `WtrackDatabaseHolder`), `WtrackNotificationListenerService` (with self-notification drop guard) + 16-step `IngestionPipeline`, domain engines (`AggregateCalculator`, `TransferSuggestionEngine`, `AppLockStateMachine`, `GateG1Evaluator`), full Material 3 Compose UI (including Settings Security App Lock + Activity Possible Transfers + Custom Parsers screen), `AndroidStatusAlertNotifier`, `RetentionPurgeWorker`, and `WTBK` v1 Argon2id encrypted backup/restore.
+> - **Hardware-Verified on `iQOO Z10R (I2505)`:** `11/11` isolated hardware instrumented tests (`SqlCipherInstrumentedTest`, `BackupAndRetentionInstrumentedTest`, `IngestionAndLedgerInstrumentedTest`, `DailyDriverFeaturesInstrumentedTest`, `ComposeThemeAndLockedUiInstrumentedTest`), live v1 → v2 SQLCipher migration upgrade with zero data loss, and CI/CD + semver release automation (`ci.yml`, `release.yml`, `setup-release-keystore.sh`). Multi-day Gate G1 statement reconciliation & manual OS soak observations remain tracked in [PHYSICAL_DEVICE_TEST_CHECKLIST.md](file:///home/adomancer/Documents/project/W-Track/docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md).
 
 Development is strictly gated into **Phase 1 (Ingestion PoC & Gate G1)** and **Phase 2 (Post-Gate G1 MVP Completion)** per **PRD Section 17 & 17.1**. **Do not polish the full UI or build insights/backup screens before Gate G1 passes.**
 

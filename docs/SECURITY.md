@@ -1,7 +1,7 @@
 # Security and Privacy Specification — W-Track
 
-**Document Status:** Engineering Security Baseline (PRD v1.4, Section 9 & ADR-002 / ADR-005 / ADR-006)  
-**Last Updated:** 2026-11-21
+**Document Status:** v1.0.0 Engineering Security Baseline (PRD v1.4 Section 9 + Daily-Driver Hardening)  
+**Last Updated:** 2026-11-22
 
 ---
 
@@ -46,9 +46,8 @@
 
 ## 4. Database Encryption & Key Management (`ADR-005` — Pending Final Owner Acceptance)
 
-### 4.1 Evaluated Implementation Stack
-- **SQLCipher Library:** **`net.zetetic:sqlcipher-android:4.20.0`** (latest stable 4.x release: SQLite `3.54.1`, LibTomCrypt `1.18.2` community backend, native 16KB page-size alignment, `arm64-v8a`, Room `2.8.x` & Room 3 compatibility) paired with `androidx.sqlite:sqlite:2.7.0` and `SupportOpenHelperFactory` (`System.loadLibrary("sqlcipher")`).
-  - *SDK Alignment Choice Pending Owner Confirmation:* Because `sqlcipher-android:4.18.0`–`4.20.0` bumped library `compileSdk` to `37`, either decouple `compileSdk = 37` (Android 17 stable GA) while keeping `targetSdk = 36` / `minSdk = 26`, OR verify `4.20.0` AAR resolution under strict `compileSdk = 36` with fallback to stable **`net.zetetic:sqlcipher-android:4.17.0`** (`androidx.sqlite:sqlite:2.6.2`).
+### 4.1 Evaluated & Verified Implementation Stack
+- **SQLCipher Library:** **`net.zetetic:sqlcipher-android:4.20.0`** (SQLite `3.54.1`, LibTomCrypt `1.18.2`, native 16KB page-size alignment, `arm64-v8a`) paired with `androidx.sqlite:sqlite:2.7.0` and `SupportOpenHelperFactory` (`System.loadLibrary("sqlcipher")`), verified under `compileSdk = 37` / `targetSdk = 36` / `minSdk = 26` on `iQOO Z10R`.
   - *Explicitly Prohibited Releases:* **SQLCipher 5 beta** (`5.0.0-beta*`, non-backward-compatible AES-256-GCM / 8KB page format) and legacy **`net.zetetic:android-database-sqlcipher:4.5.4`** (EOL, lacks 16KB ELF alignment, seen in deleted commit `38001da`).
 - **Wrapping Key (KEK) & Locked-Screen Ingestion Policy:** 256-bit `AES/GCM/NoPadding` key stored in `AndroidKeyStore`:
   - `setRandomizedEncryptionRequired(true)`
@@ -134,9 +133,13 @@ Before committing any captured sample notification into `:integration:providers`
 
 ---
 
-## 8. Security Candidates Deferred to PRD 1.5 Consideration List
+## 8. Daily-Driver App Lock & Post-v1.0.0 Backlog
 
-Per **PRD Appendix B**, the following items are **explicitly NOT part of frozen PRD v1.4** and are tracked only for v1.5 planning:
-- App-level biometric / PIN lock screen + `WindowManager.LayoutParams.FLAG_SECURE` screenshot/recents masking.
+### Implemented in v1.0.0
+- **Opt-In Biometric & Device-Credential App Lock (`USE_BIOMETRIC` + `androidx.biometric:1.1.0`):** Off by default (`Settings → Security → Biometric & Device App Lock`) with configurable inactivity re-lock (`Immediate`, `1 min`, `5 min`). Uses `BIOMETRIC_WEAK or DEVICE_CREDENTIAL` via `BiometricPrompt` over a `FragmentActivity` overlay (`AppLockOverlay`) while keeping Android Keystore KEK/DEK `setUnlockedDeviceRequired(false)` so background AFU `NotificationListenerService` capture continues uninterrupted.
+- **Opt-In Privacy-Safe Local Status Alerts (`POST_NOTIFICATIONS` + Anti-Loop Guard):** Off by default (`Settings → Retention & Monitoring → Local Status Alerts`). Alerts use generic copy only (never amounts, merchant names, or raw notification text) and `WtrackNotificationListenerService` unconditionally drops `wtrack.app` package notifications before allowlist evaluation.
+
+### Deferred Beyond v1.0.0 (PRD Appendix B)
+- `WindowManager.LayoutParams.FLAG_SECURE` screenshot/recents masking toggle.
 - Refined privacy wording regarding Android OS-level all-or-nothing Notification Access scope.
 - Google Play policy compliance review for broad public release (notification listener justification & privacy policy disclosures).

@@ -1,7 +1,7 @@
 # Database Schema & Entity-Relationship Design — W-Track
 
-**Document Status:** M1 Foundation & Schema v2 Custom Parser Specification (PRD v1.4+)  
-**Encryption:** SQLCipher for Android (`net.zetetic:sqlcipher-android`: `4.20.0` evaluated / `4.17.0` strict-API-36 fallback; no 5 beta, no EOL `4.5.4`) from Schema Version 1 (Schema v2 adds `custom_parser_rules` via `MIGRATION_1_2`)  
+**Document Status:** M1 Foundation & Schema v2 Custom Parser Specification (`v1.0.0`)  
+**Encryption:** SQLCipher for Android (`net.zetetic:sqlcipher-android:4.20.0`, hardware-verified `arm64-v8a`; no 5 beta, no EOL `4.5.4`) from Schema Version 1 (Schema v2 adds `custom_parser_rules` via `MIGRATION_1_2`, which drops the 5 custom partial unique indexes prior to Room schema validation so `Callback.onOpen` cleanly re-installs them on live upgrades)  
 **Last Updated:** 2026-11-22
 
 ---

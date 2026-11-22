@@ -11,7 +11,7 @@
 
 <p>
   <a href="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml"><img src="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/Version-0.3.0--rc1-0B6E63?style=flat-square" alt="Version 0.3.0-rc1" />
+  <img src="https://img.shields.io/badge/Version-1.0.0-0B6E63?style=flat-square" alt="Version 1.0.0" />
   <img src="https://img.shields.io/badge/Android-API%2026%E2%80%9336-064740?style=flat-square" alt="Android API 26-36" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.21-101C1A?style=flat-square" alt="Kotlin 2.2.21" />
   <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-0B6E63?style=flat-square" alt="Jetpack Compose Material 3" />
@@ -37,7 +37,7 @@
 W-Track automatically collects transaction notifications from explicitly allowlisted Indonesian banking and e-wallet apps, normalizes them into a single encrypted local ledger, routes uncertain alerts to **Needs Review**, and helps you track balances, transfers, categories, and cash flow without uploading financial data or storing banking credentials.
 
 > [!NOTE]
-> **Current Status:** All PRD v1.4 features (`M0`–`M5`) plus daily-driver release hardening (`0.3.0-rc1`, `versionCode 3`, `minSdk 26 · targetSdk 36 · compileSdk 37`) are implemented — including biometric/device-credential App Lock, auto-suggested transfer pairing, opt-in local status alerts, and zero-rebuild notification pattern rules. Currently in active **Gate G1** verification on `iQOO Z10R (Android 16)`.
+> **Current Status:** **v1.0.0** (`versionCode 1000099`, `minSdk 26 · targetSdk 36 · compileSdk 37`) is ready for daily use — shipping all `M0`–`M5` features plus opt-in Biometric / Device-Credential App Lock, auto-suggested transfer pairing, opt-in privacy-safe Local Status Alerts, and zero-rebuild notification pattern rules. Verified with `11/11` isolated hardware instrumented tests and live v1 → v2 SQLCipher migration on `iQOO Z10R (Android 16)`, with ongoing Gate G1 daily soak.
 
 ---
 
@@ -48,9 +48,9 @@ W-Track automatically collects transaction notifications from explicitly allowli
 | **100% Local-First & Offline** | No cloud account, no telemetry, and no mandatory backend. All parsing, categorization, and reporting run on-device. |
 | **Zero Banking Credentials** | Never asks for or stores bank logins, passwords, PINs, OTPs, or CVVs. |
 | **No Screen Scraping or Accessibility** | Reads only standard Android `NotificationListenerService` events from apps you explicitly enable in the allowlist (and always ignores `wtrack.app`'s own local alerts before allowlist lookup). |
-| **Biometric & Device-Credential App Lock** | Optional lock screen (`androidx.biometric`) with configurable inactivity re-lock (`Immediate`, `1 min`, `5 min`) protecting the ledger UI when returning from background. |
+| **Biometric & Device-Credential App Lock** | Optional lock screen (`androidx.biometric`, **Settings → Security → Biometric & Device App Lock**) with configurable inactivity re-lock (`Immediate`, `1 min`, `5 min`) protecting the ledger UI when returning from background. |
 | **Encrypted Storage & Backups** | Local SQLite database is encrypted with `sqlcipher-android` (`4.20.0`) + Android Keystore AES-GCM key wrapping; `.wtrackbackup` archives (`WTBK` v1) use Argon2id + AES-256-GCM. |
-| **Safe Failure Handling & Privacy-Safe Alerts** | Unseen notification formats or Android-redacted security alerts never guess amounts or directions — they route cleanly to **Needs Review**. Optional local status alerts never display amounts, merchant names, or raw notification text. |
+| **Safe Failure Handling & Privacy-Safe Alerts** | Unseen notification formats or Android-redacted security alerts never guess amounts or directions — they route cleanly to **Needs Review**. Optional **Local Status Alerts** (**Settings → Retention & Monitoring**) never display amounts, merchant names, or raw notification text. |
 
 ---
 
@@ -167,7 +167,7 @@ adb uninstall wtrack.app.test
 ### CI/CD & Releases
 
 - **Continuous Integration ([.github/workflows/ci.yml](.github/workflows/ci.yml)):** Runs automatically on every push/PR to `main` — executes `:integration:api:test`, `:integration:providers:test`, `:app:testDebugUnitTest`, `:app:lintDebug`, and `:app:assembleRelease`, uploads HTML test/lint reports, and uploads a debug APK artifact on `main` pushes.
-- **Automated APK Releases ([.github/workflows/release.yml](.github/workflows/release.yml)):** Pushing a version tag (`git tag -a v0.3.0-rc1 -m "W-Track v0.3.0-rc1" && git push origin v0.3.0-rc1`) computes semver `-Pwtrack.versionCode` / `-Pwtrack.versionName`, runs the full test + lint gate, generates `SHA256SUMS.txt`, and publishes a GitHub Release with APK assets (tags containing `-` are marked prerelease).
+- **Automated APK Releases ([.github/workflows/release.yml](.github/workflows/release.yml)):** Pushing a version tag (`git tag -a v1.0.0 -m "W-Track v1.0.0" && git push origin v1.0.0`) computes semver `-Pwtrack.versionCode` / `-Pwtrack.versionName`, runs the full test + lint gate, generates `SHA256SUMS.txt`, and publishes a GitHub Release with APK assets (tags containing `-` are marked prerelease).
 - **Optional Release Signing Secrets:** Run `./scripts/setup-release-keystore.sh` (or manually add `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` in GitHub Repository Settings → Secrets) to produce signed R8 `release` APKs automatically; without them, the workflow publishes an installable `debug` APK plus the R8-minified unsigned `release` APK.
 
 ---

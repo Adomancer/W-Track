@@ -80,8 +80,8 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     targetSdk = 36
                     val versionCodeProp = providers.gradleProperty("wtrack.versionCode").orNull?.toIntOrNull()
                     val versionNameProp = providers.gradleProperty("wtrack.versionName").orNull?.takeIf { it.isNotBlank() }
-                    versionCode = versionCodeProp ?: 3
-                    versionName = versionNameProp ?: "0.3.0-rc1"
+                    versionCode = versionCodeProp ?: 1000099
+                    versionName = versionNameProp ?: "1.0.0"
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                     vectorDrawables.useSupportLibrary = true
                 }

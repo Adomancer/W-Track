@@ -1,6 +1,6 @@
 # Architecture — W-Track
 
-**Document Status:** Active Architecture Baseline (aligned to PRD v1.4 + Custom Pattern Parsing)  
+**Document Status:** v1.0.0 Release Architecture Baseline (PRD v1.4 + Daily-Driver Release Hardening)  
 **Last Updated:** 2026-11-22
 
 ---
@@ -67,16 +67,17 @@ W-Track/
 │       ├── data/
 │       │   ├── crypto/           # Android Keystore KEK + wrapped DEK + StartupStateManager
 │       │   ├── local/            # Room DB (SQLCipher), entities, DAOs, migrations, DataStore settings
-│       │   ├── ingestion/        # NotificationListenerService, allowlist gate, pipeline, recovery, heartbeat
+│       │   ├── ingestion/        # NotificationListenerService (self-drop + allowlist gate), pipeline, recovery, heartbeat
+│       │   ├── notification/     # Opt-in privacy-safe local status alerts (AndroidStatusAlertNotifier)
 │       │   ├── repository/       # Repository implementations mapping Room <-> Domain
 │       │   ├── worker/           # WorkManager: retention purge, backup reminder, fallback heartbeat
 │       │   └── backup/           # Encrypted backup writer/reader, atomic restore, CSV exporter
 │       ├── domain/
 │       │   ├── model/            # Canonical models (Account, Transaction, NeedsReviewItem, TransferPair, etc.)
-│       │   ├── repository/       # Pure Kotlin repository interfaces & request DTOs
-│       │   ├── usecase/          # Ingestion orchestration, aggregates, reconciliation, transfer linking, rules
+│       │   ├── repository/       # Pure Kotlin repository & status-alert port interfaces + request DTOs
+│       │   ├── usecase/          # Ingestion orchestration, aggregates, transfer suggestions, app lock state, rules
 │       │   └── exception/        # Domain errors (DatabaseLockedException, InvalidTransferPairException, etc.)
-│       └── feature/              # Jetpack Compose screens & ViewModels + navigation (WtrackNavHost)
+│       └── feature/              # Jetpack Compose screens, Biometric AppLockOverlay, & ViewModels (WtrackNavHost)
 └── docs/                         # Architecture, Technical Spec, ERD, Security, Implementation Plan, ADRs
 ```
 
