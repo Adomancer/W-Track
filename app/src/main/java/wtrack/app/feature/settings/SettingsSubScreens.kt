@@ -1,6 +1,7 @@
 package wtrack.app.feature.settings
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,8 +12,10 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -53,15 +57,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
+import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.domain.usecase.ProviderMeasurementInput
 import wtrack.app.feature.common.ActionFeedbackBanner
-import wtrack.app.feature.common.CaptureStatusPill
 import wtrack.app.feature.common.SectionHeader
 import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.UiDateHelper
+import wtrack.app.feature.common.V2SettingRow
+import wtrack.app.feature.common.V2StatusDot
 import wtrack.app.feature.common.WtrackCard
 import wtrack.app.feature.common.WtrackTopBar
 import wtrack.integration.Direction
@@ -408,14 +415,19 @@ fun CategoriesScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
+
+    var showAppsSheet by remember { mutableStateOf(false) }
+    var showBatterySheet by remember { mutableStateOf(false) }
+    var showTechnicalSheet by remember { mutableStateOf(false) }
 
     var redactTermsInput by remember { mutableStateOf("") }
     var jagoDays by remember { mutableStateOf("14") }
@@ -439,15 +451,48 @@ fun DiagnosticsScreen(
         viewModel.refreshDiagnostics()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        WtrackTopBar(title = "Capture Diagnostics & Gate G1", onBack = onBack)
+    val isActive = state.captureSummary.appStatus == CaptureStatus.ACTIVE && state.captureSummary.isPermissionGranted
+    val statusDotColor = if (isActive) ext.inflow else ext.warning
+    val statusLabel = if (isActive) "Active" else "Needs attention"
+    val heroTitle = if (isActive) "All set" else "Turn on access"
+    val appNamesSummary = state.providerCatalog.joinToString(", ") { it.displayName }
 
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { WtrackTopBar(title = "Auto-capture", onBack = onBack) },
+        bottomBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Button(
+                    onClick = { viewModel.refreshDiagnostics() },
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) {
+                    Text("Run quick check", style = MaterialTheme.typography.titleMedium)
+                }
+                TextButton(onClick = { showTechnicalSheet = true }) {
+                    Text(
+                        text = "Technical details ›",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
             if (state.actionMessage != null) {
                 item(key = "msg") {
@@ -458,401 +503,291 @@ fun DiagnosticsScreen(
                 }
             }
 
-            item(key = "listener-status") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+            // Block 1: Hero Status (pure whitespace, plain English)
+            item(key = "hero-status") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("Listener & Permission Status", style = MaterialTheme.typography.titleMedium)
-                            CaptureStatusPill(state.captureSummary.appStatus)
-                        }
-                        DiagnosticsKvRow("Permission granted", "${state.captureSummary.isPermissionGranted}")
-                        DiagnosticsKvRow("Listener connected", "${state.captureSummary.isListenerConnected}")
-                        DiagnosticsKvRow(
-                            "Last alive heartbeat",
-                            if (state.captureSummary.lastAliveAt > 0L) {
-                                UiDateHelper.formatDateTime(state.captureSummary.lastAliveAt)
-                            } else {
-                                "Not recorded yet"
-                            },
+                        V2StatusDot(color = statusDotColor)
+                        Text(
+                            text = statusLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = statusDotColor,
                         )
-                        OutlinedButton(
-                            onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Open Android Notification Access") }
                     }
+                    Text(
+                        text = heroTitle,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = if (appNamesSummary.isNotBlank()) {
+                            "Listening to $appNamesSummary"
+                        } else {
+                            "Automatically reads bank & e-wallet alerts"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
-            item(key = "originos") {
-                Surface(
-                    color = ext.infoTintBg,
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, ext.infoTintBorder),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
+            // Block 2: 3 plain health rows
+            item(key = "health-rows") {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    V2SettingRow(
+                        title = "Notification access",
+                        subtitle = if (state.captureSummary.isPermissionGranted) "Allowed" else "Tap to allow",
+                        trailingColor = if (state.captureSummary.isPermissionGranted) ext.inflow else ext.warning,
+                        onClick = {
+                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Monitored apps",
+                        subtitle = "${state.providerCatalog.size} supported apps",
+                        onClick = { showAppsSheet = true },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Battery & background",
+                        subtitle = "Fix if alerts stop arriving",
+                        onClick = { showBatterySheet = true },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showAppsSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAppsSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Monitored apps", style = MaterialTheme.typography.titleLarge)
+                state.providerCatalog.forEachIndexed { idx, p ->
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        Text("vivo / iQOO OriginOS Guidance (ING-10)", style = MaterialTheme.typography.titleMedium)
+                        Text(p.displayName, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "• Test default OEM battery behavior first before Gate G1 exempting.\n" +
-                                "• If OriginOS kills the listener in Deep Doze: Settings → Battery → High background power consumption → Allow W-Track, and App Info → Allow autostart.\n" +
-                                "• Sideloaded Android 13–16 builds: App Info → ⋮ → Allow restricted settings before granting Notification Access.",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = p.notes,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (idx < state.providerCatalog.lastIndex) {
+                        HorizontalDivider(color = ext.divider)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    if (showBatterySheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBatterySheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("Battery & background", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = "If notifications stop arriving while the app is closed:\n\n1. Open App Info → Battery and allow background power.\n2. On vivo / iQOO OriginOS, turn on Autostart.\n3. On Android 13+, tap ⋮ → Allow restricted settings before enabling Notification Access.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = {
+                        showBatterySheet = false
+                        val appInfoIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(appInfoIntent)
+                    },
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Open App Info", style = MaterialTheme.typography.titleMedium) }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+
+    // One tap deeper: Gate G1, M3a sample collection, PAR-11, Capture Gaps & Logs
+    if (showTechnicalSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showTechnicalSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("Technical details", style = MaterialTheme.typography.titleLarge)
+
+                DiagnosticsKvRow("Permission granted", "${state.captureSummary.isPermissionGranted}")
+                DiagnosticsKvRow("Listener connected", "${state.captureSummary.isListenerConnected}")
+                DiagnosticsKvRow(
+                    "Last heartbeat",
+                    if (state.captureSummary.lastAliveAt > 0L) {
+                        UiDateHelper.formatDateTime(state.captureSummary.lastAliveAt)
+                    } else {
+                        "Not recorded yet"
+                    },
+                )
+
+                HorizontalDivider(color = ext.divider)
+
+                Text("M3a Sample Collection (${state.retainedSampleCount} retained)", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = redactTermsInput,
+                    onValueChange = { redactTermsInput = it },
+                    label = { Text("Extra names to redact (optional)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { exportSamplesLauncher.launch("wtrack-m3a-samples-anonymized.json") },
+                        enabled = !state.isBusy && state.retainedSampleCount > 0,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Export JSON") }
+                    OutlinedButton(
+                        onClick = viewModel::reparseRetainedM3aSamples,
+                        enabled = !state.isBusy && state.retainedSampleCount > 0,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Re-parse") }
+                    TextButton(
+                        onClick = viewModel::purgeRetainedM3aSamplesNow,
+                        enabled = !state.isBusy && state.retainedSampleCount > 0,
+                    ) { Text("Purge") }
+                }
+
+                HorizontalDivider(color = ext.divider)
+
+                Text("Parser updates", style = MaterialTheme.typography.titleMedium)
+                OutlinedButton(
+                    onClick = viewModel::scanReparseProposals,
+                    enabled = !state.isBusy,
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Scan retained events") }
+                state.reparseProposals.forEach { prop ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "${prop.sourceId} · Tx #${prop.transactionId} (v${prop.oldParserVersion} → v${prop.newParserVersion})",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.applyReparseProposal(prop) },
+                                enabled = !state.isBusy,
+                                shape = RoundedCornerShape(999.dp),
+                            ) { Text("Apply") }
+                            TextButton(
+                                onClick = { viewModel.dismissReparseProposal(prop.eventId) },
+                                enabled = !state.isBusy,
+                            ) { Text("Dismiss") }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = ext.divider)
+
+                Text("Gate G1 Evaluator", style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(value = jagoDays, onValueChange = { jagoDays = it }, label = { Text("Days") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = jagoA, onValueChange = { jagoA = it }, label = { Text("A") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = jagoB, onValueChange = { jagoB = it }, label = { Text("B") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(value = jagoC, onValueChange = { jagoC = it }, label = { Text("C") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = jagoD, onValueChange = { jagoD = it }, label = { Text("D") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = jagoWrong, onValueChange = { jagoWrong = it }, label = { Text("Wrong") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                OutlinedButton(
+                    onClick = {
+                        viewModel.evaluateGateG1(
+                            listOf(
+                                ProviderMeasurementInput(
+                                    providerName = "Provider Sample",
+                                    days = jagoDays.toIntOrNull() ?: 0,
+                                    statementTxCountA = jagoA.toIntOrNull() ?: 0,
+                                    capturedTxNotificationsB = jagoB.toIntOrNull() ?: 0,
+                                    usableNotificationsC = jagoC.toIntOrNull() ?: 0,
+                                    matchedStatementTxD = jagoD.toIntOrNull() ?: 0,
+                                    unexplainedWrongAmountOrDirection = jagoWrong.toIntOrNull() ?: 0,
+                                ),
+                            ),
+                        )
+                    },
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Check thresholds") }
+                state.gateG1Report?.let { rep ->
+                    Text("Verdict: ${rep.verdict.name} — ${rep.summary}", style = MaterialTheme.typography.bodyMedium)
+                }
+
+                HorizontalDivider(color = ext.divider)
+
+                Text("Capture gaps (${state.captureGaps.size})", style = MaterialTheme.typography.titleMedium)
+                if (state.captureGaps.isEmpty()) {
+                    Text("No capture gaps recorded.", style = MaterialTheme.typography.bodyMedium, color = ext.mutedText)
+                } else {
+                    state.captureGaps.take(10).forEach { gap ->
+                        Text(
+                            text = "${gap.reason.name} · ${UiDateHelper.formatDateTime(gap.startedAt)}",
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-            }
 
-            item(key = "providers") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("Initial PoC Provider Targets", style = MaterialTheme.typography.titleMedium)
-                        state.providerCatalog.forEachIndexed { idx, p ->
-                            val pkgInfo = if (p.verifiedPackageId != null) {
-                                val extra = if (p.candidatePackageIds.size > 1) " • all: ${p.candidatePackageIds.joinToString()}" else ""
-                                "verified: ${p.verifiedPackageId}$extra"
-                            } else {
-                                "ref: ${p.candidatePackageIds.joinToString()}"
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    text = "${p.priority}. ${p.displayName} (${p.verificationStatus}) • $pkgInfo",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = p.notes,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-                            if (idx < state.providerCatalog.lastIndex) {
-                                HorizontalDivider(color = ext.divider)
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "m3a") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("M3a Sample Collection", style = MaterialTheme.typography.titleMedium)
-                            StatusPill(
-                                label = "${state.retainedSampleCount} retained",
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                        }
-                        Text(
-                            text = "OTPs, PINs, and security notices are never retained. Exporting masks names, emails, phone numbers, and account/card numbers before writing JSON.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.mutedText,
-                        )
-                        OutlinedTextField(
-                            value = redactTermsInput,
-                            onValueChange = { redactTermsInput = it },
-                            label = { Text("Extra names/aliases to redact (comma-separated, optional)") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Button(
-                            onClick = { exportSamplesLauncher.launch("wtrack-m3a-samples-anonymized.json") },
-                            enabled = !state.isBusy && state.retainedSampleCount > 0,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Export Anonymized Samples (JSON)") }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            OutlinedButton(
-                                onClick = viewModel::reparseRetainedM3aSamples,
-                                enabled = !state.isBusy && state.retainedSampleCount > 0,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Re-parse") }
-                            OutlinedButton(
-                                onClick = viewModel::purgeRetainedM3aSamplesNow,
-                                enabled = !state.isBusy && state.retainedSampleCount > 0,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Purge Now") }
-                        }
-                    }
-                }
-            }
-
-            item(key = "par11") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("Parser Update Re-Parse Proposals (PAR-11)", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "Checks retained notifications (within verification window) against newer parser versions without touching user-edited transactions or user-set categories.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.mutedText,
-                        )
-                        OutlinedButton(
-                            onClick = viewModel::scanReparseProposals,
-                            enabled = !state.isBusy,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Scan Retained Events for Parser Updates") }
-                        state.reparseProposals.forEach { prop ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    Text(
-                                        text = "${prop.sourceId} • Tx #${prop.transactionId} (v${prop.oldParserVersion} → v${prop.newParserVersion})",
-                                        style = MaterialTheme.typography.labelLarge,
-                                    )
-                                    Text(
-                                        text = "Amount: ${prop.currentAmountMinor} → ${prop.proposedAmountMinor} ${prop.currency}\n" +
-                                            "Dir/Type: ${prop.currentDirection}/${prop.currentType} → ${prop.proposedDirection}/${prop.proposedType}\n" +
-                                            "Desc: ${prop.currentDescription ?: "-"} → ${prop.proposedDescription ?: "-"}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(
-                                            onClick = { viewModel.applyReparseProposal(prop) },
-                                            enabled = !state.isBusy,
-                                            shape = RoundedCornerShape(10.dp),
-                                        ) { Text("Apply Update") }
-                                        TextButton(
-                                            onClick = { viewModel.dismissReparseProposal(prop.eventId) },
-                                            enabled = !state.isBusy,
-                                        ) { Text("Dismiss") }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "g1") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("Gate G1 Evaluator (Appendix C)", style = MaterialTheme.typography.titleMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OutlinedTextField(
-                                value = jagoDays,
-                                onValueChange = { jagoDays = it },
-                                label = { Text("Days") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = jagoA,
-                                onValueChange = { jagoA = it },
-                                label = { Text("A (Stmt)") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = jagoB,
-                                onValueChange = { jagoB = it },
-                                label = { Text("B (Capt)") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OutlinedTextField(
-                                value = jagoC,
-                                onValueChange = { jagoC = it },
-                                label = { Text("C (Usable)") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = jagoD,
-                                onValueChange = { jagoD = it },
-                                label = { Text("D (Matched)") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = jagoWrong,
-                                onValueChange = { jagoWrong = it },
-                                label = { Text("Wrong") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.evaluateGateG1(
-                                    listOf(
-                                        ProviderMeasurementInput(
-                                            providerName = "Provider Sample",
-                                            days = jagoDays.toIntOrNull() ?: 0,
-                                            statementTxCountA = jagoA.toIntOrNull() ?: 0,
-                                            capturedTxNotificationsB = jagoB.toIntOrNull() ?: 0,
-                                            usableNotificationsC = jagoC.toIntOrNull() ?: 0,
-                                            matchedStatementTxD = jagoD.toIntOrNull() ?: 0,
-                                            unexplainedWrongAmountOrDirection = jagoWrong.toIntOrNull() ?: 0,
-                                        ),
-                                    ),
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Check Thresholds") }
-
-                        state.gateG1Report?.let { rep ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Text(
-                                        text = "Verdict: ${rep.verdict.name} — ${rep.summary}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                    )
-                                    rep.providerResults.forEach { res ->
-                                        val cov = String.format(Locale.US, "%.1f%%", res.coverage * 100)
-                                        val comp = String.format(Locale.US, "%.1f%%", res.completeness * 100)
-                                        Text(
-                                            text = "Coverage=$cov, Completeness=$comp, Blocking=${res.blockingReasons}",
-                                            style = MaterialTheme.typography.bodySmall.tabularNums(),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "gaps-hdr") {
-                SectionHeader(
-                    title = "Capture Gaps",
-                    trailingText = "${state.captureGaps.size}",
-                )
-            }
-            if (state.captureGaps.isEmpty()) {
-                item(key = "gaps-empty") {
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "No open or recent capture gaps recorded.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.mutedText,
-                            modifier = Modifier.padding(14.dp),
-                        )
-                    }
-                }
-            } else {
-                items(state.captureGaps.take(10), key = { it.id }) { gap ->
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(gap.reason.name, style = MaterialTheme.typography.labelLarge)
-                                Text(
-                                    text = "${UiDateHelper.formatDateTime(gap.startedAt)} → ${gap.endedAt?.let { UiDateHelper.formatDateTime(it) } ?: "OPEN"}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-                            if (gap.endedAt == null) {
-                                StatusPill(
-                                    label = "OPEN",
-                                    containerColor = ext.warningContainer,
-                                    contentColor = ext.onWarningContainer,
-                                    borderColor = ext.warningBorder,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "logs-hdr") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Non-Sensitive Logs (7d)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Row {
-                        TextButton(onClick = viewModel::refreshDiagnostics) { Text("Refresh") }
-                        TextButton(onClick = viewModel::clearDiagnosticLogs) { Text("Clear") }
-                    }
+                    Text("Logs (7d)", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = viewModel::clearDiagnosticLogs) { Text("Clear") }
                 }
-            }
-            if (state.diagnosticLogs.isNotEmpty()) {
-                item(key = "logs-box") {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, ext.cardBorder),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            state.diagnosticLogs.forEach { line ->
-                                Text(
-                                    text = line,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
+                state.diagnosticLogs.take(20).forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -865,7 +800,7 @@ private fun DiagnosticsKvRow(label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = WtrackTheme.colors.mutedText)
-        Text(value, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = WtrackTheme.colors.mutedText)
+        Text(value, style = MaterialTheme.typography.labelLarge)
     }
 }

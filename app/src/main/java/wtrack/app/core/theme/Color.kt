@@ -9,55 +9,55 @@ import wtrack.app.domain.model.AccountType
 
 private val mdLightPrimary = Color(0xFF0B6E63)
 private val mdLightOnPrimary = Color(0xFFFFFFFF)
-private val mdLightPrimaryContainer = Color(0xFFD8F3EE)
+private val mdLightPrimaryContainer = Color(0xFFE6F3F1)
 private val mdLightOnPrimaryContainer = Color(0xFF06403A)
 private val mdLightSecondary = Color(0xFF4E615D)
 private val mdLightOnSecondary = Color(0xFFFFFFFF)
-private val mdLightSecondaryContainer = Color(0xFFEAF2F0)
+private val mdLightSecondaryContainer = Color(0xFFF2F5F4)
 private val mdLightOnSecondaryContainer = Color(0xFF101C1A)
-private val mdLightTertiary = Color(0xFF3B6790)
+private val mdLightTertiary = Color(0xFF5E7C78)
 private val mdLightOnTertiary = Color(0xFFFFFFFF)
-private val mdLightTertiaryContainer = Color(0xFFE6F0FA)
-private val mdLightOnTertiaryContainer = Color(0xFF1E4263)
-private val mdLightError = Color(0xFFD94848)
+private val mdLightTertiaryContainer = Color(0xFFEBF1F0)
+private val mdLightOnTertiaryContainer = Color(0xFF101C1A)
+private val mdLightError = Color(0xFFC93B3B)
 private val mdLightOnError = Color(0xFFFFFFFF)
 private val mdLightErrorContainer = Color(0xFFFDECEC)
 private val mdLightOnErrorContainer = Color(0xFF8C1D1D)
-private val mdLightBackground = Color(0xFFF4F7F6)
+private val mdLightBackground = Color(0xFFFFFFFF)
 private val mdLightOnBackground = Color(0xFF101C1A)
 private val mdLightSurface = Color(0xFFFFFFFF)
 private val mdLightOnSurface = Color(0xFF101C1A)
-private val mdLightSurfaceVariant = Color(0xFFEAF2F0)
-private val mdLightOnSurfaceVariant = Color(0xFF4E615D)
+private val mdLightSurfaceVariant = Color(0xFFF2F5F4)
+private val mdLightOnSurfaceVariant = Color(0xFF6B7D79)
 private val mdLightOutline = Color(0xFFCBD7D4)
-private val mdLightOutlineVariant = Color(0xFFE3EAE8)
+private val mdLightOutlineVariant = Color(0xFFE6ECEA)
 
-private val mdDarkPrimary = Color(0xFF3ED6C3)
+private val mdDarkPrimary = Color(0xFF1FA392)
 private val mdDarkOnPrimary = Color(0xFF042B26)
-private val mdDarkPrimaryContainer = Color(0xFF154740)
+private val mdDarkPrimaryContainer = Color(0xFF153430)
 private val mdDarkOnPrimaryContainer = Color(0xFF7CF0E1)
-private val mdDarkSecondary = Color(0xFF9EB2AE)
-private val mdDarkOnSecondary = Color(0xFF0D1413)
-private val mdDarkSecondaryContainer = Color(0xFF1E2C2A)
-private val mdDarkOnSecondaryContainer = Color(0xFFEFF5F3)
-private val mdDarkTertiary = Color(0xFF7CC4FA)
+private val mdDarkSecondary = Color(0xFF8A9E9A)
+private val mdDarkOnSecondary = Color(0xFF0B1413)
+private val mdDarkSecondaryContainer = Color(0xFF152220)
+private val mdDarkOnSecondaryContainer = Color(0xFFF2F7F6)
+private val mdDarkTertiary = Color(0xFF5E7C78)
 private val mdDarkOnTertiary = Color(0xFF082238)
-private val mdDarkTertiaryContainer = Color(0xFF142B42)
+private val mdDarkTertiaryContainer = Color(0xFF152220)
 private val mdDarkOnTertiaryContainer = Color(0xFFCBE5FF)
-private val mdDarkError = Color(0xFFF87171)
+private val mdDarkError = Color(0xFFE56B6B)
 private val mdDarkOnError = Color(0xFF450A0A)
 private val mdDarkErrorContainer = Color(0xFF381616)
 private val mdDarkOnErrorContainer = Color(0xFFFECACA)
-private val mdDarkBackground = Color(0xFF0D1413)
-private val mdDarkOnBackground = Color(0xFFEFF5F3)
-private val mdDarkSurface = Color(0xFF16201F)
-private val mdDarkOnSurface = Color(0xFFEFF5F3)
-private val mdDarkSurfaceVariant = Color(0xFF1E2C2A)
-private val mdDarkOnSurfaceVariant = Color(0xFF9EB2AE)
-private val mdDarkOutline = Color(0xFF2D3E3C)
-private val mdDarkOutlineVariant = Color(0xFF243331)
+private val mdDarkBackground = Color(0xFF0B1413)
+private val mdDarkOnBackground = Color(0xFFF2F7F6)
+private val mdDarkSurface = Color(0xFF0B1413)
+private val mdDarkOnSurface = Color(0xFFF2F7F6)
+private val mdDarkSurfaceVariant = Color(0xFF152220)
+private val mdDarkOnSurfaceVariant = Color(0xFF8A9E9A)
+private val mdDarkOutline = Color(0xFF243331)
+private val mdDarkOutlineVariant = Color(0xFF1C2B29)
 
-/** Material 3 light color scheme aligned with the FigCraft Calm Precision Fintech spec. */
+/** Material 3 light color scheme aligned with V2 Minimal. */
 val LightColors = lightColorScheme(
     primary = mdLightPrimary,
     onPrimary = mdLightOnPrimary,
@@ -84,13 +84,13 @@ val LightColors = lightColorScheme(
     outline = mdLightOutline,
     outlineVariant = mdLightOutlineVariant,
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF4F7F6),
+    surfaceContainerLow = Color(0xFFF7F9F8),
     surfaceContainer = Color(0xFFFFFFFF),
-    surfaceContainerHigh = Color(0xFFEAF2F0),
-    surfaceContainerHighest = Color(0xFFE3EAE8),
+    surfaceContainerHigh = Color(0xFFF2F5F4),
+    surfaceContainerHighest = Color(0xFFE6ECEA),
 )
 
-/** Material 3 dark color scheme aligned with the FigCraft Dark Mode showcase. */
+/** Material 3 dark color scheme aligned with V2 Minimal Dark Mode. */
 val DarkColors = darkColorScheme(
     primary = mdDarkPrimary,
     onPrimary = mdDarkOnPrimary,
@@ -116,11 +116,11 @@ val DarkColors = darkColorScheme(
     onSurfaceVariant = mdDarkOnSurfaceVariant,
     outline = mdDarkOutline,
     outlineVariant = mdDarkOutlineVariant,
-    surfaceContainerLowest = Color(0xFF0D1413),
-    surfaceContainerLow = Color(0xFF141D1C),
-    surfaceContainer = Color(0xFF16201F),
-    surfaceContainerHigh = Color(0xFF1E2C2A),
-    surfaceContainerHighest = Color(0xFF243331),
+    surfaceContainerLowest = Color(0xFF0B1413),
+    surfaceContainerLow = Color(0xFF101C1A),
+    surfaceContainer = Color(0xFF131E1D),
+    surfaceContainerHigh = Color(0xFF152220),
+    surfaceContainerHighest = Color(0xFF1C2B29),
 )
 
 /**
@@ -163,7 +163,7 @@ data class WtrackExtendedColors(
 
 val LightWtrackExtendedColors = WtrackExtendedColors(
     heroGradientStart = Color(0xFF0B6E63),
-    heroGradientEnd = Color(0xFF064740),
+    heroGradientEnd = Color(0xFF0B6E63),
     heroBorder = Color(0xFF0B6E63),
     heroLabel = Color(0xFFB9E8E1),
     heroMutedText = Color(0xFF9AD6CE),
@@ -171,76 +171,76 @@ val LightWtrackExtendedColors = WtrackExtendedColors(
     heroExpenseText = Color(0xFFFFD5D0),
     heroPillContainer = Color(0x22FFFFFF),
     heroPillText = Color(0xFF74F8E7),
-    inflow = Color(0xFF0E8A5F),
-    inflowContainer = Color(0xFFE2F7EE),
-    onInflowContainer = Color(0xFF065238),
+    inflow = Color(0xFF0B6E63),
+    inflowContainer = Color(0xFFE6F3F1),
+    onInflowContainer = Color(0xFF06403A),
     warning = Color(0xFFC87A0A),
-    warningContainer = Color(0xFFFEF3DC),
-    warningBorder = Color(0xFFF3C97A),
+    warningContainer = Color(0xFFFEF6E6),
+    warningBorder = Color(0xFFF3D59B),
     warningBadgeBg = Color(0xFFF9DDA2),
     onWarningContainer = Color(0xFF7A4600),
-    transfer = Color(0xFF3B6790),
-    transferContainer = Color(0xFFE6F0FA),
-    onTransferContainer = Color(0xFF1E4263),
-    mutedText = Color(0xFF7A8D89),
-    divider = Color(0xFFEDF2F0),
-    cardBorder = Color(0xFFE3EAE8),
+    transfer = Color(0xFF4E615D),
+    transferContainer = Color(0xFFF2F5F4),
+    onTransferContainer = Color(0xFF101C1A),
+    mutedText = Color(0xFF8A9995),
+    divider = Color(0xFFE6ECEA),
+    cardBorder = Color(0xFFE6ECEA),
     navBarSurface = Color(0xFFFFFFFF),
-    totalBalanceCardBg = Color(0xFF142624),
-    totalBalanceCardMuted = Color(0xFFA8C2BE),
-    infoTintBg = Color(0xFFEBF7F4),
-    infoTintBorder = Color(0xFFB8E3D9),
-    infoTintText = Color(0xFF06403A),
+    totalBalanceCardBg = Color(0xFF0E2421),
+    totalBalanceCardMuted = Color(0xFF9BB5B0),
+    infoTintBg = Color(0xFFF7F9F8),
+    infoTintBorder = Color(0xFFE6ECEA),
+    infoTintText = Color(0xFF101C1A),
     categoryPalette = listOf(
         Color(0xFF0B6E63),
-        Color(0xFF4C6B94),
-        Color(0xFF2F9CC9),
-        Color(0xFF7B61B8),
-        Color(0xFF0E8A5F),
-        Color(0xFFC25975),
+        Color(0xFF5E7C78),
+        Color(0xFFCBD7D4),
+        Color(0xFF8FA8A4),
+        Color(0xFF3E635E),
+        Color(0xFFB3C4C0),
     ),
-    uncategorizedChartColor = Color(0xFFE69500),
+    uncategorizedChartColor = Color(0xFFC87A0A),
 )
 
 val DarkWtrackExtendedColors = WtrackExtendedColors(
-    heroGradientStart = Color(0xFF0C3B35),
-    heroGradientEnd = Color(0xFF072622),
-    heroBorder = Color(0xFF1B5E54),
+    heroGradientStart = Color(0xFF0B6E63),
+    heroGradientEnd = Color(0xFF0B6E63),
+    heroBorder = Color(0xFF1C2B29),
     heroLabel = Color(0xFF9AD6CE),
-    heroMutedText = Color(0xFF8FB5AF),
-    heroIncomeText = Color(0xFF34D399),
-    heroExpenseText = Color(0xFFFCA5A5),
+    heroMutedText = Color(0xFF8A9E9A),
+    heroIncomeText = Color(0xFF1FA392),
+    heroExpenseText = Color(0xFFE56B6B),
     heroPillContainer = Color(0x18FFFFFF),
-    heroPillText = Color(0xFF3ED6C3),
-    inflow = Color(0xFF34D399),
-    inflowContainer = Color(0xFF0E3328),
-    onInflowContainer = Color(0xFF6EE7B7),
-    warning = Color(0xFFFBBF24),
-    warningContainer = Color(0xFF33250B),
-    warningBorder = Color(0xFF664912),
+    heroPillText = Color(0xFF1FA392),
+    inflow = Color(0xFF1FA392),
+    inflowContainer = Color(0xFF153430),
+    onInflowContainer = Color(0xFF7CF0E1),
+    warning = Color(0xFFE69B2E),
+    warningContainer = Color(0xFF2B2110),
+    warningBorder = Color(0xFF594119),
     warningBadgeBg = Color(0xFF4D3710),
     onWarningContainer = Color(0xFFFDE68A),
-    transfer = Color(0xFF7CC4FA),
-    transferContainer = Color(0xFF142B42),
-    onTransferContainer = Color(0xFF93C5FD),
-    mutedText = Color(0xFF6C807C),
-    divider = Color(0xFF243331),
-    cardBorder = Color(0xFF243331),
-    navBarSurface = Color(0xFF141D1C),
-    totalBalanceCardBg = Color(0xFF0B2522),
-    totalBalanceCardMuted = Color(0xFF8FB5AF),
-    infoTintBg = Color(0xFF112D29),
-    infoTintBorder = Color(0xFF1F544C),
-    infoTintText = Color(0xFF9AD6CE),
+    transfer = Color(0xFF8A9E9A),
+    transferContainer = Color(0xFF152220),
+    onTransferContainer = Color(0xFFF2F7F6),
+    mutedText = Color(0xFF6B7D79),
+    divider = Color(0xFF1C2B29),
+    cardBorder = Color(0xFF1C2B29),
+    navBarSurface = Color(0xFF0B1413),
+    totalBalanceCardBg = Color(0xFF122623),
+    totalBalanceCardMuted = Color(0xFF8A9E9A),
+    infoTintBg = Color(0xFF131E1D),
+    infoTintBorder = Color(0xFF1C2B29),
+    infoTintText = Color(0xFFF2F7F6),
     categoryPalette = listOf(
-        Color(0xFF3ED6C3),
-        Color(0xFF60A5FA),
-        Color(0xFF38BDF8),
-        Color(0xFFA78BFA),
-        Color(0xFF34D399),
-        Color(0xFFF472B6),
+        Color(0xFF1FA392),
+        Color(0xFF5E7C78),
+        Color(0xFF3A4E4B),
+        Color(0xFF7FA39E),
+        Color(0xFF4E6B66),
+        Color(0xFF2B3D3A),
     ),
-    uncategorizedChartColor = Color(0xFFFBBF24),
+    uncategorizedChartColor = Color(0xFFE69B2E),
 )
 
 val LocalWtrackColors = staticCompositionLocalOf { LightWtrackExtendedColors }

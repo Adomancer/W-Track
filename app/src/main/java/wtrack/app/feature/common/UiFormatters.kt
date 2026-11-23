@@ -37,20 +37,22 @@ import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.MoneyFormatter
 
 object UiDateHelper {
-    fun formatDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
-        val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.getDefault())
-        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
-    }
+    private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH)
+    private val dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
+    private val timeOnlyFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
+    private val dayMonthFormatter = DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)
+    private val editableDateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
+    private val monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
+    private val shortMonthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
 
-    fun formatDate(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
-        val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.getDefault())
-        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
-    }
+    fun formatDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(dateTimeFormatter)
 
-    fun formatTimeOnly(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
-        val formatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
-        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
-    }
+    fun formatDate(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(dateFormatter)
+
+    fun formatTimeOnly(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(timeOnlyFormatter)
 
     fun formatDayGroupHeader(
         epochMillis: Long,
@@ -59,14 +61,13 @@ object UiDateHelper {
     ): String {
         val txDate = Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalDate()
         val today = Instant.ofEpochMilli(nowEpochMillis).atZone(zoneId).toLocalDate()
-        val dayMonth = txDate.format(DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)).uppercase(Locale.ENGLISH)
         return when (txDate) {
-            today -> "TODAY · $dayMonth"
-            today.minusDays(1) -> "YESTERDAY · $dayMonth"
+            today -> "Today"
+            today.minusDays(1) -> "Yesterday"
             else -> if (txDate.year == today.year) {
-                dayMonth
+                txDate.format(dayMonthFormatter)
             } else {
-                txDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)).uppercase(Locale.ENGLISH)
+                txDate.format(dateFormatter)
             }
         }
     }
@@ -79,28 +80,23 @@ object UiDateHelper {
         val diffDays = ((nowEpochMillis - epochMillis) / 86_400_000L).coerceAtLeast(0L)
         return when {
             diffDays == 0L -> "Today"
-            diffDays == 1L -> "1d ago"
-            else -> "${diffDays}d ago"
+            diffDays == 1L -> "1 day ago"
+            else -> "$diffDays days ago"
         }
     }
 
-    fun formatEditableDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String {
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
-        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
-    }
+    fun formatEditableDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(editableDateTimeFormatter)
 
     fun parseEditableDateTime(input: String, zoneId: ZoneId = ZoneId.systemDefault()): Long? {
         val trimmed = input.trim()
         if (trimmed.isEmpty()) return null
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
         return runCatching {
-            java.time.LocalDateTime.parse(trimmed, formatter).atZone(zoneId).toInstant().toEpochMilli()
+            java.time.LocalDateTime.parse(trimmed, editableDateTimeFormatter).atZone(zoneId).toInstant().toEpochMilli()
         }.getOrNull()
     }
 
     fun monthWindow(nowEpochMillis: Long, monthOffset: Int, zoneId: ZoneId = ZoneId.systemDefault()): MonthWindow {
-        val monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
-        val shortMonthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
         val currentMonth = Instant.ofEpochMilli(nowEpochMillis).atZone(zoneId).toLocalDate()
         val targetYm = YearMonth.from(currentMonth).plusMonths(monthOffset.toLong())
         val prevYm = targetYm.minusMonths(1)

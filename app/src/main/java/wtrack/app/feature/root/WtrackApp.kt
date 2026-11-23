@@ -3,6 +3,13 @@ package wtrack.app.feature.root
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
@@ -29,19 +37,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -62,6 +72,7 @@ import wtrack.app.feature.insights.InsightsScreen
 import wtrack.app.feature.insights.InsightsViewModel
 import wtrack.app.feature.review.ReviewScreen
 import wtrack.app.feature.review.ReviewViewModel
+import wtrack.app.feature.settings.AboutScreen
 import wtrack.app.feature.settings.CategoriesScreen
 import wtrack.app.feature.settings.CustomParsersScreen
 import wtrack.app.feature.settings.CustomParsersViewModel
@@ -80,6 +91,7 @@ private sealed class WtrackRoute(val route: String, val label: String, val icon:
     data object Rules : WtrackRoute("rules", "Rules")
     data object Categories : WtrackRoute("categories", "Categories")
     data object Diagnostics : WtrackRoute("diagnostics", "Diagnostics")
+    data object About : WtrackRoute("about", "About")
     data object CustomParsers : WtrackRoute("custom_parsers?sourceId={sourceId}", "Parsers")
     data object TransactionDetail : WtrackRoute("transaction_detail/{txId}", "Detail")
 }
@@ -91,9 +103,11 @@ private val topLevelTabs = listOf(
     WtrackRoute.Insights,
 )
 
+private val topLevelRouteSet = topLevelTabs.map { it.route }.toSet()
+
 @Composable
 fun WtrackApp(rootViewModel: MainRootViewModel = hiltViewModel()) {
-    val rootState by rootViewModel.uiState.collectAsState()
+    val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = LocalActivity.current
 
@@ -208,23 +222,29 @@ private fun WtrackMainScaffold(
                             val selected = currentRoute == tab.route
                             NavigationBarItem(
                                 selected = selected,
-                                onClick = { navigateSingleTop(tab.route) },
+                                onClick = {
+                                    if (currentRoute != tab.route) {
+                                        navigateSingleTop(tab.route)
+                                    }
+                                },
                                 icon = {
                                     Icon(
                                         imageVector = tab.icon!!,
                                         contentDescription = tab.label,
+                                        modifier = Modifier.size(21.dp),
                                     )
                                 },
                                 label = {
                                     Text(
                                         text = tab.label,
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedIconColor = MaterialTheme.colorScheme.onBackground,
+                                    selectedTextColor = MaterialTheme.colorScheme.onBackground,
+                                    indicatorColor = Color.Transparent,
                                     unselectedIconColor = WtrackTheme.colors.mutedText,
                                     unselectedTextColor = WtrackTheme.colors.mutedText,
                                 ),
@@ -244,7 +264,7 @@ private fun WtrackMainScaffold(
                 WtrackCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
                 ) {
@@ -253,7 +273,7 @@ private fun WtrackMainScaffold(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = "Backup restored — grant Notification Access to resume capture (ING-02).",
+                            text = "Backup restored — grant Notification Access to resume capture.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
@@ -262,8 +282,8 @@ private fun WtrackMainScaffold(
                                 onClick = {
                                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                                 },
-                                shape = RoundedCornerShape(10.dp),
-                            ) { Text("Grant Notification Access") }
+                                shape = RoundedCornerShape(999.dp),
+                            ) { Text("Allow access") }
                             TextButton(onClick = onDismissPostRestorePrompt) { Text("Dismiss") }
                         }
                     }
@@ -273,6 +293,54 @@ private fun WtrackMainScaffold(
                 navController = navController,
                 startDestination = WtrackRoute.Dashboard.route,
                 modifier = Modifier.weight(1f),
+                enterTransition = {
+                    val isTabSwitch = initialState.destination.route in topLevelRouteSet &&
+                        targetState.destination.route in topLevelRouteSet
+                    if (isTabSwitch) {
+                        fadeIn(animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing))
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = tween(durationMillis = 210, easing = FastOutSlowInEasing),
+                            initialOffsetX = { fullWidth -> fullWidth / 5 },
+                        ) + fadeIn(animationSpec = tween(durationMillis = 170))
+                    }
+                },
+                exitTransition = {
+                    val isTabSwitch = initialState.destination.route in topLevelRouteSet &&
+                        targetState.destination.route in topLevelRouteSet
+                    if (isTabSwitch) {
+                        fadeOut(animationSpec = tween(durationMillis = 90, easing = LinearOutSlowInEasing))
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing),
+                            targetOffsetX = { fullWidth -> -fullWidth / 10 },
+                        ) + fadeOut(animationSpec = tween(durationMillis = 130))
+                    }
+                },
+                popEnterTransition = {
+                    val isTabSwitch = initialState.destination.route in topLevelRouteSet &&
+                        targetState.destination.route in topLevelRouteSet
+                    if (isTabSwitch) {
+                        fadeIn(animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing))
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                            initialOffsetX = { fullWidth -> -fullWidth / 10 },
+                        ) + fadeIn(animationSpec = tween(durationMillis = 160))
+                    }
+                },
+                popExitTransition = {
+                    val isTabSwitch = initialState.destination.route in topLevelRouteSet &&
+                        targetState.destination.route in topLevelRouteSet
+                    if (isTabSwitch) {
+                        fadeOut(animationSpec = tween(durationMillis = 90, easing = LinearOutSlowInEasing))
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                            targetOffsetX = { fullWidth -> fullWidth / 5 },
+                        ) + fadeOut(animationSpec = tween(durationMillis = 130))
+                    }
+                },
             ) {
                 composable(WtrackRoute.Dashboard.route) {
                     DashboardScreen(
@@ -323,7 +391,11 @@ private fun WtrackMainScaffold(
                         onOpenCategories = { navController.navigate(WtrackRoute.Categories.route) },
                         onOpenDiagnostics = { navController.navigate(WtrackRoute.Diagnostics.route) },
                         onOpenCustomParsers = { navController.navigate("custom_parsers") },
+                        onOpenAbout = { navController.navigate(WtrackRoute.About.route) },
                     )
+                }
+                composable(WtrackRoute.About.route) {
+                    AboutScreen(onBack = { navController.popBackStack() })
                 }
                 composable(
                     route = WtrackRoute.CustomParsers.route,

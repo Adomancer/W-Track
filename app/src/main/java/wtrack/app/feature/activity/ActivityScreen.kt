@@ -1,6 +1,7 @@
 package wtrack.app.feature.activity
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,30 +14,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,12 +45,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,10 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.abs
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
@@ -70,15 +70,16 @@ import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.feature.common.ActionFeedbackBanner
-import wtrack.app.feature.common.AvatarCircle
 import wtrack.app.feature.common.MoneyAmountTextField
-import wtrack.app.feature.common.ProviderBadgeAvatar
 import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.UiDateHelper
-import wtrack.app.feature.common.WtrackCard
+import wtrack.app.feature.common.V2CircleIconButton
+import wtrack.app.feature.common.V2StatusDot
+import wtrack.app.feature.common.V2TransactionRow
 import wtrack.app.feature.common.WtrackTopBar
 import wtrack.app.feature.common.formatCurrency
 import wtrack.app.feature.common.isValidMoneyInput
+import wtrack.app.feature.common.v2CategoryIcon
 import wtrack.integration.Direction
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -87,28 +88,19 @@ fun ActivityScreen(
     viewModel: ActivityViewModel,
     onOpenTransaction: (Long) -> Unit,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
     var showCreateSheet by remember { mutableStateOf(false) }
     var showFiltersSheet by remember { mutableStateOf(false) }
-    var showDateMenu by remember { mutableStateOf(false) }
-    var showAccountMenu by remember { mutableStateOf(false) }
 
-    val advancedFilterCount = listOfNotNull(
-        state.filter.type,
-        state.filter.categoryId,
-        state.filter.tagId,
-        state.filter.direction,
-    ).size
-    val uncategorizedId = remember(state.categories) {
-        state.categories.firstOrNull { it.systemKey == "UNCATEGORIZED" }?.id
-    }
-    val uncategorizedCount = remember(state.allItems, uncategorizedId) {
-        state.allItems.count {
-            it.transaction.status == TransactionStatus.CONFIRMED &&
-                (it.transaction.categoryId == null || it.transaction.categoryId == uncategorizedId)
-        }
-    }
+    val hasActiveFilter = state.filter.dateFilter != ActivityDateFilter.ALL ||
+        state.filter.accountId != null ||
+        state.filter.uncategorizedOnly ||
+        state.filter.showVoided ||
+        state.filter.type != null ||
+        state.filter.categoryId != null ||
+        state.filter.tagId != null ||
+        state.filter.direction != null
 
     val groupedByDay = remember(state.items) {
         state.items.groupBy { UiDateHelper.localDateOf(it.transaction.occurredAt) }
@@ -116,422 +108,215 @@ fun ActivityScreen(
             .toList()
     }
 
-    val netOutflowMinor = remember(state.items, state.baseCurrency) {
-        state.items
-            .asSequence()
-            .filter {
-                it.transaction.status == TransactionStatus.CONFIRMED &&
-                    it.transaction.currency.equals(state.baseCurrency, ignoreCase = true) &&
-                    it.transferPair == null &&
-                    it.transaction.transactionType != DomainTransactionType.ADJUSTMENT &&
-                    it.transaction.direction == Direction.OUTFLOW
-            }
-            .sumOf { it.transaction.amountMinor }
-    }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            if (state.accounts.isNotEmpty()) {
-                FloatingActionButton(
-                    onClick = { showCreateSheet = true },
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = "Add manual transaction")
-                }
-            }
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (state.actionMessage != null) {
-                item {
-                    ActionFeedbackBanner(
-                        message = state.actionMessage!!,
-                        onDismiss = viewModel::clearMessage,
-                    )
-                }
-            }
-
-            // Header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Activity",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Surface(
-                        color = if (advancedFilterCount > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(999.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            if (advancedFilterCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        ),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickable { showFiltersSheet = true },
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Tune,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = if (advancedFilterCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = if (advancedFilterCount > 0) "Filters ($advancedFilterCount)" else "Filters",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (advancedFilterCount > 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Rounded tonal search field
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    OutlinedTextField(
-                        value = state.filter.query,
-                        onValueChange = { q -> viewModel.updateFilter { it.copy(query = q) } },
-                        placeholder = {
-                            Text(
-                                text = "Search merchant, account, #tag...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ext.mutedText,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingIcon = {
-                            if (state.filter.query.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { viewModel.updateFilter { it.copy(query = "") } },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Close,
-                                        contentDescription = "Clear search",
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-
-            // Single smart filter chip row (decluttered vs 5 stacked rows)
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        Box {
-                            val activeDate = state.filter.dateFilter != ActivityDateFilter.ALL
-                            FilterChip(
-                                selected = activeDate,
-                                onClick = { showDateMenu = true },
-                                label = { Text("${state.filter.dateFilter.label} ▾") },
-                                shape = RoundedCornerShape(999.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                ),
-                            )
-                            DropdownMenu(expanded = showDateMenu, onDismissRequest = { showDateMenu = false }) {
-                                ActivityDateFilter.entries.forEach { range ->
-                                    DropdownMenuItem(
-                                        text = { Text(range.label) },
-                                        onClick = {
-                                            showDateMenu = false
-                                            viewModel.updateFilter { it.copy(dateFilter = range) }
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    item {
-                        Box {
-                            val selectedAccName = state.accounts.firstOrNull { it.id == state.filter.accountId }?.name
-                            FilterChip(
-                                selected = selectedAccName != null,
-                                onClick = { showAccountMenu = true },
-                                label = { Text((selectedAccName ?: "All Accounts") + " ▾") },
-                                shape = RoundedCornerShape(999.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                ),
-                            )
-                            DropdownMenu(expanded = showAccountMenu, onDismissRequest = { showAccountMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("All Accounts") },
-                                    onClick = {
-                                        showAccountMenu = false
-                                        viewModel.updateFilter { it.copy(accountId = null) }
-                                    },
-                                )
-                                state.accounts.forEach { acc ->
-                                    DropdownMenuItem(
-                                        text = { Text(acc.name) },
-                                        onClick = {
-                                            showAccountMenu = false
-                                            viewModel.updateFilter { it.copy(accountId = acc.id) }
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    item {
-                        val uncatLabel = if (uncategorizedCount > 0) "Uncategorized ($uncategorizedCount)" else "Uncategorized"
-                        FilterChip(
-                            selected = state.filter.uncategorizedOnly,
-                            onClick = { viewModel.updateFilter { it.copy(uncategorizedOnly = !it.uncategorizedOnly) } },
-                            label = { Text(uncatLabel) },
-                            shape = RoundedCornerShape(999.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = if (uncategorizedCount > 0) ext.warningContainer else MaterialTheme.colorScheme.surface,
-                                labelColor = if (uncategorizedCount > 0) ext.onWarningContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                selectedContainerColor = ext.warning,
-                                selectedLabelColor = Color.White,
-                            ),
-                        )
-                    }
-
-                    item {
-                        FilterChip(
-                            selected = state.filter.showVoided,
-                            onClick = { viewModel.updateFilter { it.copy(showVoided = !it.showVoided) } },
-                            label = { Text("Voided") },
-                            shape = RoundedCornerShape(999.dp),
-                        )
-                    }
-                }
-            }
-
-            // Meta strip
-            item {
-                Text(
-                    text = "${state.items.size} transaction(s) · Outflow ${formatCurrency(netOutflowMinor, state.baseCurrency)}",
-                    style = MaterialTheme.typography.labelMedium.tabularNums(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        if (state.actionMessage != null) {
+            item(key = "msg") {
+                ActionFeedbackBanner(
+                    message = state.actionMessage!!,
+                    onDismiss = viewModel::clearMessage,
                 )
             }
+        }
 
-            // Auto-suggested inter-account transfer pairs
-            if (state.transferSuggestions.isNotEmpty()) {
-                item {
-                    WtrackCard(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Text(
-                                text = "Possible Transfers (${state.transferSuggestions.size})",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            state.transferSuggestions.forEachIndexed { idx, item ->
-                                if (idx > 0) {
-                                    HorizontalDivider(color = ext.divider)
-                                }
-                                val s = item.suggestion
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onOpenTransaction(s.outgoing.id) },
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(
-                                        modifier = Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                                    ) {
-                                        Text(
-                                            text = "${item.outgoingAccountName} → ${item.incomingAccountName}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        val feeNote = if (s.estimatedFeeMinor > 0L) {
-                                            " · Fee ${formatCurrency(s.estimatedFeeMinor, s.outgoing.currency)}"
-                                        } else {
-                                            ""
-                                        }
-                                        Text(
-                                            text = "${formatCurrency(s.incoming.amountMinor, s.incoming.currency)}$feeNote · ${UiDateHelper.formatDateTime(s.outgoing.occurredAt)}",
-                                            style = MaterialTheme.typography.bodySmall.tabularNums(),
-                                            color = ext.mutedText,
-                                        )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        TextButton(
-                                            onClick = { viewModel.dismissTransferSuggestion(s.outgoing.id, s.incoming.id) },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                        ) {
-                                            Text("Dismiss")
-                                        }
-                                        Button(
-                                            onClick = { viewModel.confirmTransferSuggestion(s) },
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        ) {
-                                            Text("Link")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+        // Top Bar: Title + circular "+" button
+        item(key = "top-bar") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Activity",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                if (state.accounts.isNotEmpty()) {
+                    V2CircleIconButton(
+                        icon = Icons.Outlined.Add,
+                        contentDescription = "Add transaction",
+                        onClick = { showCreateSheet = true },
+                    )
                 }
             }
+        }
 
-            // Read-only derived transfer fee rows (TRF-04)
-            if (state.derivedFees.isNotEmpty()) {
-                item {
-                    WtrackCard(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
+        // Pill search field + circular filter icon
+        item(key = "search-filter") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (state.filter.query.isEmpty()) {
                             Text(
-                                text = "Derived Transfer Fees (Read-Only)",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            state.derivedFees.forEach { fee ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onOpenTransaction(fee.outgoingTransactionId) },
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column {
-                                        Text("Transfer Fee (Derived)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                        Text(
-                                            text = UiDateHelper.formatDateTime(fee.occurredAt),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = ext.mutedText,
-                                        )
-                                    }
-                                    Text(
-                                        text = formatCurrency(-fee.amountMinor, fee.currency, signed = true),
-                                        style = MaterialTheme.typography.titleSmall.tabularNums(),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (state.items.isEmpty()) {
-                item {
-                    WtrackCard {
-                        Column(
-                            modifier = Modifier.padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text("No matching transactions", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                text = "Try clearing filters or tap + to add a manual cash entry.",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "Search",
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = ext.mutedText,
                             )
                         }
+                        BasicTextField(
+                            value = state.filter.query,
+                            onValueChange = { q -> viewModel.updateFilter { it.copy(query = q) } },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onBackground,
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    if (state.filter.query.isNotEmpty()) {
+                        IconButton(
+                            onClick = { viewModel.updateFilter { it.copy(query = "") } },
+                            modifier = Modifier.size(24.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Clear search",
+                                tint = ext.mutedText,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     }
                 }
-            } else {
-                groupedByDay.forEach { (_, dayItems) ->
-                    val firstEpoch = dayItems.first().transaction.occurredAt
-                    val dayOutflow = dayItems
-                        .asSequence()
-                        .filter {
-                            it.transaction.status == TransactionStatus.CONFIRMED &&
-                                it.transaction.currency.equals(state.baseCurrency, ignoreCase = true) &&
-                                it.transferPair == null &&
-                                it.transaction.transactionType != DomainTransactionType.ADJUSTMENT &&
-                                it.transaction.direction == Direction.OUTFLOW
-                        }
-                        .sumOf { it.transaction.amountMinor }
 
-                    item(key = "hdr-${UiDateHelper.localDateOf(firstEpoch)}") {
+                Box {
+                    V2CircleIconButton(
+                        icon = Icons.Outlined.Tune,
+                        contentDescription = "Filters",
+                        onClick = { showFiltersSheet = true },
+                        size = 44.dp,
+                    )
+                    if (hasActiveFilter) {
+                        V2StatusDot(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-6).dp, y = 6.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Day-grouped transaction rows (no tags or chips on rows)
+        if (state.items.isEmpty()) {
+            item(key = "empty") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "No matching transactions",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = "Try clearing your search or filters, or tap + to add an entry.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
+            groupedByDay.forEach { (date, dayItems) ->
+                val firstEpoch = dayItems.first().transaction.occurredAt
+                val dayNet = dayItems
+                    .asSequence()
+                    .filter {
+                        it.transaction.status == TransactionStatus.CONFIRMED &&
+                            it.transaction.currency.equals(state.baseCurrency, ignoreCase = true) &&
+                            it.transferPair == null &&
+                            it.transaction.transactionType != DomainTransactionType.ADJUSTMENT
+                    }
+                    .sumOf {
+                        if (it.transaction.direction == Direction.INFLOW) it.transaction.amountMinor else -it.transaction.amountMinor
+                    }
+
+                item(key = "day-$date") {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 4.dp),
+                                .padding(bottom = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = UiDateHelper.formatDayGroupHeader(firstEpoch),
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            if (dayOutflow > 0L) {
+                            if (dayNet != 0L) {
                                 Text(
-                                    text = formatCurrency(-dayOutflow, state.baseCurrency, signed = true),
-                                    style = MaterialTheme.typography.labelMedium.tabularNums(),
+                                    text = formatCurrency(dayNet, state.baseCurrency, signed = true),
+                                    style = MaterialTheme.typography.bodyMedium.tabularNums(),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                    }
 
-                    item(key = "grp-${UiDateHelper.localDateOf(firstEpoch)}") {
-                        WtrackCard {
-                            dayItems.forEachIndexed { idx, item ->
-                                ActivityTransactionRow(
-                                    item = item,
-                                    baseCurrency = state.baseCurrency,
-                                    onClick = { onOpenTransaction(item.transaction.id) },
-                                )
-                                if (idx < dayItems.lastIndex) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = 14.dp),
-                                        color = ext.divider,
-                                    )
-                                }
+                        dayItems.forEachIndexed { idx, item ->
+                            val tx = item.transaction
+                            val isPaired = item.transferPair != null
+                            val isInflow = !isPaired && tx.direction == Direction.INFLOW
+                            val title = tx.merchantName ?: tx.description ?: tx.transactionType.name
+                            val isUncategorized = !isPaired &&
+                                (item.categoryName.isBlank() || item.categoryName.equals("Uncategorized", ignoreCase = true))
+                            val displayCategory = when {
+                                isPaired -> "Transfer"
+                                isUncategorized -> "Needs category"
+                                else -> item.categoryName
+                            }
+                            val amountText = if (isPaired) {
+                                formatCurrency(abs(tx.amountMinor), tx.currency)
+                            } else {
+                                val signed = if (tx.direction == Direction.INFLOW) tx.amountMinor else -tx.amountMinor
+                                formatCurrency(signed, tx.currency, signed = true)
+                            }
+
+                            V2TransactionRow(
+                                merchant = title,
+                                category = displayCategory,
+                                amountText = amountText,
+                                isInflow = isInflow,
+                                isUncategorized = isUncategorized,
+                                isVoided = tx.status == TransactionStatus.VOIDED,
+                                icon = v2CategoryIcon(
+                                    categoryName = displayCategory,
+                                    isIncome = isInflow,
+                                    isTransfer = isPaired,
+                                    isUncategorized = isUncategorized,
+                                ),
+                                onClick = { onOpenTransaction(tx.id) },
+                            )
+                            if (idx < dayItems.lastIndex) {
+                                HorizontalDivider(color = ext.divider)
                             }
                         }
                     }
@@ -540,6 +325,7 @@ fun ActivityScreen(
         }
     }
 
+    // All filters live neatly one tap deeper in the Filters sheet
     if (showFiltersSheet) {
         ModalBottomSheet(
             onDismissRequest = { showFiltersSheet = false },
@@ -550,7 +336,7 @@ fun ActivityScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(
@@ -558,14 +344,68 @@ fun ActivityScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Filter Transactions", style = MaterialTheme.typography.titleMedium)
+                    Text("Filters", style = MaterialTheme.typography.titleLarge)
                     TextButton(
                         onClick = {
                             viewModel.updateFilter {
-                                it.copy(type = null, categoryId = null, tagId = null, direction = null)
+                                it.copy(
+                                    dateFilter = ActivityDateFilter.ALL,
+                                    accountId = null,
+                                    uncategorizedOnly = false,
+                                    showVoided = false,
+                                    type = null,
+                                    categoryId = null,
+                                    tagId = null,
+                                    direction = null,
+                                )
                             }
                         },
                     ) { Text("Reset") }
+                }
+
+                Text("Date", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActivityDateFilter.entries.forEach { range ->
+                        FilterChip(
+                            selected = state.filter.dateFilter == range,
+                            onClick = { viewModel.updateFilter { it.copy(dateFilter = range) } },
+                            label = { Text(range.label) },
+                        )
+                    }
+                }
+
+                if (state.accounts.isNotEmpty()) {
+                    Text("Account", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = state.filter.accountId == null,
+                            onClick = { viewModel.updateFilter { it.copy(accountId = null) } },
+                            label = { Text("All") },
+                        )
+                        state.accounts.forEach { acc ->
+                            FilterChip(
+                                selected = state.filter.accountId == acc.id,
+                                onClick = {
+                                    viewModel.updateFilter { it.copy(accountId = if (it.accountId == acc.id) null else acc.id) }
+                                },
+                                label = { Text(acc.name) },
+                            )
+                        }
+                    }
+                }
+
+                Text("Status", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = state.filter.uncategorizedOnly,
+                        onClick = { viewModel.updateFilter { it.copy(uncategorizedOnly = !it.uncategorizedOnly) } },
+                        label = { Text("Needs category") },
+                    )
+                    FilterChip(
+                        selected = state.filter.showVoided,
+                        onClick = { viewModel.updateFilter { it.copy(showVoided = !it.showVoided) } },
+                        label = { Text("Include voided") },
+                    )
                 }
 
                 Text("Direction", style = MaterialTheme.typography.labelLarge)
@@ -581,7 +421,7 @@ fun ActivityScreen(
                     }
                 }
 
-                Text("Transaction Type", style = MaterialTheme.typography.labelLarge)
+                Text("Type", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DomainTransactionType.entries.forEach { t ->
                         FilterChip(
@@ -594,16 +434,18 @@ fun ActivityScreen(
                     }
                 }
 
-                Text("Category", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.categories.forEach { cat ->
-                        FilterChip(
-                            selected = state.filter.categoryId == cat.id,
-                            onClick = {
-                                viewModel.updateFilter { it.copy(categoryId = if (it.categoryId == cat.id) null else cat.id) }
-                            },
-                            label = { Text(cat.name) },
-                        )
+                if (state.categories.isNotEmpty()) {
+                    Text("Category", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.categories.forEach { cat ->
+                            FilterChip(
+                                selected = state.filter.categoryId == cat.id,
+                                onClick = {
+                                    viewModel.updateFilter { it.copy(categoryId = if (it.categoryId == cat.id) null else cat.id) }
+                                },
+                                label = { Text(cat.name) },
+                            )
+                        }
                     }
                 }
 
@@ -624,9 +466,11 @@ fun ActivityScreen(
 
                 Button(
                     onClick = { showFiltersSheet = false },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text("Apply Filters") }
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Done", style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -651,10 +495,10 @@ fun ActivityScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Add Manual Transaction", style = MaterialTheme.typography.titleMedium)
+                Text("Add transaction", style = MaterialTheme.typography.titleLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     state.accounts.forEach { acc ->
                         FilterChip(
@@ -684,9 +528,9 @@ fun ActivityScreen(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Description / Merchant") },
+                    label = { Text("Merchant / description") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -694,7 +538,7 @@ fun ActivityScreen(
                     onValueChange = { note = it },
                     label = { Text("Note (optional)") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -712,133 +556,14 @@ fun ActivityScreen(
                         showCreateSheet = false
                         viewModel.createManualTransaction(selectedAccountId, amountInput, direction, type, categoryId, description, note)
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text("Save Transaction") }
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Save", style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ActivityTransactionRow(
-    item: ActivityTransactionItem,
-    baseCurrency: String,
-    onClick: () -> Unit,
-) {
-    val ext = WtrackTheme.colors
-    val tx = item.transaction
-    val isPaired = item.transferPair != null
-    val title = tx.merchantName ?: tx.description ?: tx.transactionType.name
-    val (avatarText, avatarBg, avatarFg) = when {
-        tx.status == TransactionStatus.VOIDED -> Triple("×", MaterialTheme.colorScheme.surfaceVariant, ext.mutedText)
-        isPaired -> Triple("↔", ext.transferContainer, ext.onTransferContainer)
-        tx.direction == Direction.INFLOW -> Triple("↓", ext.inflowContainer, ext.inflow)
-        else -> Triple(
-            title.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "W",
-            ext.warningContainer,
-            ext.warning,
-        )
-    }
-
-    val amountText = if (isPaired) {
-        formatCurrency(abs(tx.amountMinor), tx.currency)
-    } else {
-        val signed = if (tx.direction == Direction.INFLOW) tx.amountMinor else -tx.amountMinor
-        formatCurrency(signed, tx.currency, signed = true)
-    }
-    val amountColor = when {
-        tx.status == TransactionStatus.VOIDED -> ext.mutedText
-        isPaired -> ext.transfer
-        tx.direction == Direction.INFLOW -> ext.inflow
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-
-    val isUncategorized = item.categoryName.equals("Uncategorized", ignoreCase = true)
-    val subtitle = buildString {
-        if (isPaired && item.counterpartAccountName != null) {
-            val arrow = if (tx.direction == Direction.OUTFLOW) "→" else "←"
-            append("${item.accountName} $arrow ${item.counterpartAccountName}")
-        } else {
-            append(item.accountName)
-            if (!isUncategorized) append(" · ${item.categoryName}")
-        }
-        append(" · ${UiDateHelper.formatTimeOnly(tx.occurredAt)}")
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AvatarCircle(
-            text = avatarText,
-            containerColor = avatarBg,
-            contentColor = avatarFg,
-            size = 34.dp,
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (tx.status == TransactionStatus.VOIDED) ext.mutedText else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = ext.mutedText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val hasBadges = tx.status == TransactionStatus.VOIDED ||
-                isPaired ||
-                isUncategorized ||
-                !tx.currency.equals(baseCurrency, ignoreCase = true) ||
-                tx.transactionType == DomainTransactionType.ADJUSTMENT ||
-                item.tags.isNotEmpty()
-            if (hasBadges) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (tx.status == TransactionStatus.VOIDED) {
-                        StatusPill("VOIDED", MaterialTheme.colorScheme.surfaceVariant, ext.mutedText)
-                    }
-                    if (isPaired) {
-                        StatusPill("Paired ↔", ext.transferContainer, ext.onTransferContainer)
-                    }
-                    if (isUncategorized && !isPaired && tx.transactionType != DomainTransactionType.ADJUSTMENT) {
-                        StatusPill("Uncategorized", ext.warningContainer, ext.onWarningContainer)
-                    }
-                    if (!tx.currency.equals(baseCurrency, ignoreCase = true)) {
-                        StatusPill("Foreign (${tx.currency})")
-                    }
-                    if (tx.transactionType == DomainTransactionType.ADJUSTMENT) {
-                        StatusPill("Adjustment")
-                    }
-                    item.tags.forEach { tag ->
-                        StatusPill(
-                            label = "#${tag.name}",
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
-            }
-        }
-        Text(
-            text = amountText,
-            style = MaterialTheme.typography.titleSmall.tabularNums(),
-            fontWeight = FontWeight.Bold,
-            color = amountColor,
-        )
     }
 }
 
@@ -849,16 +574,16 @@ fun TransactionDetailScreen(
     viewModel: ActivityViewModel,
     onBack: () -> Unit,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
     val item = state.allItems.firstOrNull { it.transaction.id == transactionId }
         ?: run {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
-                topBar = { WtrackTopBar(title = "Transaction Detail", onBack = onBack) },
+                topBar = { WtrackTopBar(title = "", onBack = onBack) },
             ) { inner ->
-                Column(modifier = Modifier.padding(inner).padding(20.dp)) {
-                    Text("Transaction #$transactionId not found.")
+                Column(modifier = Modifier.padding(inner).padding(24.dp)) {
+                    Text("Transaction not found.", style = MaterialTheme.typography.bodyLarge)
                 }
             }
             return
@@ -872,66 +597,85 @@ fun TransactionDetailScreen(
     var showRefundPicker by remember { mutableStateOf(false) }
     var confirmPairedVoid by remember { mutableStateOf(false) }
     var confirmPairedDelete by remember { mutableStateOf(false) }
+    var showMoreDetails by remember { mutableStateOf(false) }
 
     val displayTitle = tx.merchantName ?: tx.description ?: tx.transactionType.name
     val isPaired = item.transferPair != null
+    val isInflow = !isPaired && tx.direction == Direction.INFLOW
     val signed = if (tx.direction == Direction.INFLOW) tx.amountMinor else -tx.amountMinor
+    val amountText = if (isPaired) {
+        formatCurrency(abs(tx.amountMinor), tx.currency)
+    } else {
+        formatCurrency(signed, tx.currency, signed = true)
+    }
     val heroAmountColor = when {
         tx.status == TransactionStatus.VOIDED -> ext.mutedText
-        isPaired -> ext.transfer
-        tx.direction == Direction.INFLOW -> ext.inflow
-        else -> MaterialTheme.colorScheme.onSurface
+        isInflow -> ext.inflow
+        else -> MaterialTheme.colorScheme.onBackground
     }
-    val heroAvatarBg = when {
-        isPaired -> ext.transferContainer
-        tx.direction == Direction.INFLOW -> ext.inflowContainer
-        else -> ext.warningContainer
-    }
-    val heroAvatarFg = when {
-        isPaired -> ext.onTransferContainer
-        tx.direction == Direction.INFLOW -> ext.inflow
-        else -> ext.warning
-    }
-    val heroAvatarText = when {
-        isPaired -> "↔"
-        tx.direction == Direction.INFLOW -> "↓"
-        else -> displayTitle.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "W"
-    }
+    val isUncategorized = item.categoryName.isBlank() || item.categoryName.equals("Uncategorized", ignoreCase = true)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             WtrackTopBar(
-                title = "Transaction Detail",
+                title = "",
                 onBack = onBack,
                 trailing = {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(999.dp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickable { showEditSheet = true },
-                    ) {
+                    TextButton(onClick = { showEditSheet = true }) {
                         Text(
                             text = "Edit",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 },
             )
+        },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (tx.status == TransactionStatus.CONFIRMED) {
+                    TextButton(
+                        onClick = {
+                            if (item.transferPair != null) {
+                                confirmPairedVoid = true
+                            } else {
+                                viewModel.voidTransaction(tx.id)
+                            }
+                        },
+                    ) {
+                        Text(
+                            text = "Void transaction",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                } else {
+                    TextButton(onClick = { viewModel.restoreTransaction(tx.id) }) {
+                        Text(
+                            text = "Restore transaction",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
         },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
             if (state.actionMessage != null) {
-                item {
+                item(key = "msg") {
                     ActionFeedbackBanner(
                         message = state.actionMessage!!,
                         onDismiss = viewModel::clearMessage,
@@ -939,228 +683,145 @@ fun TransactionDetailScreen(
                 }
             }
 
-            // Hero Receipt Card
-            item {
-                WtrackCard(cornerRadius = 20.dp) {
-                    Column(
+            // Centered Hero: 48dp neutral icon circle, 40sp amount, 16sp merchant
+            item(key = "hero") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        AvatarCircle(
-                            text = heroAvatarText,
-                            containerColor = heroAvatarBg,
-                            contentColor = heroAvatarFg,
-                            size = 44.dp,
+                        Icon(
+                            imageVector = v2CategoryIcon(
+                                categoryName = item.categoryName,
+                                isIncome = isInflow,
+                                isTransfer = isPaired,
+                                isUncategorized = isUncategorized,
+                            ),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(22.dp),
                         )
+                    }
+                    Text(
+                        text = amountText,
+                        style = MaterialTheme.typography.displaySmall.tabularNums(),
+                        color = heroAmountColor,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = displayTitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+
+            // 4 core rows + "More details ›"
+            item(key = "details") {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    DetailRow(label = "Account") {
                         Text(
-                            text = displayTitle,
+                            text = item.accountName,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
+                    }
+                    HorizontalDivider(color = ext.divider)
+                    DetailRow(label = "Date") {
                         Text(
-                            text = formatCurrency(signed, tx.currency, signed = true),
-                            style = MaterialTheme.typography.headlineMedium.tabularNums(),
-                            color = heroAmountColor,
+                            text = UiDateHelper.formatDateTime(tx.occurredAt),
+                            style = MaterialTheme.typography.bodyLarge.tabularNums(),
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            StatusPill(
-                                label = if (tx.status == TransactionStatus.CONFIRMED) "Confirmed" else "VOIDED",
-                                containerColor = if (tx.status == TransactionStatus.CONFIRMED) ext.inflowContainer else MaterialTheme.colorScheme.errorContainer,
-                                contentColor = if (tx.status == TransactionStatus.CONFIRMED) ext.onInflowContainer else MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                            StatusPill(
-                                label = if (tx.parserVersion != null) "Auto · v${tx.parserVersion}" else "Manual",
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                            StatusPill(
-                                label = tx.transactionType.name,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                     }
-                }
-            }
-
-            // Structured Details Card
-            item {
-                WtrackCard {
-                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
-                        DetailRow(label = "Account") {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                ProviderBadgeAvatar(labelOrPackage = item.accountName, size = 18.dp)
-                                Text(item.accountName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        DetailRow(label = "Date & Time") {
-                            Text(
-                                text = UiDateHelper.formatDateTime(tx.occurredAt),
-                                style = MaterialTheme.typography.bodyMedium.tabularNums(),
-                            )
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        DetailRow(label = "Category") {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { showCategorySheet = true }
-                                    .padding(vertical = 2.dp),
-                            ) {
-                                Text(item.categoryName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    text = "Change ›",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        DetailRow(label = "Tags") {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                item.tags.forEach { tag ->
-                                    StatusPill(
-                                        label = "#${tag.name} ×",
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(999.dp))
-                                            .clickable { viewModel.removeTagFromTransaction(tx.id, tag.id) },
-                                    )
-                                }
-                                StatusPill(
-                                    label = "+ Tag",
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    borderColor = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .clickable { showTagSheet = true },
-                                )
-                            }
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        DetailRow(label = "Note") {
-                            Text(
-                                text = tx.note?.takeIf { it.isNotBlank() } ?: "No note (tap Edit)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (tx.note.isNullOrBlank()) ext.mutedText else MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                        if (item.transferPair != null) {
-                            HorizontalDivider(color = ext.divider)
-                            DetailRow(label = "Linked Pair") {
-                                Text(
-                                    text = "↔ ${item.counterpartAccountName ?: "Account"} (Fee: ${formatCurrency(item.transferPair.feeMinor, tx.currency)})",
-                                    style = MaterialTheme.typography.bodySmall.tabularNums(),
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ext.transfer,
-                                )
-                            }
-                        }
-                        if (tx.providerReference != null) {
-                            HorizontalDivider(color = ext.divider)
-                            DetailRow(label = "Provider Ref") {
-                                Text(tx.providerReference, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Auto-Rule Shortcut Card
-            if (tx.transactionType != DomainTransactionType.ADJUSTMENT) {
-                item {
-                    WtrackCard(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant,
+                    HorizontalDivider(color = ext.divider)
+                    DetailRow(
+                        label = "Category",
                         onClick = { showCategorySheet = true },
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    text = if (tx.appliedRuleId != null) "Auto-rule applied" else "Category & Auto-Rule",
-                                    style = MaterialTheme.typography.labelLarge,
-                                )
-                                Text(
-                                    text = "Assign \"$displayTitle\" → ${item.categoryName} for future captures",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
                             Text(
-                                text = "Configure ›",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                text = if (isUncategorized) "Needs category" else item.categoryName,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (isUncategorized) ext.mutedText else MaterialTheme.colorScheme.onBackground,
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = ext.mutedText,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
-                }
-            }
+                    HorizontalDivider(color = ext.divider)
+                    DetailRow(
+                        label = "Note",
+                        onClick = { showEditSheet = true },
+                    ) {
+                        Text(
+                            text = tx.note?.takeIf { it.isNotBlank() } ?: "Add note",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (tx.note.isNullOrBlank()) ext.mutedText else MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    HorizontalDivider(color = ext.divider)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clickable { showMoreDetails = !showMoreDetails },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "More details",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Icon(
+                            imageVector = if (showMoreDetails) {
+                                Icons.Outlined.KeyboardArrowDown
+                            } else {
+                                Icons.AutoMirrored.Outlined.KeyboardArrowRight
+                            },
+                            contentDescription = null,
+                            tint = ext.mutedText,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
 
-            // Captured Evidence Card (TX-03, TX-05)
-            if (tx.retainedPayloadPreview != null || tx.originalSnapshot != null) {
-                item {
-                    WtrackCard(borderColor = ext.infoTintBorder) {
+                    // One tap deeper: Evidence, auto-rule, tags, transfer linking, manual delete
+                    AnimatedVisibility(visible = showMoreDetails) {
                         Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Shield,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Text("Captured Evidence", style = MaterialTheme.typography.labelLarge)
-                                }
-                                StatusPill(
-                                    label = if (tx.parserVersion != null) "Parser v${tx.parserVersion}" else "Captured",
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
                             if (tx.retainedPayloadPreview != null) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.background,
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "Captured notification",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                     Text(
                                         text = "\"${tx.retainedPayloadPreview}\"",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(10.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onBackground,
                                     )
                                 }
                             }
@@ -1169,89 +830,92 @@ fun TransactionDetailScreen(
                                     snap.direction == tx.direction &&
                                     snap.transactionType == tx.transactionType &&
                                     snap.accountId == tx.accountId
-                                val snapSigned = if (snap.direction == Direction.INFLOW) snap.amountMinor else -snap.amountMinor
                                 Text(
-                                    text = "Original captured: ${formatCurrency(snapSigned, snap.currency, signed = true)} · ${snap.direction.name}" +
-                                        if (unchanged) " · Unchanged ✓" else " · Edited",
-                                    style = MaterialTheme.typography.labelSmall.tabularNums(),
+                                    text = if (unchanged) "Original captured amount unchanged" else "Edited after capture",
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = if (unchanged) ext.inflow else ext.warning,
                                 )
                             }
-                        }
-                    }
-                }
-            }
+                            if (tx.parserVersion != null) {
+                                Text(
+                                    text = "Parser v${tx.parserVersion}${tx.appliedRuleId?.let { " · Auto-rule #$it" } ?: ""}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = ext.mutedText,
+                                )
+                            }
+                            if (item.transferPair != null) {
+                                Text(
+                                    text = "Paired transfer ↔ ${item.counterpartAccountName ?: "Account"} (Fee ${formatCurrency(item.transferPair.feeMinor, tx.currency)})",
+                                    style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
 
-            // Transfer / Refund & Void Actions
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        if (item.transferPair == null && tx.status == TransactionStatus.CONFIRMED && tx.transactionType != DomainTransactionType.ADJUSTMENT) {
-                            OutlinedButton(
-                                onClick = { showTransferPicker = true },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Link Transfer Pair") }
-                        } else if (item.transferPair != null) {
-                            OutlinedButton(
-                                onClick = { viewModel.unlinkTransfer(item.transferPair.id) },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Unlink Transfer") }
-                        }
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                item.tags.forEach { tag ->
+                                    StatusPill(
+                                        label = "#${tag.name} ×",
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(999.dp))
+                                            .clickable { viewModel.removeTagFromTransaction(tx.id, tag.id) },
+                                    )
+                                }
+                                StatusPill(
+                                    label = "+ Tag",
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .clickable { showTagSheet = true },
+                                )
+                            }
 
-                        if (tx.transactionType == DomainTransactionType.REFUND && tx.direction == Direction.INFLOW) {
-                            OutlinedButton(
-                                onClick = { showRefundPicker = true },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            ) { Text(if (tx.relatedTransactionId == null) "Link Original" else "Change Original") }
-                        }
-                    }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                if (item.transferPair == null && tx.status == TransactionStatus.CONFIRMED && tx.transactionType != DomainTransactionType.ADJUSTMENT) {
+                                    OutlinedButton(
+                                        onClick = { showTransferPicker = true },
+                                        shape = RoundedCornerShape(999.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text("Link transfer") }
+                                } else if (item.transferPair != null) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.unlinkTransfer(item.transferPair.id) },
+                                        shape = RoundedCornerShape(999.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text("Unlink transfer") }
+                                }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        if (tx.status == TransactionStatus.CONFIRMED) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (item.transferPair != null) {
-                                        confirmPairedVoid = true
-                                    } else {
-                                        viewModel.voidTransaction(tx.id)
-                                    }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Void Transaction") }
-                        } else {
-                            Button(
-                                onClick = { viewModel.restoreTransaction(tx.id) },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Restore Transaction") }
-                        }
-                        if (tx.eventId == null) {
-                            OutlinedButton(
-                                onClick = {
-                                    if (item.transferPair != null) {
-                                        confirmPairedDelete = true
-                                    } else {
-                                        viewModel.deleteManual(tx.id)
-                                        onBack()
-                                    }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                modifier = Modifier.weight(1f),
-                            ) { Text("Delete Manual") }
+                                if (tx.transactionType == DomainTransactionType.REFUND && tx.direction == Direction.INFLOW) {
+                                    OutlinedButton(
+                                        onClick = { showRefundPicker = true },
+                                        shape = RoundedCornerShape(999.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text(if (tx.relatedTransactionId == null) "Link original" else "Change original") }
+                                }
+                            }
+
+                            if (tx.eventId == null) {
+                                TextButton(
+                                    onClick = {
+                                        if (item.transferPair != null) {
+                                            confirmPairedDelete = true
+                                        } else {
+                                            viewModel.deleteManual(tx.id)
+                                            onBack()
+                                        }
+                                    },
+                                ) {
+                                    Text("Delete manual entry", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
@@ -1277,10 +941,10 @@ fun TransactionDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Edit Transaction", style = MaterialTheme.typography.titleMedium)
+                Text("Edit transaction", style = MaterialTheme.typography.titleLarge)
                 if (state.accounts.isNotEmpty()) {
                     Text("Account", style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1305,7 +969,7 @@ fun TransactionDetailScreen(
                     onValueChange = { editDateTime = it },
                     label = { Text("Date & time (yyyy-MM-dd HH:mm)") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1323,16 +987,16 @@ fun TransactionDetailScreen(
                 OutlinedTextField(
                     value = editDescription,
                     onValueChange = { editDescription = it },
-                    label = { Text("Description") },
+                    label = { Text("Merchant / description") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = editNote,
                     onValueChange = { editNote = it },
                     label = { Text("Note") },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Button(
@@ -1353,9 +1017,11 @@ fun TransactionDetailScreen(
                             note = editNote,
                         )
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text("Save Changes") }
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Save changes", style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -1375,10 +1041,10 @@ fun TransactionDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Category & Auto-Rule", style = MaterialTheme.typography.titleMedium)
+                Text("Category", style = MaterialTheme.typography.titleLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     state.categories.forEach { cat ->
                         FilterChip(
@@ -1390,12 +1056,12 @@ fun TransactionDetailScreen(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = saveRuleChecked, onCheckedChange = { saveRuleChecked = it })
-                    Text("Remember as rule for future matching transactions", style = MaterialTheme.typography.bodySmall)
+                    Text("Remember for future transactions here", style = MaterialTheme.typography.bodyMedium)
                 }
                 if (saveRuleChecked) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = backfillChecked, onCheckedChange = { backfillChecked = it })
-                        Text("Backfill uncategorized transactions for this merchant", style = MaterialTheme.typography.bodySmall)
+                        Text("Apply to past uncategorized ones", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Button(
@@ -1403,9 +1069,11 @@ fun TransactionDetailScreen(
                         showCategorySheet = false
                         viewModel.setCategoryAndOptionalRule(tx, editCategoryId, saveRuleChecked, backfillChecked)
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                ) { Text("Apply Category") }
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Save", style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -1423,12 +1091,11 @@ fun TransactionDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Manage Tags (TX-06)", style = MaterialTheme.typography.titleMedium)
+                Text("Tags", style = MaterialTheme.typography.titleLarge)
                 if (availableSuggestions.isNotEmpty()) {
-                    Text("Existing tags", style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         availableSuggestions.forEach { suggestion ->
                             FilterChip(
@@ -1450,9 +1117,9 @@ fun TransactionDetailScreen(
                     OutlinedTextField(
                         value = newTagInput,
                         onValueChange = { newTagInput = it },
-                        label = { Text("New tag (e.g., work, travel)") },
+                        label = { Text("New tag") },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f),
                     )
                     Button(
@@ -1463,7 +1130,7 @@ fun TransactionDetailScreen(
                             showTagSheet = false
                             viewModel.addTagToTransaction(tx.id, tag)
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(999.dp),
                     ) { Text("Add") }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -1474,8 +1141,8 @@ fun TransactionDetailScreen(
     if (confirmPairedVoid) {
         AlertDialog(
             onDismissRequest = { confirmPairedVoid = false },
-            title = { Text("Unlink Transfer & Void?") },
-            text = { Text("This transaction belongs to a confirmed transfer pair. Voiding it will unlink the transfer pair (PRD section 4.5).") },
+            title = { Text("Unlink transfer & void?") },
+            text = { Text("This transaction is part of a transfer pair. Voiding it will unlink the pair.") },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -1483,7 +1150,7 @@ fun TransactionDetailScreen(
                         confirmPairedVoid = false
                         viewModel.voidTransaction(tx.id)
                     },
-                ) { Text("Unlink & Void") }
+                ) { Text("Unlink & void") }
             },
             dismissButton = { TextButton(onClick = { confirmPairedVoid = false }) { Text("Cancel") } },
         )
@@ -1492,8 +1159,8 @@ fun TransactionDetailScreen(
     if (confirmPairedDelete) {
         AlertDialog(
             onDismissRequest = { confirmPairedDelete = false },
-            title = { Text("Unlink Transfer & Delete?") },
-            text = { Text("This manual transaction belongs to a confirmed transfer pair. Deleting it will unlink the transfer pair.") },
+            title = { Text("Unlink transfer & delete?") },
+            text = { Text("This manual transaction is part of a transfer pair. Deleting it will unlink the pair.") },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -1502,7 +1169,7 @@ fun TransactionDetailScreen(
                         viewModel.deleteManual(tx.id)
                         onBack()
                     },
-                ) { Text("Unlink & Delete") }
+                ) { Text("Unlink & delete") }
             },
             dismissButton = { TextButton(onClick = { confirmPairedDelete = false }) { Text("Cancel") } },
         )
@@ -1522,10 +1189,10 @@ fun TransactionDetailScreen(
         }
         AlertDialog(
             onDismissRequest = { showTransferPicker = false },
-            title = { Text("Select Matching Transfer Leg") },
+            title = { Text("Link matching transfer") },
             text = {
                 if (candidates.isEmpty()) {
-                    Text("No unlinked opposite-direction transactions in ${tx.currency} on another account.")
+                    Text("No matching opposite-direction transactions in ${tx.currency} on another account.")
                 } else {
                     LazyColumn {
                         items(candidates, key = { it.transaction.id }) { c ->
@@ -1543,7 +1210,7 @@ fun TransactionDetailScreen(
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("${c.accountName} • ${UiDateHelper.formatDate(c.transaction.occurredAt)}", modifier = Modifier.weight(1f))
+                                Text("${c.accountName} · ${UiDateHelper.formatDate(c.transaction.occurredAt)}", modifier = Modifier.weight(1f))
                                 Text(formatCurrency(c.transaction.amountMinor, c.transaction.currency), fontWeight = FontWeight.SemiBold)
                             }
                         }
@@ -1562,7 +1229,7 @@ fun TransactionDetailScreen(
         }
         AlertDialog(
             onDismissRequest = { showRefundPicker = false },
-            title = { Text("Link Refund to Original Purchase") },
+            title = { Text("Link original purchase") },
             text = {
                 LazyColumn {
                     item {
@@ -1597,20 +1264,22 @@ fun TransactionDetailScreen(
 @Composable
 private fun DetailRow(
     label: String,
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp),
+            .height(56.dp)
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = WtrackTheme.colors.mutedText,
-            modifier = Modifier.padding(end = 12.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 16.dp),
         )
         Box(contentAlignment = Alignment.CenterEnd) {
             content()

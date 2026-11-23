@@ -1,7 +1,7 @@
 package wtrack.app.feature.accounts
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,45 +9,33 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Rule
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
 import wtrack.app.domain.model.Account
@@ -66,15 +55,10 @@ import wtrack.app.domain.model.AccountType
 import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.feature.common.ActionFeedbackBanner
-import wtrack.app.feature.common.CaptureStatusPill
 import wtrack.app.feature.common.MoneyAmountTextField
-import wtrack.app.feature.common.PossibleGapPill
-import wtrack.app.feature.common.ProviderBadgeAvatar
-import wtrack.app.feature.common.SectionHeader
-import wtrack.app.feature.common.StatusPill
-import wtrack.app.feature.common.UiDateHelper
-import wtrack.app.feature.common.WtrackCard
-import wtrack.app.feature.common.WtrackTopBar
+import wtrack.app.feature.common.V2CircleIconButton
+import wtrack.app.feature.common.V2SettingRow
+import wtrack.app.feature.common.V2StatusDot
 import wtrack.app.feature.common.formatCurrency
 import wtrack.app.feature.common.isValidMoneyInput
 
@@ -85,532 +69,360 @@ fun AccountsScreen(
     onOpenDiagnostics: () -> Unit,
     onOpenCustomParsers: (String?) -> Unit = {},
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
     var showCreateSheet by remember { mutableStateOf(false) }
+    var selectedAccountForActions by remember { mutableStateOf<AccountCardUiModel?>(null) }
     var editingAccount by remember { mutableStateOf<Account?>(null) }
     var correctingAccount by remember { mutableStateOf<AccountCardUiModel?>(null) }
     var linkingAccount by remember { mutableStateOf<Account?>(null) }
+    var showArchivedSheet by remember { mutableStateOf(false) }
 
     val primaryCurrency = state.activeAccounts.firstOrNull()?.account?.currency ?: "IDR"
     val primaryCurrencyTotalMinor = state.activeAccounts
         .filter { it.account.currency.equals(primaryCurrency, ignoreCase = true) }
         .sumOf { it.account.estimatedBalanceMinor }
-    val otherCurrencyTotals = state.activeAccounts
-        .filter { !it.account.currency.equals(primaryCurrency, ignoreCase = true) }
-        .groupBy { it.account.currency.uppercase() }
-        .mapValues { (_, items) -> items.sumOf { it.account.estimatedBalanceMinor } }
-    val attentionCount = state.activeAccounts.count {
-        it.account.captureStatus == CaptureStatus.ATTENTION ||
-            it.account.hasPossibleGap ||
-            (it.checkpoint?.driftMinor ?: 0L) != 0L
-    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        WtrackTopBar(
-            title = "Accounts",
-            trailing = {
-                IconButton(onClick = onOpenDiagnostics, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = "Capture Diagnostics",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Button(
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(32.dp),
+    ) {
+        if (state.actionMessage != null) {
+            item(key = "msg") {
+                ActionFeedbackBanner(
+                    message = state.actionMessage!!,
+                    onDismiss = viewModel::clearMessage,
+                )
+            }
+        }
+
+        // Top Bar
+        item(key = "top-bar") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Accounts",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                V2CircleIconButton(
+                    icon = Icons.Outlined.Add,
+                    contentDescription = "Add account",
                     onClick = { showCreateSheet = true },
-                    shape = RoundedCornerShape(999.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                )
+            }
+        }
+
+        // Block 1: ONLY dark elevated card in the app
+        item(key = "total-balance-card") {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(ext.totalBalanceCardBg)
+                    .padding(horizontal = 24.dp, vertical = 28.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = " Add",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = "Total balance",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ext.totalBalanceCardMuted,
                     )
-                }
-            },
-        )
-
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (state.actionMessage != null) {
-                item(key = "msg") {
-                    ActionFeedbackBanner(
-                        message = state.actionMessage!!,
-                        onDismiss = viewModel::clearMessage,
+                    Text(
+                        text = formatCurrency(primaryCurrencyTotalMinor, primaryCurrency),
+                        style = MaterialTheme.typography.displaySmall.tabularNums(),
+                        color = Color.White,
                     )
                 }
             }
+        }
 
-            if (state.activeAccounts.isNotEmpty()) {
-                item(key = "total-card") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(ext.totalBalanceCardBg)
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = "Total Estimated Balance ($primaryCurrency)",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = ext.totalBalanceCardMuted,
-                                )
-                                Surface(
-                                    color = Color.White.copy(alpha = 0.12f),
-                                    shape = RoundedCornerShape(999.dp),
-                                ) {
-                                    Text(
-                                        text = "${state.activeAccounts.size} active",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    )
-                                }
-                            }
-                            Text(
-                                text = formatCurrency(primaryCurrencyTotalMinor, primaryCurrency),
-                                style = MaterialTheme.typography.headlineMedium.tabularNums(),
-                                color = Color.White,
-                            )
-                            if (otherCurrencyTotals.isNotEmpty()) {
-                                val formattedOthers = otherCurrencyTotals.entries.joinToString(" · ") { (cur, amt) ->
-                                    formatCurrency(amt, cur)
-                                }
-                                Text(
-                                    text = "Other currencies: $formattedOthers",
-                                    style = MaterialTheme.typography.labelSmall.tabularNums(),
-                                    color = ext.totalBalanceCardMuted,
-                                )
-                            }
-                            if (attentionCount > 0) {
-                                Text(
-                                    text = "$attentionCount account(s) have a capture gap or balance drift",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.warningBadgeBg,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
+        // Block 2: Plain list of name + balance with 6px status dot
+        item(key = "accounts-list") {
             if (state.activeAccounts.isEmpty()) {
-                item(key = "empty") {
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(16.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AccountBalanceWallet,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .padding(14.dp)
-                                        .size(28.dp),
-                                )
-                            }
-                            Text(
-                                text = "No accounts configured",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Add your bank, e-wallet, or cash accounts, then allowlist notification apps to auto-capture balances and transactions.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ext.mutedText,
-                            )
-                            Button(onClick = { showCreateSheet = true }, shape = RoundedCornerShape(999.dp)) {
-                                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text(" Add First Account")
-                            }
-                        }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "No accounts yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = "Add a bank, e-wallet, or cash account to start tracking.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = { showCreateSheet = true },
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier.height(48.dp),
+                    ) {
+                        Text("Add account")
                     }
                 }
             } else {
-                items(state.activeAccounts, key = { it.account.id }) { item ->
-                    val acc = item.account
-                    var menuExpanded by remember(acc.id) { mutableStateOf(false) }
-                    val needsReconcileEmphasis = acc.hasPossibleGap || (item.checkpoint?.driftMinor ?: 0L) != 0L
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    state.activeAccounts.forEachIndexed { idx, item ->
+                        val acc = item.account
+                        val needsCheck = acc.hasPossibleGap ||
+                            acc.captureStatus == CaptureStatus.ATTENTION ||
+                            (item.checkpoint?.driftMinor ?: 0L) != 0L
+                        val dotColor = if (needsCheck) ext.warning else ext.inflow
 
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(15.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    ProviderBadgeAvatar(
-                                        labelOrPackage = acc.provider.ifBlank { acc.name },
-                                        size = 38.dp,
-                                        accountType = acc.accountType,
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = acc.name,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Text(
-                                            text = "${acc.provider.ifBlank { "Manual" }} · ${acc.accountType.name} · ${acc.currency}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = ext.mutedText,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    CaptureStatusPill(acc.captureStatus)
-                                    Box {
-                                        IconButton(
-                                            onClick = { menuExpanded = true },
-                                            modifier = Modifier.size(32.dp),
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.MoreVert,
-                                                contentDescription = "Account actions",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(18.dp),
-                                            )
-                                        }
-                                        DropdownMenu(
-                                            expanded = menuExpanded,
-                                            onDismissRequest = { menuExpanded = false },
-                                        ) {
-                                            DropdownMenuItem(
-                                                text = { Text("Edit account") },
-                                                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    editingAccount = acc
-                                                },
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Link notification app") },
-                                                leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    linkingAccount = acc
-                                                },
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Parser rules") },
-                                                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Rule, contentDescription = null) },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    onOpenCustomParsers(item.linkedSources.firstOrNull()?.link?.sourceId)
-                                                },
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Capture diagnostics") },
-                                                leadingIcon = { Icon(Icons.Outlined.Shield, contentDescription = null) },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    onOpenDiagnostics()
-                                                },
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Archive account") },
-                                                leadingIcon = { Icon(Icons.Outlined.Archive, contentDescription = null) },
-                                                onClick = {
-                                                    menuExpanded = false
-                                                    viewModel.archiveAccount(acc.id)
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    text = "Estimated Balance",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                                Text(
-                                    text = formatCurrency(acc.estimatedBalanceMinor, acc.currency),
-                                    style = MaterialTheme.typography.headlineSmall.tabularNums(),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Text(
-                                    text = if (acc.lastReconciledAt != null) {
-                                        "Last reconciled ${UiDateHelper.formatDate(acc.lastReconciledAt)}"
-                                    } else {
-                                        "Not reconciled yet"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-
-                            if (acc.hasPossibleGap || acc.unparsedLast30DaysCount > 0) {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    if (acc.hasPossibleGap) {
-                                        PossibleGapPill(label = "Possible capture gap")
-                                    }
-                                    if (acc.unparsedLast30DaysCount > 0) {
-                                        StatusPill(
-                                            label = "${acc.unparsedLast30DaysCount} unparsed (30d)",
-                                            containerColor = ext.warningContainer,
-                                            contentColor = ext.onWarningContainer,
-                                            borderColor = ext.warningBorder,
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (acc.captureStatus == CaptureStatus.UNSUPPORTED) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(10.dp),
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = "Auto-detect fallback active: alerts go to Needs Review pre-filled. Teach a pattern once to auto-parse future alerts.",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        TextButton(
-                                            onClick = { onOpenCustomParsers(item.linkedSources.firstOrNull()?.link?.sourceId) },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                        ) {
-                                            Text("Teach Pattern", style = MaterialTheme.typography.labelMedium)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (item.checkpoint != null) {
-                                val cp = item.checkpoint
-                                val hasDrift = cp.driftMinor != 0L
-                                Surface(
-                                    color = if (hasDrift) ext.warningContainer else ext.inflowContainer,
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (hasDrift) ext.warningBorder else ext.inflowContainer,
-                                    ),
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = "Reported ${formatCurrency(cp.reportedBalanceMinor, acc.currency)}",
-                                            style = MaterialTheme.typography.labelSmall.tabularNums(),
-                                            color = if (hasDrift) ext.onWarningContainer else ext.onInflowContainer,
-                                        )
-                                        Text(
-                                            text = if (hasDrift) {
-                                                "Drift ${formatCurrency(cp.driftMinor, acc.currency, signed = true)}"
-                                            } else {
-                                                "Matches estimate"
-                                            },
-                                            style = MaterialTheme.typography.labelSmall.tabularNums(),
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (hasDrift) ext.onWarningContainer else ext.onInflowContainer,
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (item.linkedSources.isNotEmpty()) {
-                                HorizontalDivider(color = ext.divider)
-                                Text(
-                                    text = "Linked Notification Sources",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                item.linkedSources.forEach { ls ->
-                                    val src = ls.source
-                                    val samplingActive = src?.sampleCollectionUntil != null && src.sampleCollectionUntil > state.nowEpochMillis
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = ls.link.sourceId + (ls.link.accountHint?.let { " · hint: $it" } ?: ""),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                            if (src != null) {
-                                                val customCount = state.customRuleCountsBySource[src.id] ?: 0
-                                                val statusText = buildString {
-                                                    append(if (src.isAllowlisted) "Allowlisted" else "Paused")
-                                                    if (customCount > 0) {
-                                                        append(" · $customCount custom pattern(s)")
-                                                    }
-                                                }
-                                                Text(
-                                                    text = statusText,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = ext.mutedText,
-                                                )
-                                            }
-                                        }
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        ) {
-                                            if (src != null && src.parserVersion == null) {
-                                                Text("14d", style = MaterialTheme.typography.labelSmall, color = ext.mutedText)
-                                                Switch(
-                                                    checked = samplingActive,
-                                                    onCheckedChange = { enable -> viewModel.toggleSampleCollection(src.id, enable) },
-                                                )
-                                            }
-                                            TextButton(
-                                                onClick = { viewModel.unlinkSource(ls.link.id) },
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                            ) {
-                                                Text("Unlink", style = MaterialTheme.typography.labelMedium)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                if (needsReconcileEmphasis) {
-                                    Button(
-                                        onClick = { correctingAccount = item },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = ext.warning,
-                                            contentColor = Color.White,
-                                        ),
-                                    ) {
-                                        Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Text(" Reconcile Now")
-                                    }
-                                } else {
-                                    OutlinedButton(
-                                        onClick = { correctingAccount = item },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp),
-                                    ) {
-                                        Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Text(" Reconcile")
-                                    }
-                                }
-                                OutlinedButton(
-                                    onClick = { linkingAccount = acc },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                ) {
-                                    Icon(Icons.Outlined.Link, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Text(" Link App")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (state.archivedAccounts.isNotEmpty()) {
-                item(key = "archived-hdr") {
-                    SectionHeader(
-                        title = "Archived Accounts",
-                        trailingText = "${state.archivedAccounts.size}",
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                items(state.archivedAccounts, key = { "arch-${it.account.id}" }) { item ->
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                .height(64.dp)
+                                .clickable { selectedAccountForActions = item },
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Row(
                                 modifier = Modifier.weight(1f),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                ProviderBadgeAvatar(
-                                    labelOrPackage = item.account.provider.ifBlank { item.account.name },
-                                    size = 32.dp,
-                                    accountType = item.account.accountType,
-                                )
-                                Column {
-                                    Text(item.account.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                V2StatusDot(color = dotColor)
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = formatCurrency(item.account.estimatedBalanceMinor, item.account.currency),
-                                        style = MaterialTheme.typography.labelSmall.tabularNums(),
-                                        color = ext.mutedText,
+                                        text = acc.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
+                                    if (needsCheck) {
+                                        Text(
+                                            text = "Needs check",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = ext.warning,
+                                        )
+                                    }
                                 }
                             }
-                            TextButton(onClick = { viewModel.restoreAccount(item.account.id) }) {
-                                Text("Restore")
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = formatCurrency(acc.estimatedBalanceMinor, acc.currency),
+                                    style = MaterialTheme.typography.titleMedium.tabularNums(),
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = ext.mutedText,
+                                    modifier = Modifier.size(18.dp),
+                                )
                             }
                         }
+                        if (idx < state.activeAccounts.lastIndex) {
+                            HorizontalDivider(color = ext.divider)
+                        }
+                    }
+
+                    if (state.archivedAccounts.isNotEmpty()) {
+                        HorizontalDivider(color = ext.divider)
+                        V2SettingRow(
+                            title = "Archived accounts",
+                            trailingText = "${state.archivedAccounts.size}",
+                            onClick = { showArchivedSheet = true },
+                        )
                     }
                 }
             }
         }
     }
 
+    // Account Detail / Actions Sheet (one tap deeper)
+    if (selectedAccountForActions != null) {
+        val item = state.activeAccounts.firstOrNull { it.account.id == selectedAccountForActions!!.account.id }
+            ?: selectedAccountForActions!!
+        val acc = item.account
+        ModalBottomSheet(
+            onDismissRequest = { selectedAccountForActions = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(acc.name, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = formatCurrency(acc.estimatedBalanceMinor, acc.currency),
+                        style = MaterialTheme.typography.displaySmall.tabularNums(),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = "${acc.provider.ifBlank { "Manual" }} · ${acc.accountType.name.lowercase().replaceFirstChar(Char::uppercase)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        selectedAccountForActions = null
+                        correctingAccount = item
+                    },
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Update balance", style = MaterialTheme.typography.titleMedium) }
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    V2SettingRow(
+                        title = "Edit account",
+                        onClick = {
+                            selectedAccountForActions = null
+                            editingAccount = acc
+                        },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Link notification app",
+                        subtitle = if (item.linkedSources.isEmpty()) "Not linked" else "${item.linkedSources.size} linked",
+                        onClick = {
+                            selectedAccountForActions = null
+                            linkingAccount = acc
+                        },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Parser rules",
+                        onClick = {
+                            selectedAccountForActions = null
+                            onOpenCustomParsers(item.linkedSources.firstOrNull()?.link?.sourceId)
+                        },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Auto-capture health",
+                        onClick = {
+                            selectedAccountForActions = null
+                            onOpenDiagnostics()
+                        },
+                    )
+                }
+
+                if (item.linkedSources.isNotEmpty()) {
+                    HorizontalDivider(color = ext.divider)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Linked apps",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        item.linkedSources.forEach { ls ->
+                            val src = ls.source
+                            val samplingActive = src?.sampleCollectionUntil != null && src.sampleCollectionUntil > state.nowEpochMillis
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(ls.link.sourceId, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    if (src != null) {
+                                        Text(
+                                            text = if (src.isAllowlisted) "Active" else "Paused",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (src != null && src.parserVersion == null) {
+                                        Switch(
+                                            checked = samplingActive,
+                                            onCheckedChange = { enable -> viewModel.toggleSampleCollection(src.id, enable) },
+                                        )
+                                    }
+                                    TextButton(onClick = { viewModel.unlinkSource(ls.link.id) }) {
+                                        Text("Unlink")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                TextButton(
+                    onClick = {
+                        selectedAccountForActions = null
+                        viewModel.archiveAccount(acc.id)
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text("Archive account", color = MaterialTheme.colorScheme.error)
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+
+    if (showArchivedSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showArchivedSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Archived accounts", style = MaterialTheme.typography.titleLarge)
+                state.archivedAccounts.forEachIndexed { idx, item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.account.name, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = formatCurrency(item.account.estimatedBalanceMinor, item.account.currency),
+                                style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = { viewModel.restoreAccount(item.account.id) }) {
+                            Text("Restore")
+                        }
+                    }
+                    if (idx < state.archivedAccounts.lastIndex) {
+                        HorizontalDivider(color = ext.divider)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
     if (showCreateSheet) {
         AccountEditorBottomSheet(
-            title = "New Account",
+            title = "New account",
             initial = null,
             onDismiss = { showCreateSheet = false },
             onConfirm = { name, provider, type, cur, opening ->
@@ -623,7 +435,7 @@ fun AccountsScreen(
     if (editingAccount != null) {
         val acc = editingAccount!!
         AccountEditorBottomSheet(
-            title = "Edit Account",
+            title = "Edit account",
             initial = acc,
             onDismiss = { editingAccount = null },
             onConfirm = { name, provider, type, cur, _ ->
@@ -633,6 +445,7 @@ fun AccountsScreen(
         )
     }
 
+    // V2 Minimal Screen 09: Update / Reconcile Balance
     if (correctingAccount != null) {
         val card = correctingAccount!!
         val acc = card.account
@@ -652,54 +465,16 @@ fun AccountsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ProviderBadgeAvatar(
-                        labelOrPackage = acc.provider.ifBlank { acc.name },
-                        size = 36.dp,
-                        accountType = acc.accountType,
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Update balance", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = "${acc.name} · Current ${formatCurrency(acc.estimatedBalanceMinor, acc.currency)}",
+                        style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Column {
-                        Text("Reconcile Balance", style = MaterialTheme.typography.titleMedium)
-                        Text("${acc.name} · ${acc.currency}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
-                    }
-                }
-
-                WtrackCard(
-                    cornerRadius = 14.dp,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    elevation = 0.dp,
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Estimated Balance", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
-                            Text(
-                                text = formatCurrency(acc.estimatedBalanceMinor, acc.currency),
-                                style = MaterialTheme.typography.titleSmall.tabularNums(),
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                        if (card.checkpoint != null) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Last Reported Checkpoint", style = MaterialTheme.typography.labelSmall, color = ext.mutedText)
-                                Text(
-                                    text = formatCurrency(card.checkpoint.reportedBalanceMinor, acc.currency),
-                                    style = MaterialTheme.typography.labelMedium.tabularNums(),
-                                    color = ext.mutedText,
-                                )
-                            }
-                        }
-                    }
                 }
 
                 MoneyAmountTextField(
@@ -713,83 +488,63 @@ fun AccountsScreen(
                 )
 
                 if (deltaMinor != null) {
-                    Surface(
-                        color = if (deltaMinor == 0L) ext.inflowContainer else MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, ext.infoTintBorder),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("Adjustment Delta", style = MaterialTheme.typography.labelMedium)
-                                Text(
-                                    text = if (deltaMinor == 0L) {
-                                        "No adjustment needed"
-                                    } else {
-                                        formatCurrency(deltaMinor, acc.currency, signed = true)
-                                    },
-                                    style = MaterialTheme.typography.titleSmall.tabularNums(),
-                                    fontWeight = FontWeight.Bold,
-                                    color = when {
-                                        deltaMinor > 0L -> ext.inflow
-                                        deltaMinor < 0L -> MaterialTheme.colorScheme.error
-                                        else -> MaterialTheme.colorScheme.primary
-                                    },
-                                )
-                            }
                             Text(
-                                text = "Updates this account balance without changing Income or Spending totals.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ext.mutedText,
+                                text = "Adjustment",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = if (deltaMinor == 0L) "No change" else formatCurrency(deltaMinor, acc.currency, signed = true),
+                                style = MaterialTheme.typography.titleMedium.tabularNums(),
+                                color = if (deltaMinor == 0L) ext.inflow else ext.warning,
                             )
                         }
+                        Text(
+                            text = "Updates your balance only — won't affect spending.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                } else {
-                    Text(
-                        text = "Balance adjustments update only this account's balance without changing Income or Spending totals.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ext.mutedText,
-                    )
+                    HorizontalDivider(color = ext.divider)
                 }
 
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
                     label = { Text("Note (optional)") },
-                    placeholder = { Text("e.g. Monthly statement check") },
+                    placeholder = { Text("e.g. Missed parking fee") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp, bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    OutlinedButton(
-                        onClick = { correctingAccount = null },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                    ) { Text("Cancel") }
                     Button(
                         enabled = isValidMoneyInput(actualInput, acc.currency, allowZero = true, allowNegative = true),
                         onClick = {
                             correctingAccount = null
                             viewModel.correctBalance(acc.id, acc.currency, actualInput, note)
                         },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                    ) { Text("Save Adjustment") }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(999.dp),
+                    ) { Text("Save balance", style = MaterialTheme.typography.titleMedium) }
+                    TextButton(onClick = { correctingAccount = null }) {
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -810,15 +565,10 @@ fun AccountsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Allowlist & Link App", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Candidate packages (tap to prefill, verify actual installed ID on device):",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = ext.mutedText,
-                )
+                Text("Link notification app", style = MaterialTheme.typography.titleLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -836,11 +586,6 @@ fun AccountsScreen(
                         }
                     }
                 }
-                Text(
-                    text = "Other common Indonesian banks & e-wallets (auto-detect fallback ready):",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = ext.mutedText,
-                )
                 val otherIndonesianApps = remember {
                     listOf(
                         "GoPay / Gojek" to "com.gojek.app",
@@ -887,7 +632,7 @@ fun AccountsScreen(
                 OutlinedTextField(
                     value = hint,
                     onValueChange = { hint = it },
-                    label = { Text("Masked account hint (optional, e.g. last 4 or pocket)") },
+                    label = { Text("Account hint (optional)") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -901,7 +646,7 @@ fun AccountsScreen(
                     OutlinedButton(
                         onClick = { linkingAccount = null },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(999.dp),
                     ) { Text("Cancel") }
                     Button(
                         enabled = pkg.isNotBlank(),
@@ -910,8 +655,8 @@ fun AccountsScreen(
                             viewModel.linkSource(acc.id, pkg, label, hint.ifBlank { null })
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                    ) { Text("Allowlist & Link") }
+                        shape = RoundedCornerShape(999.dp),
+                    ) { Text("Link app") }
                 }
             }
         }
@@ -953,13 +698,12 @@ private fun AccountEditorBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleLarge)
 
             if (initial == null) {
-                Text("Quick Provider Preset", style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -970,7 +714,7 @@ private fun AccountEditorBottomSheet(
                             onClick = {
                                 provider = presetProvider
                                 type = presetType
-                                if (name.isBlank()) name = "$presetProvider Main"
+                                if (name.isBlank()) name = presetProvider
                             },
                             label = { Text(presetProvider) },
                         )
@@ -981,7 +725,7 @@ private fun AccountEditorBottomSheet(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Account Name") },
+                label = { Text("Account name") },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -995,7 +739,6 @@ private fun AccountEditorBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Text("Account Type", style = MaterialTheme.typography.labelLarge)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -1012,7 +755,7 @@ private fun AccountEditorBottomSheet(
             OutlinedTextField(
                 value = currency,
                 onValueChange = { currency = it.uppercase() },
-                label = { Text("ISO Currency (e.g., IDR)") },
+                label = { Text("Currency (e.g., IDR)") },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -1040,15 +783,15 @@ private fun AccountEditorBottomSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(999.dp),
                 ) { Text("Cancel") }
                 Button(
                     enabled = name.isNotBlank() &&
                         (initial != null || isValidMoneyInput(opening, currency, allowZero = true, allowNegative = true, isOptional = true)),
                     onClick = { onConfirm(name, provider, type, currency, opening) },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                ) { Text("Save Account") }
+                    shape = RoundedCornerShape(999.dp),
+                ) { Text("Save account") }
             }
         }
     }

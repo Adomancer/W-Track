@@ -1,52 +1,53 @@
 package wtrack.app.feature.review
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircleOutline
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.providerBrandStyle
 import wtrack.app.core.theme.tabularNums
@@ -56,10 +57,7 @@ import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.NeedsReviewItem
 import wtrack.app.feature.common.ActionFeedbackBanner
 import wtrack.app.feature.common.MoneyAmountTextField
-import wtrack.app.feature.common.ProviderBadgeAvatar
-import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.UiDateHelper
-import wtrack.app.feature.common.WtrackCard
 import wtrack.app.feature.common.WtrackTopBar
 import wtrack.app.feature.common.isValidMoneyInput
 import wtrack.integration.Direction
@@ -71,260 +69,213 @@ fun ReviewScreen(
     viewModel: ReviewViewModel,
     onBack: (() -> Unit)? = null,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
+    var currentIndex by rememberSaveable { mutableIntStateOf(0) }
     var resolvingItem by remember { mutableStateOf<NeedsReviewItem?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        WtrackTopBar(
-            title = "Needs Review",
-            onBack = onBack,
-            trailing = {
-                StatusPill(
-                    label = if (state.items.isEmpty()) "All clear" else "${state.items.size} pending",
-                    containerColor = if (state.items.isEmpty()) ext.inflowContainer else ext.warningContainer,
-                    contentColor = if (state.items.isEmpty()) ext.onInflowContainer else ext.onWarningContainer,
-                    borderColor = if (state.items.isEmpty()) null else ext.warningBorder,
-                )
-            },
-        )
+    val safeIndex = if (state.items.isNotEmpty()) currentIndex.coerceIn(0, state.items.lastIndex) else 0
+    val currentItem = state.items.getOrNull(safeIndex)
 
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (state.actionMessage != null) {
-                item(key = "msg") {
-                    ActionFeedbackBanner(
-                        message = state.actionMessage!!,
-                        onDismiss = viewModel::clearMessage,
-                    )
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            WtrackTopBar(
+                title = "Needs review",
+                onBack = onBack,
+                trailing = {
+                    if (state.items.isNotEmpty()) {
+                        Text(
+                            text = "${safeIndex + 1} of ${state.items.size}",
+                            style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            if (currentItem != null) {
+                val canQuickConfirm = currentItem.draftAmountMinor != null && state.accounts.isNotEmpty()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Button(
+                        enabled = state.accounts.isNotEmpty(),
+                        onClick = {
+                            if (canQuickConfirm) {
+                                val targetAccountId = currentItem.draftAccountId ?: state.accounts.first().id
+                                val currency = currentItem.draftCurrency
+                                    ?: state.accounts.firstOrNull { it.id == targetAccountId }?.currency
+                                    ?: state.defaultCurrency
+                                val amountInput = MoneyFormatter.formatForInput(currentItem.draftAmountMinor!!, currency)
+                                viewModel.saveResolved(
+                                    item = currentItem,
+                                    accountId = targetAccountId,
+                                    amountMajorInput = amountInput,
+                                    currency = currency,
+                                    direction = currentItem.draftDirection ?: Direction.OUTFLOW,
+                                    type = currentItem.draftType ?: DomainTransactionType.PURCHASE,
+                                    description = currentItem.draftDescription ?: currentItem.draftMerchantRaw.orEmpty(),
+                                    categoryId = null,
+                                    rememberAccountHint = !currentItem.draftAccountHint.isNullOrBlank(),
+                                    rememberPattern = false,
+                                    customTemplatePattern = null,
+                                    customNumberLocale = CustomNumberLocale.INDONESIAN,
+                                )
+                            } else {
+                                resolvingItem = currentItem
+                            }
+                        },
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                    ) {
+                        Text(
+                            text = if (canQuickConfirm) "Confirm" else "Review details",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            if (state.items.size > 1) {
+                                currentIndex = (safeIndex + 1) % state.items.size
+                            } else {
+                                viewModel.ignore(currentItem.id)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                    ) {
+                        Text(
+                            text = if (state.items.size > 1) "Skip" else "Dismiss",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            if (state.actionMessage != null) {
+                ActionFeedbackBanner(
+                    message = state.actionMessage!!,
+                    onDismiss = viewModel::clearMessage,
+                )
+            }
 
-            if (state.items.isEmpty()) {
-                item(key = "empty") {
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Surface(
-                                color = ext.inflowContainer,
-                                shape = RoundedCornerShape(16.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CheckCircleOutline,
-                                    contentDescription = null,
-                                    tint = ext.inflow,
-                                    modifier = Modifier
-                                        .padding(14.dp)
-                                        .size(28.dp),
-                                )
-                            }
-                            Text(
-                                text = "Needs Review Queue Empty",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Incomplete, ambiguous, unmapped, or OS-redacted notifications appear here before entering your confirmed ledger.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ext.mutedText,
-                            )
-                        }
+            if (currentItem == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 64.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircleOutline,
+                            contentDescription = null,
+                            tint = ext.inflow,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        Text(
+                            text = "All caught up",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Text(
+                            text = "No notifications waiting for review.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             } else {
-                item(key = "reassurance") {
-                    Surface(
-                        color = ext.warningContainer,
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, ext.warningBorder),
+                val brand = providerBrandStyle(currentItem.packageName)
+                val currency = currentItem.draftCurrency ?: state.defaultCurrency
+                val amountLabel = currentItem.draftAmountMinor?.let { amt ->
+                    val signed = if (currentItem.draftDirection == Direction.INFLOW) amt else -amt
+                    MoneyFormatter.format(signed, currency, signed = true)
+                }
+
+                // Single Item Focus Card
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, ext.divider),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
+                        Text(
+                            text = "${brand.displayName} · ${UiDateHelper.formatDateTime(currentItem.postedAt)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        Text(
+                            text = amountLabel ?: "Amount needed",
+                            style = if (amountLabel != null) {
+                                MaterialTheme.typography.displaySmall.tabularNums()
+                            } else {
+                                MaterialTheme.typography.titleLarge
+                            },
+                            color = if (currentItem.draftDirection == Direction.INFLOW) {
+                                ext.inflow
+                            } else {
+                                MaterialTheme.colorScheme.onBackground
+                            },
+                        )
+
+                        Text(
+                            text = if (!currentItem.payloadText.isNullOrBlank()) {
+                                "“${currentItem.payloadText}”"
+                            } else {
+                                "Notification text hidden by Android. Tap below to enter the amount."
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+
+                        HorizontalDivider(color = ext.divider)
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                .clickable { resolvingItem = currentItem },
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
-                                contentDescription = null,
-                                tint = ext.warning,
-                                modifier = Modifier.size(18.dp),
+                            Text(
+                                text = "Details & category",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                text = "Items here are quarantined before entering your confirmed ledger so your balances never double-count or drift.",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = ext.onWarningContainer,
-                            )
-                        }
-                    }
-                }
-
-                items(state.items, key = { it.id }) { item ->
-                    val brand = providerBrandStyle(item.packageName)
-                    val isErrorReason = item.reviewReason == ReviewReason.PIPELINE_ERROR ||
-                        item.reviewReason == ReviewReason.VALIDATION_FAILED
-                    val reasonColor = if (isErrorReason) {
-                        MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-                    } else {
-                        ext.warningContainer to ext.onWarningContainer
-                    }
-                    val hasDraftDetails = item.draftAmountMinor != null ||
-                        item.draftDirection != null ||
-                        item.draftType != null ||
-                        !item.draftAccountHint.isNullOrBlank()
-
-                    WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(15.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    ProviderBadgeAvatar(labelOrPackage = item.packageName, size = 34.dp)
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = brand.displayName,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Text(
-                                            text = "${item.packageName} · ${UiDateHelper.formatDateTime(item.postedAt)}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = ext.mutedText,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                                StatusPill(
-                                    label = reviewReasonLabel(item.reviewReason),
-                                    containerColor = reasonColor.first,
-                                    contentColor = reasonColor.second,
-                                    borderColor = if (isErrorReason) null else ext.warningBorder,
-                                )
-                            }
-
-                            if (!item.payloadText.isNullOrBlank()) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(
-                                        text = "\"${item.payloadText}\"",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    )
-                                }
-                            } else {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(
-                                        text = "Notification payload withheld/redacted by OS or retention expiry.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ext.mutedText,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    )
-                                }
-                            }
-
-                            if (hasDraftDetails) {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    if (item.draftAmountMinor != null && item.draftCurrency != null) {
-                                        StatusPill(
-                                            label = MoneyFormatter.format(item.draftAmountMinor, item.draftCurrency),
-                                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        )
-                                    }
-                                    item.draftDirection?.let {
-                                        StatusPill(label = it.name)
-                                    }
-                                    item.draftType?.let {
-                                        StatusPill(label = it.name)
-                                    }
-                                    item.draftAccountHint?.takeIf { it.isNotBlank() }?.let { hint ->
-                                        StatusPill(label = "Hint: $hint")
-                                    }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Button(
-                                    onClick = { resolvingItem = item },
-                                    enabled = state.accounts.isNotEmpty(),
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                ) {
-                                    Text(if (item.draftAmountMinor != null) "Confirm & Save" else "Fill & Save")
-                                }
-                                OutlinedButton(
-                                    onClick = { viewModel.retry(item.id) },
-                                    shape = RoundedCornerShape(12.dp),
-                                ) {
-                                    Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Text(" Retry")
-                                }
-                                TextButton(onClick = { viewModel.ignore(item.id) }) {
-                                    Text("Ignore")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                item(key = "tip") {
-                    WtrackCard(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        elevation = 0.dp,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Lightbulb,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Text(
-                                text = "When resolving unmapped notifications with a pocket or card hint, check \"Remember hint\" so future alerts match automatically.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ext.mutedText,
+                                text = (currentItem.draftDescription ?: currentItem.draftMerchantRaw ?: "Edit") + " ›",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
                             )
                         }
                     }
@@ -370,24 +321,10 @@ fun ReviewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Confirm Transaction Details", style = MaterialTheme.typography.titleMedium)
-
-                if (!item.payloadText.isNullOrBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Text(
-                            text = item.payloadText,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(10.dp),
-                        )
-                    }
-                }
+                Text("Review details", style = MaterialTheme.typography.titleLarge)
 
                 Text("Account", style = MaterialTheme.typography.labelLarge)
                 FlowRow(
@@ -430,7 +367,7 @@ fun ReviewScreen(
                     }
                 }
 
-                Text("Transaction Type", style = MaterialTheme.typography.labelLarge)
+                Text("Type", style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -446,7 +383,7 @@ fun ReviewScreen(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Description / Merchant") },
+                    label = { Text("Merchant / description") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -471,89 +408,59 @@ fun ReviewScreen(
                         Checkbox(checked = rememberHint, onCheckedChange = { rememberHint = it })
                         Text(
                             text = "Remember hint \"${item.draftAccountHint}\" for this account",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                         )
                     }
                 }
 
                 if (item.payloadBody != null || item.payloadText != null) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, ext.cardBorder),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(
-                                    checked = rememberPattern,
-                                    onCheckedChange = { checked ->
-                                        rememberPattern = checked
-                                        if (checked && patternInput.isBlank() && patternSuggestion != null) {
-                                            patternInput = patternSuggestion.templatePattern
-                                            patternLocale = patternSuggestion.numberLocale
-                                        }
-                                    },
-                                )
-                                Column {
-                                    Text(
-                                        text = "Remember this notification pattern",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    Text(
-                                        text = "Auto-parse future matching notifications from ${item.packageName}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ext.mutedText,
-                                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = rememberPattern,
+                            onCheckedChange = { checked ->
+                                rememberPattern = checked
+                                if (checked && patternInput.isBlank() && patternSuggestion != null) {
+                                    patternInput = patternSuggestion.templatePattern
+                                    patternLocale = patternSuggestion.numberLocale
                                 }
-                            }
-                            if (rememberPattern) {
-                                OutlinedTextField(
-                                    value = patternInput,
-                                    onValueChange = { patternInput = it },
-                                    label = { Text("Pattern template") },
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    FilterChip(
-                                        selected = patternLocale == CustomNumberLocale.INDONESIAN,
-                                        onClick = { patternLocale = CustomNumberLocale.INDONESIAN },
-                                        label = { Text("ID (50.000)") },
-                                    )
-                                    FilterChip(
-                                        selected = patternLocale == CustomNumberLocale.ENGLISH,
-                                        onClick = { patternLocale = CustomNumberLocale.ENGLISH },
-                                        label = { Text("EN (50,000.00)") },
-                                    )
-                                }
-                                Text(
-                                    text = "Placeholders: {AMOUNT} (required), {MERCHANT}, {REF}, {IGNORE}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                            }
+                            },
+                        )
+                        Text(
+                            text = "Remember notification format",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    if (rememberPattern) {
+                        OutlinedTextField(
+                            value = patternInput,
+                            onValueChange = { patternInput = it },
+                            label = { Text("Pattern template") },
+                            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = patternLocale == CustomNumberLocale.INDONESIAN,
+                                onClick = { patternLocale = CustomNumberLocale.INDONESIAN },
+                                label = { Text("ID (50.000)") },
+                            )
+                            FilterChip(
+                                selected = patternLocale == CustomNumberLocale.ENGLISH,
+                                onClick = { patternLocale = CustomNumberLocale.ENGLISH },
+                                label = { Text("EN (50,000.00)") },
+                            )
                         }
                     }
                 }
 
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp, bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    OutlinedButton(
-                        onClick = { resolvingItem = null },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                    ) { Text("Cancel") }
                     Button(
                         enabled = isValidMoneyInput(amountInput, currencyInput) &&
                             (!rememberPattern || patternInput.isNotBlank()),
@@ -574,23 +481,23 @@ fun ReviewScreen(
                                 customNumberLocale = patternLocale,
                             )
                         },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                    ) { Text("Confirm & Save") }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(999.dp),
+                    ) { Text("Confirm", style = MaterialTheme.typography.titleMedium) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        TextButton(onClick = {
+                            resolvingItem = null
+                            viewModel.retry(item.id)
+                        }) { Text("Retry") }
+                        TextButton(onClick = {
+                            resolvingItem = null
+                            viewModel.ignore(item.id)
+                        }) { Text("Ignore", color = MaterialTheme.colorScheme.error) }
+                    }
                 }
             }
         }
     }
-}
-
-private fun reviewReasonLabel(reason: ReviewReason): String = when (reason) {
-    ReviewReason.MISSING_AMOUNT -> "Missing Amount"
-    ReviewReason.MISSING_DIRECTION -> "Missing Direction"
-    ReviewReason.INVALID_VALUE -> "Invalid Value"
-    ReviewReason.AMBIGUOUS_FIELD -> "Ambiguous Field"
-    ReviewReason.UNKNOWN_FORMAT -> "Unknown Format"
-    ReviewReason.ACCOUNT_UNMAPPED -> "Unmapped Account"
-    ReviewReason.ACCOUNT_AMBIGUOUS -> "Ambiguous Account"
-    ReviewReason.VALIDATION_FAILED -> "Validation Failed"
-    ReviewReason.PIPELINE_ERROR -> "Pipeline Error"
 }

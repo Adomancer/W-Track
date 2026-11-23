@@ -9,64 +9,73 @@ import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.Rule
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import wtrack.app.core.theme.WtrackTheme
+import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.domain.model.ThemeMode
 import wtrack.app.feature.common.ActionFeedbackBanner
-import wtrack.app.feature.common.CaptureStatusPill
-import wtrack.app.feature.common.SegmentedOptionRow
-import wtrack.app.feature.common.WtrackCard
+import wtrack.app.feature.common.UiDateHelper
+import wtrack.app.feature.common.V2SettingRow
 import wtrack.app.feature.common.WtrackTopBar
 import wtrack.app.feature.root.canUseDeviceAppLock
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -75,10 +84,16 @@ fun SettingsScreen(
     onOpenCategories: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenCustomParsers: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
+
+    var showBackupSheet by remember { mutableStateOf(false) }
+    var showCategoriesSheet by remember { mutableStateOf(false) }
+    var showAppearanceSheet by remember { mutableStateOf(false) }
+    var showCurrencySecuritySheet by remember { mutableStateOf(false) }
 
     var pendingExportUri by remember { mutableStateOf<Uri?>(null) }
     var pendingScheduledFolderUri by remember { mutableStateOf<String?>(null) }
@@ -133,19 +148,67 @@ fun SettingsScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        WtrackTopBar(title = "Settings", onBack = onBack)
+    val alertsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        viewModel.setLocalAlertsEnabled(granted)
+    }
 
-        if (state.isBusy) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
+    val captureHealthy = state.captureSummary.appStatus == CaptureStatus.ACTIVE
+    val captureSubtitle = when (state.captureSummary.appStatus) {
+        CaptureStatus.ACTIVE -> "Working smoothly"
+        CaptureStatus.DISCONNECTED -> "Paused — tap to check"
+        CaptureStatus.ATTENTION -> "Needs attention"
+        CaptureStatus.UNSUPPORTED -> "Manual mode"
+    }
+    val lastBackupLabel = state.settings.lastBackupAt?.let { ts ->
+        "Last backed up ${UiDateHelper.formatDaysAgo(ts, System.currentTimeMillis()).lowercase()}"
+    } ?: "Not backed up yet"
+    val themeLabel = state.settings.themeMode.name.lowercase().replaceFirstChar(Char::uppercase)
+    val appVersion = remember(context) { getAppVersionName(context) }
 
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            Column {
+                WtrackTopBar(title = "Settings", onBack = onBack)
+                if (state.isBusy) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        bottomBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                TextButton(
+                    onClick = { showWipeStep1 = true },
+                    enabled = !state.isBusy,
+                ) {
+                    Text(
+                        text = "Erase all data",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text(
+                    text = "W-Track $appVersion",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ext.mutedText,
+                )
+            }
+        },
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
             if (state.actionMessage != null) {
                 item(key = "msg") {
@@ -158,601 +221,450 @@ fun SettingsScreen(
 
             if (state.showPostRestorePermissionPrompt) {
                 item(key = "post-restore") {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                text = "Backup restored — re-grant Notification Access so W-Track can resume capturing notifications (ING-02).",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                ) { Text("Grant Notification Access") }
-                                TextButton(onClick = viewModel::dismissPostRestorePrompt) { Text("Dismiss") }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // CAPTURE & AUTOMATION
-            item(key = "sec-capture") {
-                SettingsGroupLabel("CAPTURE & AUTOMATION")
-            }
-            item(key = "capture-card") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenDiagnostics)
-                            .padding(horizontal = 14.dp, vertical = 13.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = RoundedCornerShape(10.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Shield,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .padding(7.dp)
-                                        .size(18.dp),
-                                )
-                            }
-                            Column {
-                                Text("Capture Diagnostics & Gate G1", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    text = "Listener status, gap log, OriginOS tips & logs",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            CaptureStatusPill(state.captureSummary.appStatus)
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = ext.mutedText,
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ext.divider)
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenCustomParsers)
-                            .padding(horizontal = 14.dp, vertical = 13.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoAwesome,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Column {
-                                Text("Notification Parsers", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    text = "Custom patterns for new banks & e-wallets",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("${state.customParserRuleCount}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = ext.mutedText,
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ext.divider)
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenRules)
-                            .padding(horizontal = 14.dp, vertical = 13.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.Rule,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text("Categorization Rules", style = MaterialTheme.typography.titleSmall)
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("${state.rules.size}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = ext.mutedText,
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ext.divider)
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenCategories)
-                            .padding(horizontal = 14.dp, vertical = 13.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Category,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text("Categories", style = MaterialTheme.typography.titleSmall)
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("${state.categories.size}", style = MaterialTheme.typography.labelMedium, color = ext.mutedText)
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = ext.mutedText,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // APPEARANCE & CURRENCY
-            item(key = "sec-appearance") {
-                SettingsGroupLabel("APPEARANCE & CURRENCY")
-            }
-            item(key = "appearance-card") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(15.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("Theme", style = MaterialTheme.typography.titleSmall)
-                            val modes = ThemeMode.entries
-                            SegmentedOptionRow(
-                                options = modes.map { it.name.lowercase().replaceFirstChar(Char::uppercase) },
-                                selectedIndex = modes.indexOf(state.settings.themeMode).coerceAtLeast(0),
-                                onSelect = { idx -> viewModel.setThemeMode(modes[idx]) },
-                            )
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Base Currency (single-currency aggregates)", style = MaterialTheme.typography.labelLarge)
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                listOf("IDR", "USD", "SGD", "MYR", "EUR", "JPY").forEach { cur ->
-                                    FilterChip(
-                                        selected = state.settings.baseCurrency == cur,
-                                        onClick = { viewModel.setBaseCurrency(cur) },
-                                        label = { Text(cur) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // SECURITY & PRIVACY
-            item(key = "sec-security") {
-                SettingsGroupLabel("SECURITY")
-            }
-            item(key = "security-card") {
-                val lockSupported = remember(context) { canUseDeviceAppLock(context) }
-                var lockUnavailableHint by remember { mutableStateOf(false) }
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(15.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Biometric & Device App Lock", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    text = "Require fingerprint, face, or device PIN/pattern before viewing ledger data.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-                            Switch(
-                                checked = state.settings.appLockEnabled,
-                                onCheckedChange = { enable ->
-                                    if (enable && !lockSupported) {
-                                        lockUnavailableHint = true
-                                    } else {
-                                        lockUnavailableHint = false
-                                        viewModel.setAppLock(enable, state.settings.appLockTimeoutSeconds)
-                                    }
-                                },
-                            )
-                        }
-                        if (lockUnavailableHint || (!lockSupported && state.settings.appLockEnabled)) {
-                            Text(
-                                text = "Configure a screen lock PIN, pattern, or biometric in Android Settings to enable App Lock.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                        if (state.settings.appLockEnabled) {
-                            HorizontalDivider(color = ext.divider)
-                            Text("Re-lock after leaving app", style = MaterialTheme.typography.labelLarge)
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                listOf(
-                                    0 to "Immediate",
-                                    60 to "1 min",
-                                    300 to "5 min",
-                                ).forEach { (seconds, label) ->
-                                    FilterChip(
-                                        selected = state.settings.appLockTimeoutSeconds == seconds,
-                                        onClick = { viewModel.setAppLock(true, seconds) },
-                                        label = { Text(label) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // PRIVACY & MONITORING
-            item(key = "sec-retention") {
-                SettingsGroupLabel("RETENTION & MONITORING")
-            }
-            item(key = "retention-card") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(15.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text("Verification window for raw notification text", style = MaterialTheme.typography.labelLarge)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            listOf(0, 7, 14, 30).forEach { days ->
-                                FilterChip(
-                                    selected = state.settings.verificationWindowDays == days,
-                                    onClick = { viewModel.setVerificationWindowDays(days) },
-                                    label = { Text(if (days == 0) "0d (Immediate)" else "${days}d") },
-                                )
-                            }
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        Text("Heartbeat stale gap threshold", style = MaterialTheme.typography.labelLarge)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            listOf(1, 3, 6, 12).forEach { hours ->
-                                FilterChip(
-                                    selected = state.settings.heartbeatStaleHours == hours,
-                                    onClick = { viewModel.setHeartbeatStaleHours(hours) },
-                                    label = { Text("${hours}h") },
-                                )
-                            }
-                        }
-                        HorizontalDivider(color = ext.divider)
-                        val alertsPermissionLauncher = rememberLauncherForActivityResult(
-                            contract = ActivityResultContracts.RequestPermission(),
-                        ) { granted ->
-                            viewModel.setLocalAlertsEnabled(granted)
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Local Status Alerts", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    text = "Opt-in privacy-safe device alerts for Needs Review, capture pause, and overdue backups (never includes amounts or merchants).",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ext.mutedText,
-                                )
-                            }
-                            Switch(
-                                checked = state.settings.localAlertsEnabled,
-                                onCheckedChange = { enable ->
-                                    if (!enable) {
-                                        viewModel.setLocalAlertsEnabled(false)
-                                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.POST_NOTIFICATIONS,
-                                        ) != PackageManager.PERMISSION_GRANTED
-                                    ) {
-                                        alertsPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    } else {
-                                        viewModel.setLocalAlertsEnabled(true)
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ENCRYPTED BACKUP & DATA SAFETY
-            item(key = "sec-backup") {
-                SettingsGroupLabel("BACKUP & DATA SAFETY")
-            }
-            item(key = "backup-card") {
-                WtrackCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(15.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text("Encrypted Backups", style = MaterialTheme.typography.titleSmall)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Backups are passphrase-encrypted with Argon2id + AES-256-GCM and omit raw notification payloads and unresolved Needs Review drafts.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.mutedText,
+                            text = "Backup restored — allow Notification Access to resume auto-capture.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
                         )
-                        if (state.pendingReviewCount > 0) {
-                            Surface(
-                                color = ext.warningContainer,
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, ext.warningBorder),
-                            ) {
-                                Text(
-                                    text = "Pending Needs Review items (${state.pendingReviewCount}) will NOT be included in the backup. Resolve them first if you want them backed up.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.onWarningContainer,
-                                    modifier = Modifier.padding(10.dp),
-                                )
-                            }
-                        }
-
-                        Text("Backup reminder interval (days)", style = MaterialTheme.typography.labelLarge)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            listOf(7, 14, 30).forEach { days ->
-                                FilterChip(
-                                    selected = state.settings.backupReminderDays == days,
-                                    onClick = { viewModel.setBackupReminderThresholds(days, state.settings.backupReminderTxCount) },
-                                    label = { Text("${days}d") },
-                                )
-                            }
-                        }
-
-                        Text("Backup reminder transaction threshold", style = MaterialTheme.typography.labelLarge)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            listOf(50, 100, 250).forEach { txCount ->
-                                FilterChip(
-                                    selected = state.settings.backupReminderTxCount == txCount,
-                                    onClick = { viewModel.setBackupReminderThresholds(state.settings.backupReminderDays, txCount) },
-                                    label = { Text("$txCount tx") },
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = { exportBackupLauncher.launch("wtrack-backup.wtrackbackup") },
-                            enabled = !state.isBusy,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Create Encrypted Backup") }
-
-                        HorizontalDivider(color = ext.divider)
-
-                        Text("Scheduled Backup Folder (SAF • DATA-14)", style = MaterialTheme.typography.labelLarge)
-                        val savedFolderUri = state.settings.scheduledBackupFolderUri
-                        if (savedFolderUri == null) {
-                            Text(
-                                text = "No SAF folder selected. Choose a synced or local folder so reminders can target it directly without storing your passphrase.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ext.mutedText,
-                            )
-                            OutlinedButton(
-                                onClick = { openBackupFolderLauncher.launch(null) },
-                                enabled = !state.isBusy,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Choose SAF Backup Folder") }
-                        } else {
-                            val folderLabel = Uri.parse(savedFolderUri).lastPathSegment ?: savedFolderUri
-                            Text("Saved folder: $folderLabel", style = MaterialTheme.typography.labelMedium)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("Scheduled reminder enabled", style = MaterialTheme.typography.bodySmall)
-                                Switch(
-                                    checked = state.settings.scheduledBackupEnabled,
-                                    onCheckedChange = { enabled ->
-                                        viewModel.setScheduledBackupConfig(
-                                            savedFolderUri,
-                                            enabled,
-                                            state.settings.scheduledBackupIntervalDays,
-                                        )
-                                    },
-                                )
-                            }
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf(3, 7, 14).forEach { days ->
-                                    FilterChip(
-                                        selected = state.settings.scheduledBackupIntervalDays == days,
-                                        onClick = {
-                                            viewModel.setScheduledBackupConfig(
-                                                savedFolderUri,
-                                                state.settings.scheduledBackupEnabled,
-                                                days,
-                                            )
-                                        },
-                                        label = { Text("${days}d") },
-                                    )
-                                }
-                            }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = {
-                                    pendingScheduledFolderUri = savedFolderUri
-                                    backupPassphrase = ""
-                                    backupPassphraseConfirm = ""
+                                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                                 },
-                                enabled = !state.isBusy,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Back Up to Saved Folder") }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(
-                                    onClick = { openBackupFolderLauncher.launch(null) },
-                                    enabled = !state.isBusy,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.weight(1f),
-                                ) { Text("Change Folder") }
-                                OutlinedButton(
-                                    onClick = {
-                                        viewModel.setScheduledBackupConfig(
-                                            null,
-                                            false,
-                                            state.settings.scheduledBackupIntervalDays,
-                                        )
-                                    },
-                                    enabled = !state.isBusy,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.weight(1f),
-                                ) { Text("Clear Folder") }
-                            }
+                                shape = RoundedCornerShape(999.dp),
+                            ) { Text("Allow access") }
+                            TextButton(onClick = viewModel::dismissPostRestorePrompt) { Text("Dismiss") }
                         }
-
-                        HorizontalDivider(color = ext.divider)
-
-                        OutlinedButton(
-                            onClick = { restoreBackupLauncher.launch(arrayOf("*/*")) },
-                            enabled = !state.isBusy,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Restore Encrypted Backup") }
-
-                        OutlinedButton(
-                            onClick = { showCsvWarning = true },
-                            enabled = !state.isBusy,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Export Unencrypted CSV") }
                     }
                 }
             }
 
-            // DANGER ZONE
-            item(key = "sec-danger") {
-                SettingsGroupLabel("DANGER ZONE", color = MaterialTheme.colorScheme.error)
+            // Block 1: Auto-capture status row bounded by hairlines
+            item(key = "auto-capture-block") {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Auto-capture",
+                        subtitle = captureSubtitle,
+                        leadingDotColor = if (captureHealthy) ext.inflow else ext.warning,
+                        onClick = onOpenDiagnostics,
+                    )
+                    HorizontalDivider(color = ext.divider)
+                }
             }
-            item(key = "danger-card") {
-                WtrackCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(15.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+
+            // Block 2: 4 plain user-friendly settings rows
+            item(key = "settings-list") {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    V2SettingRow(
+                        title = "Backup & export",
+                        subtitle = lastBackupLabel,
+                        onClick = { showBackupSheet = true },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Categories & rules",
+                        subtitle = "${state.categories.size} categories · ${state.rules.size} rules",
+                        onClick = { showCategoriesSheet = true },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Appearance",
+                        subtitle = themeLabel,
+                        onClick = { showAppearanceSheet = true },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "Currency & security",
+                        subtitle = buildString {
+                            append(state.settings.baseCurrency)
+                            if (state.settings.appLockEnabled) append(" · Lock on")
+                        },
+                        onClick = { showCurrencySecuritySheet = true },
+                    )
+                    HorizontalDivider(color = ext.divider)
+                    V2SettingRow(
+                        title = "About",
+                        subtitle = "Version $appVersion",
+                        onClick = onOpenAbout,
+                    )
+                }
+            }
+        }
+    }
+
+    // Sheet 1: Backup & Export (all existing backup & CSV features preserved)
+    if (showBackupSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBackupSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("Backup & export", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = "Backups are encrypted with your passphrase and stored wherever you choose.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (state.pendingReviewCount > 0) {
+                    Text(
+                        text = "${state.pendingReviewCount} item(s) still in Needs Review won't be included until confirmed.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ext.warning,
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        showBackupSheet = false
+                        exportBackupLauncher.launch("wtrack-backup.wtrackbackup")
+                    },
+                    enabled = !state.isBusy,
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) { Text("Back up now", style = MaterialTheme.typography.titleMedium) }
+
+                OutlinedButton(
+                    onClick = {
+                        showBackupSheet = false
+                        restoreBackupLauncher.launch(arrayOf("*/*"))
+                    },
+                    enabled = !state.isBusy,
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) { Text("Restore backup") }
+
+                HorizontalDivider(color = ext.divider)
+
+                Text("Scheduled folder", style = MaterialTheme.typography.titleMedium)
+                val savedFolderUri = state.settings.scheduledBackupFolderUri
+                if (savedFolderUri == null) {
+                    OutlinedButton(
+                        onClick = { openBackupFolderLauncher.launch(null) },
+                        enabled = !state.isBusy,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Choose backup folder") }
+                } else {
+                    val folderLabel = Uri.parse(savedFolderUri).lastPathSegment ?: savedFolderUri
+                    Text("Folder: $folderLabel", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.WarningAmber,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Text("Erase Local Data", style = MaterialTheme.typography.titleSmall)
-                        }
-                        Text(
-                            text = "Permanently deletes your SQLCipher database, wrapped keys, logs, and settings from this device.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.mutedText,
+                        Text("Backup reminders", style = MaterialTheme.typography.bodyLarge)
+                        Switch(
+                            checked = state.settings.scheduledBackupEnabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.setScheduledBackupConfig(
+                                    savedFolderUri,
+                                    enabled,
+                                    state.settings.scheduledBackupIntervalDays,
+                                )
+                            },
                         )
+                    }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(3, 7, 14).forEach { days ->
+                            FilterChip(
+                                selected = state.settings.scheduledBackupIntervalDays == days,
+                                onClick = {
+                                    viewModel.setScheduledBackupConfig(
+                                        savedFolderUri,
+                                        state.settings.scheduledBackupEnabled,
+                                        days,
+                                    )
+                                },
+                                label = { Text("Every ${days}d") },
+                            )
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = { showWipeStep1 = true },
-                            enabled = !state.isBusy,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Erase All Stored Data") }
+                            onClick = {
+                                showBackupSheet = false
+                                pendingScheduledFolderUri = savedFolderUri
+                                backupPassphrase = ""
+                                backupPassphraseConfirm = ""
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(999.dp),
+                        ) { Text("Back up here") }
+                        TextButton(
+                            onClick = {
+                                viewModel.setScheduledBackupConfig(null, false, state.settings.scheduledBackupIntervalDays)
+                            },
+                        ) { Text("Clear") }
                     }
                 }
+
+                Text("Reminder frequency", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(7, 14, 30).forEach { days ->
+                        FilterChip(
+                            selected = state.settings.backupReminderDays == days,
+                            onClick = { viewModel.setBackupReminderThresholds(days, state.settings.backupReminderTxCount) },
+                            label = { Text("${days}d") },
+                        )
+                    }
+                    listOf(50, 100, 250).forEach { txCount ->
+                        FilterChip(
+                            selected = state.settings.backupReminderTxCount == txCount,
+                            onClick = { viewModel.setBackupReminderThresholds(state.settings.backupReminderDays, txCount) },
+                            label = { Text("$txCount tx") },
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = ext.divider)
+
+                TextButton(
+                    onClick = {
+                        showBackupSheet = false
+                        showCsvWarning = true
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) { Text("Export CSV (unencrypted)") }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+
+    // Sheet 2: Categories, Rules & Parsers
+    if (showCategoriesSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showCategoriesSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = "Categories & rules",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                V2SettingRow(
+                    title = "Categories",
+                    trailingText = "${state.categories.size}",
+                    onClick = {
+                        showCategoriesSheet = false
+                        onOpenCategories()
+                    },
+                )
+                HorizontalDivider(color = ext.divider)
+                V2SettingRow(
+                    title = "Auto-categorization rules",
+                    trailingText = "${state.rules.size}",
+                    onClick = {
+                        showCategoriesSheet = false
+                        onOpenRules()
+                    },
+                )
+                HorizontalDivider(color = ext.divider)
+                V2SettingRow(
+                    title = "Custom notification patterns",
+                    trailingText = "${state.customParserRuleCount}",
+                    onClick = {
+                        showCategoriesSheet = false
+                        onOpenCustomParsers()
+                    },
+                )
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+    }
+
+    // Sheet 3: Appearance
+    if (showAppearanceSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAppearanceSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Appearance", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = "Choose how W-Track looks on your device.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ThemeMode.entries.forEach { mode ->
+                        AppearanceModeOption(
+                            mode = mode,
+                            selected = state.settings.themeMode == mode,
+                            onClick = { viewModel.setThemeMode(mode) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    // Sheet 4: Currency, App Lock & Privacy
+    if (showCurrencySecuritySheet) {
+        val lockSupported = remember(context) { canUseDeviceAppLock(context) }
+        var lockUnavailableHint by remember { mutableStateOf(false) }
+
+        ModalBottomSheet(
+            onDismissRequest = { showCurrencySecuritySheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("Currency & security", style = MaterialTheme.typography.titleLarge)
+
+                Text("Main currency", style = MaterialTheme.typography.labelLarge)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    listOf("IDR", "USD", "SGD", "MYR", "EUR", "JPY").forEach { cur ->
+                        FilterChip(
+                            selected = state.settings.baseCurrency == cur,
+                            onClick = { viewModel.setBaseCurrency(cur) },
+                            label = { Text(cur) },
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = ext.divider)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("App lock", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "Require fingerprint, face, or PIN to open.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.settings.appLockEnabled,
+                        onCheckedChange = { enable ->
+                            if (enable && !lockSupported) {
+                                lockUnavailableHint = true
+                            } else {
+                                lockUnavailableHint = false
+                                viewModel.setAppLock(enable, state.settings.appLockTimeoutSeconds)
+                            }
+                        },
+                    )
+                }
+                if (lockUnavailableHint || (!lockSupported && state.settings.appLockEnabled)) {
+                    Text(
+                        text = "Set up a screen lock in Android Settings first.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (state.settings.appLockEnabled) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0 to "Immediate", 60 to "1 min", 300 to "5 min").forEach { (seconds, label) ->
+                            FilterChip(
+                                selected = state.settings.appLockTimeoutSeconds == seconds,
+                                onClick = { viewModel.setAppLock(true, seconds) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = ext.divider)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Status reminders", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "Alert me if capture pauses or items need review.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.settings.localAlertsEnabled,
+                        onCheckedChange = { enable ->
+                            if (!enable) {
+                                viewModel.setLocalAlertsEnabled(false)
+                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                alertsPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                viewModel.setLocalAlertsEnabled(true)
+                            }
+                        },
+                    )
+                }
+
+                Text("Keep notification history", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0, 7, 14, 30).forEach { days ->
+                        FilterChip(
+                            selected = state.settings.verificationWindowDays == days,
+                            onClick = { viewModel.setVerificationWindowDays(days) },
+                            label = { Text(if (days == 0) "Don't keep" else "${days}d") },
+                        )
+                    }
+                }
+                Text("Pause warning after", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 3, 6, 12).forEach { hours ->
+                        FilterChip(
+                            selected = state.settings.heartbeatStaleHours == hours,
+                            onClick = { viewModel.setHeartbeatStaleHours(hours) },
+                            label = { Text("${hours}h") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -765,22 +677,17 @@ fun SettingsScreen(
                 pendingExportUri = null
                 pendingScheduledFolderUri = null
             },
-            title = { Text(if (folderUriStr != null) "Encrypt Backup to Saved Folder" else "Encrypt Backup File") },
+            title = { Text("Protect backup with a passphrase") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = buildString {
-                            append("Lost passphrases cannot be recovered. Raw notification payloads and Needs Review items are excluded by design.")
-                            if (state.pendingReviewCount > 0) {
-                                append(" You currently have ${state.pendingReviewCount} pending Needs Review item(s) that will be skipped.")
-                            }
-                        },
-                        style = MaterialTheme.typography.bodySmall,
+                        text = "Choose a passphrase (at least 8 characters). Keep it safe — it cannot be reset.",
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
                         value = backupPassphrase,
                         onValueChange = { backupPassphrase = it },
-                        label = { Text("Passphrase (min 8 chars)") },
+                        label = { Text("Passphrase") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -835,7 +742,7 @@ fun SettingsScreen(
                             )
                         }
                     },
-                ) { Text("Encrypt & Verify") }
+                ) { Text("Save backup") }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -850,7 +757,7 @@ fun SettingsScreen(
         val uri = pendingRestoreUri!!
         AlertDialog(
             onDismissRequest = { pendingRestoreUri = null },
-            title = { Text("Restore Backup") },
+            title = { Text("Restore backup") },
             text = {
                 OutlinedTextField(
                     value = backupPassphrase,
@@ -876,15 +783,15 @@ fun SettingsScreen(
     if (showCsvWarning) {
         AlertDialog(
             onDismissRequest = { showCsvWarning = false },
-            title = { Text("Unencrypted CSV Warning") },
+            title = { Text("Export unencrypted CSV?") },
             text = {
-                Text("CSV export writes plaintext financial transactions without encryption (DATA-11). Use encrypted backup for secure storage or device migration.")
+                Text("CSV files are readable by any app. Use encrypted backup for secure storage.")
             },
             confirmButton = {
                 Button(onClick = {
                     showCsvWarning = false
                     exportCsvLauncher.launch("wtrack-transactions.csv")
-                }) { Text("Continue to CSV Export") }
+                }) { Text("Export CSV") }
             },
             dismissButton = { TextButton(onClick = { showCsvWarning = false }) { Text("Cancel") } },
         )
@@ -893,8 +800,8 @@ fun SettingsScreen(
     if (showWipeStep1) {
         AlertDialog(
             onDismissRequest = { showWipeStep1 = false },
-            title = { Text("Erase All Local Data?") },
-            text = { Text("This deletes the SQLCipher database, wrapped keys, logs, and preferences from this device.") },
+            title = { Text("Erase all local data?") },
+            text = { Text("This permanently deletes all transactions, accounts, logs, and settings from this device.") },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -912,7 +819,7 @@ fun SettingsScreen(
     if (showWipeStep2) {
         AlertDialog(
             onDismissRequest = { showWipeStep2 = false },
-            title = { Text("Type WIPE to Confirm") },
+            title = { Text("Type WIPE to confirm") },
             text = {
                 OutlinedTextField(
                     value = wipeConfirmInput,
@@ -930,7 +837,7 @@ fun SettingsScreen(
                         showWipeStep2 = false
                         viewModel.wipeAllData()
                     },
-                ) { Text("Erase Everything") }
+                ) { Text("Erase everything") }
             },
             dismissButton = { TextButton(onClick = { showWipeStep2 = false }) { Text("Cancel") } },
         )
@@ -938,15 +845,132 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsGroupLabel(
-    text: String,
-    color: androidx.compose.ui.graphics.Color = WtrackTheme.colors.mutedText,
+private fun AppearanceModeOption(
+    mode: ThemeMode,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = color,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-    )
+    val ext = WtrackTheme.colors
+    val label = mode.name.lowercase().replaceFirstChar(Char::uppercase)
+    val shape = RoundedCornerShape(16.dp)
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else ext.divider
+    val borderWidth = if (selected) 2.dp else 1.dp
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(76.dp)
+                .clip(shape)
+                .border(borderWidth, borderColor, shape),
+        ) {
+            when (mode) {
+                ThemeMode.LIGHT -> MiniThemePreview(dark = false, modifier = Modifier.fillMaxSize())
+                ThemeMode.DARK -> MiniThemePreview(dark = true, modifier = Modifier.fillMaxSize())
+                ThemeMode.SYSTEM -> Row(modifier = Modifier.fillMaxSize()) {
+                    MiniThemePreview(
+                        dark = false,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                    )
+                    MiniThemePreview(
+                        dark = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                    )
+                }
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (selected) {
+                            Modifier.background(MaterialTheme.colorScheme.primary)
+                        } else {
+                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiniThemePreview(
+    dark: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val bg = if (dark) Color(0xFF0B1413) else Color(0xFFFFFFFF)
+    val ink = if (dark) Color(0xFFF2F7F6) else Color(0xFF101C1A)
+    val accent = if (dark) Color(0xFF1FA392) else Color(0xFF0B6E63)
+    val line = if (dark) Color(0xFF1C2B29) else Color(0xFFE6ECEA)
+
+    Column(
+        modifier = modifier
+            .background(bg)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(accent),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.75f)
+                .height(8.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(ink),
+        )
+        Spacer(Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(line),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .height(5.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(line),
+        )
+    }
 }
