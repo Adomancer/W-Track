@@ -11,7 +11,8 @@
 
 <p>
   <a href="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml"><img src="https://github.com/Adomancer/W-Track/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/Version-1.0.0-0B6E63?style=flat-square" alt="Version 1.0.0" />
+  <img src="https://img.shields.io/badge/Version-1.1.0-0B6E63?style=flat-square" alt="Version 1.1.0" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-064740?style=flat-square" alt="License: GPLv3" /></a>
   <img src="https://img.shields.io/badge/Android-API%2026%E2%80%9336-064740?style=flat-square" alt="Android API 26-36" />
   <img src="https://img.shields.io/badge/Kotlin-2.2.21-101C1A?style=flat-square" alt="Kotlin 2.2.21" />
   <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-0B6E63?style=flat-square" alt="Jetpack Compose Material 3" />
@@ -185,3 +186,9 @@ adb uninstall wtrack.app.test
 | [docs/PROVIDERS.md](docs/PROVIDERS.md) | Installed package registry, observed templates, and Gate G1 evidence table |
 | [docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md](docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md) | Physical `iQOO Z10R` verification checklist |
 | [docs/ADR/](docs/ADR/) | Architecture Decision Records (`ADR-001` through `ADR-006`) |
+
+---
+
+## License
+
+W-Track is free software licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See [LICENSE](LICENSE) for full details.

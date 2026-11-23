@@ -144,6 +144,12 @@ fun AboutScreen(
                     subtitle = "Share feedback or report a bug",
                     onClick = { openUrl("https://github.com/Adomancer/W-Track/issues") },
                 )
+                HorizontalDivider(color = ext.divider)
+                V2SettingRow(
+                    title = "License",
+                    subtitle = "GNU General Public License v3.0",
+                    onClick = { openUrl("https://github.com/Adomancer/W-Track/blob/main/LICENSE") },
+                )
             }
         }
     }
