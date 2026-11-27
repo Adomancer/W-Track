@@ -27,11 +27,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import wtrack.app.R
+import wtrack.app.feature.common.UiText
 
 internal const val WTRACK_BIOMETRIC_AUTHENTICATORS =
     BiometricManager.Authenticators.BIOMETRIC_WEAK or
@@ -48,14 +51,14 @@ internal fun AppLockOverlay(
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var statusMessage by remember { mutableStateOf<UiText?>(null) }
 
     val triggerPrompt = remember(activity) {
         {
             if (activity == null) {
-                statusMessage = "Unable to attach biometric prompt to host window."
+                statusMessage = UiText.Resource(R.string.app_lock_no_host)
             } else if (!canUseDeviceAppLock(activity)) {
-                statusMessage = "No biometric or device PIN/pattern is enrolled on this device."
+                statusMessage = UiText.Resource(R.string.app_lock_not_enrolled)
             } else {
                 statusMessage = null
                 launchDeviceCredentialPrompt(
@@ -92,13 +95,13 @@ internal fun AppLockOverlay(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "W-Track is Locked",
+                text = stringResource(R.string.app_lock_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Authenticate with biometrics or your device PIN/pattern to view your ledger.",
+                text = stringResource(R.string.app_lock_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -106,7 +109,7 @@ internal fun AppLockOverlay(
             statusMessage?.let { msg ->
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = msg,
+                    text = msg.asString(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
@@ -114,7 +117,7 @@ internal fun AppLockOverlay(
             }
             Spacer(modifier = Modifier.height(24.dp))
             Button(onClick = triggerPrompt) {
-                Text("Unlock W-Track")
+                Text(stringResource(R.string.app_lock_unlock_button))
             }
         }
     }
@@ -123,7 +126,7 @@ internal fun AppLockOverlay(
 private fun launchDeviceCredentialPrompt(
     activity: FragmentActivity,
     onSucceeded: () -> Unit,
-    onErrorOrCancel: (String) -> Unit,
+    onErrorOrCancel: (UiText) -> Unit,
 ) {
     val executor = ContextCompat.getMainExecutor(activity)
     val prompt = BiometricPrompt(
@@ -135,17 +138,24 @@ private fun launchDeviceCredentialPrompt(
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                onErrorOrCancel(errString.toString().ifBlank { "Authentication cancelled." })
+                val text = errString.toString().trim()
+                onErrorOrCancel(
+                    if (text.isNotEmpty()) {
+                        UiText.Dynamic(text)
+                    } else {
+                        UiText.Resource(R.string.app_lock_auth_cancelled)
+                    },
+                )
             }
 
             override fun onAuthenticationFailed() {
-                onErrorOrCancel("Authentication not recognized. Try again.")
+                onErrorOrCancel(UiText.Resource(R.string.app_lock_auth_failed))
             }
         },
     )
     val promptInfo = BiometricPrompt.PromptInfo.Builder()
-        .setTitle("Unlock W-Track")
-        .setSubtitle("Verify your identity to access your private financial ledger")
+        .setTitle(activity.getString(R.string.app_lock_unlock_button))
+        .setSubtitle(activity.getString(R.string.app_lock_prompt_subtitle))
         .setAllowedAuthenticators(WTRACK_BIOMETRIC_AUTHENTICATORS)
         .build()
     prompt.authenticate(promptInfo)

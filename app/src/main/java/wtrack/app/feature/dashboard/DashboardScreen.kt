@@ -31,10 +31,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.abs
+import wtrack.app.R
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
 import wtrack.app.feature.common.SectionHeader
@@ -90,7 +93,7 @@ fun DashboardScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Notifications,
-                            contentDescription = "Needs Review",
+                            contentDescription = stringResource(R.string.dashboard_cd_needs_review),
                             modifier = Modifier.size(22.dp),
                             tint = MaterialTheme.colorScheme.onBackground,
                         )
@@ -113,7 +116,7 @@ fun DashboardScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Settings",
+                            contentDescription = stringResource(R.string.dashboard_cd_settings),
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -130,7 +133,10 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
-                        text = "Net cash flow · ${state.shortMonthLabel.ifBlank { state.monthLabel }}",
+                        text = stringResource(
+                            R.string.dashboard_net_cash_flow,
+                            state.shortMonthLabel.ifBlank { state.monthLabel },
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -140,7 +146,7 @@ fun DashboardScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                            contentDescription = "Previous month",
+                            contentDescription = stringResource(R.string.dashboard_cd_prev_month),
                             tint = ext.mutedText,
                             modifier = Modifier.size(16.dp),
                         )
@@ -152,7 +158,7 @@ fun DashboardScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = "Next month",
+                                contentDescription = stringResource(R.string.dashboard_cd_next_month),
                                 tint = ext.mutedText,
                                 modifier = Modifier.size(16.dp),
                             )
@@ -169,7 +175,7 @@ fun DashboardScreen(
                 val incomeStr = formatCompactCurrency(state.summary.totalIncomeMinor, state.baseCurrency)
                 val spentStr = formatCompactCurrency(state.summary.totalExpenseMinor, state.baseCurrency)
                 Text(
-                    text = "Income $incomeStr · Spent $spentStr",
+                    text = stringResource(R.string.dashboard_income_spent, incomeStr, spentStr),
                     style = MaterialTheme.typography.bodyMedium.tabularNums(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -195,7 +201,11 @@ fun DashboardScreen(
                         ) {
                             V2StatusDot(color = ext.warning)
                             Text(
-                                text = "${state.pendingReviewCount} need review",
+                                text = pluralStringResource(
+                                    R.plurals.dashboard_need_review,
+                                    state.pendingReviewCount,
+                                    state.pendingReviewCount,
+                                ),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
@@ -222,17 +232,17 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Back up your ledger",
+                            text = stringResource(R.string.dashboard_backup_reminder),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.weight(1f),
                         )
                         Row {
                             TextButton(onClick = viewModel::dismissBackupReminder) {
-                                Text("Later", color = ext.mutedText)
+                                Text(stringResource(R.string.action_later), color = ext.mutedText)
                             }
                             TextButton(onClick = onOpenSettings) {
-                                Text("Back up", fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.dashboard_back_up_action), fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -245,15 +255,15 @@ fun DashboardScreen(
         item(key = "recent-activity") {
             Column(modifier = Modifier.fillMaxWidth()) {
                 SectionHeader(
-                    title = "Recent activity",
-                    actionLabel = "See all",
+                    title = stringResource(R.string.dashboard_recent_activity),
+                    actionLabel = stringResource(R.string.action_see_all),
                     onAction = onOpenActivity,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
 
                 if (visibleRecent.isEmpty()) {
                     Text(
-                        text = "No activity yet.",
+                        text = stringResource(R.string.dashboard_no_activity),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ext.mutedText,
                         modifier = Modifier.padding(vertical = 20.dp),
@@ -266,8 +276,8 @@ fun DashboardScreen(
                         val categoryName = state.categoryNames[tx.categoryId]
                         val isUncategorized = !isPaired && categoryName.isNullOrBlank()
                         val displayCategory = when {
-                            isPaired -> "Transfer"
-                            isUncategorized -> "Needs category"
+                            isPaired -> stringResource(R.string.label_transfer)
+                            isUncategorized -> stringResource(R.string.label_needs_category)
                             else -> categoryName!!
                         }
                         val amountText = if (isPaired) {

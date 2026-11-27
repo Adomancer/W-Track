@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">W-Track</string>
+
+    <!-- Aksi & Label Umum -->
+    <string name="action_cancel">Batal</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_add">Tambah</string>
+    <string name="action_edit">Ubah</string>
+    <string name="action_delete">Hapus</string>
+    <string name="action_close">Tutup</string>
+    <string name="action_done">Selesai</string>
+    <string name="action_ok">OK</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_continue">Lanjut</string>
+    <string name="action_back">Kembali</string>
+    <string name="action_restore">Pulihkan</string>
+    <string name="action_dismiss">Tutup</string>
+    <string name="action_clear">Hapus</string>
+    <string name="action_apply">Terapkan</string>
+    <string name="action_retry">Coba lagi</string>
+    <string name="action_ignore">Abaikan</string>
+    <string name="action_confirm">Konfirmasi</string>
+    <string name="action_skip">Lewati</string>
+    <string name="action_see_all">Lihat semua</string>
+    <string name="action_unlink">Putus tautan</string>
+    <string name="action_later">Nanti</string>
+    <string name="action_open_app_info">Buka Info Aplikasi</string>
+
+    <string name="label_all">Semua</string>
+    <string name="label_any">Semua</string>
+    <string name="label_both">Keduanya</string>
+    <string name="label_account">Akun</string>
+    <string name="label_account_fallback">Akun #%1$d</string>
+    <string name="label_category">Kategori</string>
+    <string name="label_category_fallback">Kategori</string>
+    <string name="label_date">Tanggal</string>
+    <string name="label_note">Catatan</string>
+    <string name="label_note_optional">Catatan (opsional)</string>
+    <string name="label_direction">Arah</string>
+    <string name="label_type">Jenis</string>
+    <string name="label_status">Status</string>
+    <string name="label_tags">Tag</string>
+    <string name="label_currency">Mata uang</string>
+    <string name="label_passphrase">Frasa sandi</string>
+    <string name="label_confirm_passphrase">Konfirmasi frasa sandi</string>
+    <string name="label_needs_category">Perlu kategori</string>
+    <string name="label_uncategorized">Belum dikategorikan</string>
+    <string name="label_transfer">Transfer</string>
+    <string name="label_manual">Manual</string>
+    <string name="label_system">Sistem</string>
+    <string name="label_custom">Kustom</string>
+    <string name="label_archived">Diarsipkan</string>
+    <string name="label_active">Aktif</string>
+    <string name="label_paused">Dijeda</string>
+    <string name="label_allowed">Diizinkan</string>
+    <string name="label_turn_on">Aktifkan</string>
+    <string name="label_ready">Siap</string>
+    <string name="label_version_format">Versi %1$s</string>
+    <string name="label_voided_category">Dibatalkan · %1$s</string>
+    <string name="label_possible_gap">Kemungkinan Celah</string>
+
+    <!-- Enum -->
+    <string name="direction_outflow">Pengeluaran</string>
+    <string name="direction_inflow">Pemasukan</string>
+
+    <string name="tx_type_purchase">Pembelian</string>
+    <string name="tx_type_transfer">Transfer</string>
+    <string name="tx_type_fee">Biaya</string>
+    <string name="tx_type_refund">Pengembalian</string>
+    <string name="tx_type_cash">Tunai</string>
+    <string name="tx_type_adjustment">Penyesuaian</string>
+    <string name="tx_type_other">Lainnya</string>
+
+    <string name="account_type_bank">Bank</string>
+    <string name="account_type_ewallet">E-Wallet</string>
+    <string name="account_type_credit_card">Kartu Kredit</string>
+    <string name="account_type_cash">Tunai</string>
+    <string name="account_type_other">Lainnya</string>
+
+    <string name="theme_system">Sistem</string>
+    <string name="theme_light">Terang</string>
+    <string name="theme_dark">Gelap</string>
+
+    <string name="capture_status_active">Aktif</string>
+    <string name="capture_status_disconnected">Terputus</string>
+    <string name="capture_status_attention">Perlu perhatian</string>
+    <string name="capture_status_unsupported">Tidak didukung</string>
+
+    <string name="date_filter_all">Semua tanggal</string>
+    <string name="date_filter_this_month">Bulan ini</string>
+    <string name="date_filter_last_30_days">30 hari terakhir</string>
+    <string name="date_filter_previous_month">Bulan lalu</string>
+
+    <string name="number_locale_id_short">ID</string>
+    <string name="number_locale_en_short">EN</string>
+    <string name="number_locale_id_example">ID (50.000)</string>
+    <string name="number_locale_en_example">EN (50,000.00)</string>
+
+    <!-- Tanggal -->
+    <string name="date_today">Hari ini</string>
+    <string name="date_yesterday">Kemarin</string>
+    <string name="date_never">Belum pernah</string>
+    <plurals name="date_days_ago">
+        <item quantity="other">%1$d hari yang lalu</item>
+    </plurals>
+
+    <!-- Input Nominal -->
+    <string name="money_placeholder_idr">cth. 50000 atau 50.000</string>
+    <string name="money_placeholder_zero_decimal">cth. 1500</string>
+    <string name="money_placeholder_decimal">cth. 50000 atau 50.25</string>
+    <string name="money_hint_idr">Ketik 50000, 50.000, atau 50,000 (koma untuk sen: 50.000,50)</string>
+    <string name="money_hint_zero_decimal">Ketik 1500 atau 1,500</string>
+    <string name="money_hint_decimal">Ketik 50000, 50,000, atau 50.25</string>
+    <string name="money_invalid_amount">Nominal %1$s tidak valid (contoh: 50000, 50.000, 50,000)</string>
+    <string name="money_will_save_as">Akan disimpan sebagai: %1$s</string>
+
+    <!-- Tab Navigasi -->
+    <string name="nav_home">Beranda</string>
+    <string name="nav_activity">Aktivitas</string>
+    <string name="nav_accounts">Akun</string>
+    <string name="nav_insights">Ringkasan</string>
+    <string name="nav_review">Tinjau</string>
+    <string name="nav_settings">Pengaturan</string>
+    <string name="nav_rules">Aturan</string>
+    <string name="nav_categories">Kategori</string>
+    <string name="nav_diagnostics">Diagnostik</string>
+    <string name="nav_about">Tentang</string>
+    <string name="nav_parsers">Parser</string>
+    <string name="nav_detail">Detail</string>
+
+    <!-- Root / Kunci Aplikasi / Database Terkunci -->
+    <string name="post_restore_banner">Cadangan dipulihkan — izinkan Akses Notifikasi untuk melanjutkan pencatatan otomatis.</string>
+    <string name="post_restore_allow_access">Izinkan akses</string>
+
+    <string name="app_lock_title">W-Track Terkunci</string>
+    <string name="app_lock_subtitle">Autentikasi dengan biometrik atau PIN/pola perangkat untuk membuka catatan keuangan Anda.</string>
+    <string name="app_lock_unlock_button">Buka Kunci W-Track</string>
+    <string name="app_lock_prompt_subtitle">Verifikasi identitas Anda untuk mengakses catatan keuangan pribadi</string>
+    <string name="app_lock_no_host">Tidak dapat menampilkan dialog biometrik pada jendela saat ini.</string>
+    <string name="app_lock_not_enrolled">Belum ada biometrik atau PIN/pola perangkat yang terdaftar di perangkat ini.</string>
+    <string name="app_lock_auth_cancelled">Autentikasi dibatalkan.</string>
+    <string name="app_lock_auth_failed">Autentikasi tidak dikenali. Coba lagi.</string>
+
+    <string name="db_locked_title">Database Terenkripsi Terkunci</string>
+    <string name="locked_reason_key_missing">Kunci Terbungkus Hilang</string>
+    <string name="locked_reason_key_invalid">Kunci Keystore Tidak Valid atau Rusak</string>
+    <string name="locked_reason_db_open_failed">Dekripsi Database Gagal</string>
+    <string name="db_locked_preserved_notice">File database lokal terenkripsi Anda tetap disimpan utuh. W-Track tidak akan menghapus catatan Anda secara diam-diam.</string>
+    <string name="db_locked_restore_button">Pulihkan dari Cadangan Terenkripsi (.wtrackbackup)</string>
+    <string name="db_locked_erase_button">Hapus Data Lokal &amp; Mulai Ulang</string>
+    <string name="db_locked_enter_passphrase">Masukkan Frasa Sandi Cadangan</string>
+    <string name="db_locked_wipe_step1_title">Hapus Semua Data Lokal?</string>
+    <string name="db_locked_wipe_step1_body">Tindakan ini menghapus permanen buku kas terenkripsi, akun, kategori, aturan, dan materi kunci Keystore lokal. Tidak dapat dibatalkan tanpa file cadangan.</string>
+    <string name="db_locked_wipe_step2_title">Konfirmasi Akhir</string>
+    <string name="db_locked_wipe_step2_prompt">Ketik %1$s untuk menghapus permanen seluruh data keuangan lokal:</string>
+    <string name="db_locked_wipe_confirm_button">Hapus Semuanya</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_get_started">Mulai</string>
+    <string name="onboarding_restore_backup">Pulihkan cadangan</string>
+    <string name="onboarding_finish">Selesai</string>
+    <string name="onboarding_step_progress">%1$d dari %2$d</string>
+    <string name="onboarding_hero_title">Privat secara\nbawaan.</string>
+    <string name="onboarding_hero_subtitle">Catatan keuangan lokal otomatis dari notifikasi bank &amp; e-wallet Anda.</string>
+    <string name="onboarding_trust1_title">Tetap di ponsel Anda</string>
+    <string name="onboarding_trust1_subtitle">Tanpa server cloud, tanpa login bank</string>
+    <string name="onboarding_trust2_title">Hanya aplikasi pilihan Anda</string>
+    <string name="onboarding_trust2_subtitle">OTP dan kode login selalu diabaikan</string>
+    <string name="onboarding_trust3_title">Kendali penuh di tangan Anda</string>
+    <string name="onboarding_trust3_subtitle">Notifikasi yang ragu menunggu konfirmasi Anda</string>
+    <string name="onboarding_step2_title">Aktifkan catat otomatis</string>
+    <string name="onboarding_step2_subtitle">Izinkan akses notifikasi agar W-Track dapat membaca alert transaksi di perangkat Anda.</string>
+    <string name="onboarding_notification_access">Akses notifikasi</string>
+    <string name="onboarding_run_quick_check">Jalankan pemeriksaan cepat</string>
+    <string name="onboarding_verify_capture">Pastikan pencatatan siap bekerja</string>
+    <string name="onboarding_supported_providers">Didukung langsung: %1$s.</string>
+    <string name="onboarding_supported_fallback">Mendukung notifikasi bank/e-wallet bawaan dan pola notifikasi kustom.</string>
+    <string name="onboarding_battery_help_link">Butuh bantuan baterai atau pengaturan terbatas? ›</string>
+    <string name="onboarding_step3_title">Mata uang &amp; akun pertama</string>
+    <string name="onboarding_step3_subtitle">Pilih mata uang utama dan tambahkan akun pertama Anda (opsional).</string>
+    <string name="onboarding_first_account">Akun pertama</string>
+    <string name="onboarding_account_name">Nama akun</string>
+    <string name="onboarding_opening_balance">Saldo awal (opsional)</string>
+    <string name="onboarding_save_account">Simpan akun</string>
+    <string name="onboarding_first_account_added">Akun pertama ditambahkan.</string>
+    <string name="onboarding_battery_dialog_title">Baterai &amp; pengaturan terbatas</string>
+    <string name="onboarding_battery_dialog_body">Jika Android 13+ memblokir Akses Notifikasi untuk aplikasi sideload, buka Info Aplikasi → ⋮ → Izinkan pengaturan terbatas.\n\nJika notifikasi berhenti masuk di latar belakang, izinkan penggunaan daya latar belakang dan Autostart di Info Aplikasi → Baterai.</string>
+    <string name="onboarding_restore_dialog_title">Pulihkan cadangan</string>
+    <string name="onboarding_backup_passphrase">Frasa sandi cadangan</string>
+
+    <!-- Beranda (Dashboard) -->
+    <string name="dashboard_cd_needs_review">Perlu Tinjauan</string>
+    <string name="dashboard_cd_settings">Pengaturan</string>
+    <string name="dashboard_cd_prev_month">Bulan sebelumnya</string>
+    <string name="dashboard_cd_next_month">Bulan berikutnya</string>
+    <string name="dashboard_net_cash_flow">Arus kas bersih · %1$s</string>
+    <string name="dashboard_income_spent">Masuk %1$s · Keluar %2$s</string>
+    <plurals name="dashboard_need_review">
+        <item quantity="other">%1$d perlu ditinjau</item>
+    </plurals>
+    <string name="dashboard_backup_reminder">Cadangkan catatan Anda</string>
+    <string name="dashboard_back_up_action">Cadangkan</string>
+    <string name="dashboard_recent_activity">Aktivitas terbaru</string>
+    <string name="dashboard_no_activity">Belum ada aktivitas.</string>
+
+    <!-- Aktivitas & Detail Transaksi -->
+    <string name="activity_title">Aktivitas</string>
+    <string name="activity_cd_add_tx">Tambah transaksi</string>
+    <string name="activity_search_placeholder">Cari</string>
+    <string name="activity_cd_clear_search">Hapus pencarian</string>
+    <string name="activity_cd_filters">Filter</string>
+    <string name="activity_empty_title">Tidak ada transaksi yang cocok</string>
+    <string name="activity_empty_subtitle">Coba hapus pencarian atau filter, atau ketuk + untuk menambah transaksi.</string>
+    <string name="activity_filters_title">Filter</string>
+    <string name="activity_filter_needs_category">Perlu kategori</string>
+    <string name="activity_filter_include_voided">Sertakan yang dibatalkan</string>
+    <string name="activity_add_tx_title">Tambah transaksi</string>
+    <string name="activity_amount_label">Nominal (%1$s)</string>
+    <string name="activity_merchant_desc_label">Merchant / keterangan</string>
+    <string name="tx_detail_not_found">Transaksi tidak ditemukan.</string>
+    <string name="tx_detail_add_note">Tambah catatan</string>
+    <string name="tx_detail_more_details">Detail lainnya</string>
+    <string name="tx_detail_captured_notif">Notifikasi tertangkap</string>
+    <string name="tx_detail_original_unchanged">Nominal asli tertangkap tidak diubah</string>
+    <string name="tx_detail_edited_after_capture">Diubah setelah tertangkap</string>
+    <string name="tx_detail_parser_version">Parser v%1$d</string>
+    <string name="tx_detail_parser_version_with_rule">Parser v%1$d · Aturan otomatis #%2$d</string>
+    <string name="tx_detail_paired_transfer">Transfer berpasangan ↔ %1$s (Biaya %2$s)</string>
+    <string name="tx_detail_add_tag_pill">+ Tag</string>
+    <string name="tx_detail_link_transfer">Tautkan transfer</string>
+    <string name="tx_detail_unlink_transfer">Putus tautan transfer</string>
+    <string name="tx_detail_link_original">Tautkan transaksi asli</string>
+    <string name="tx_detail_change_original">Ubah transaksi asli</string>
+    <string name="tx_detail_delete_manual">Hapus entri manual</string>
+    <string name="tx_detail_void_action">Batalkan transaksi</string>
+    <string name="tx_detail_restore_action">Pulihkan transaksi</string>
+    <string name="tx_detail_edit_title">Ubah transaksi</string>
+    <string name="tx_detail_datetime_label">Tanggal &amp; waktu (yyyy-MM-dd HH:mm)</string>
+    <string name="tx_detail_save_changes">Simpan perubahan</string>
+    <string name="tx_detail_remember_rule">Ingat untuk transaksi serupa berikutnya</string>
+    <string name="tx_detail_apply_backfill">Terapkan ke transaksi lama tanpa kategori</string>
+    <string name="tx_detail_new_tag">Tag baru</string>
+    <string name="tx_detail_unlink_void_title">Putus transfer &amp; batalkan?</string>
+    <string name="tx_detail_unlink_void_body">Transaksi ini merupakan bagian dari pasangan transfer. Membatalkannya akan memutus tautan pasangan.</string>
+    <string name="tx_detail_unlink_void_confirm">Putus &amp; batalkan</string>
+    <string name="tx_detail_unlink_delete_title">Putus transfer &amp; hapus?</string>
+    <string name="tx_detail_unlink_delete_body">Transaksi manual ini merupakan bagian dari pasangan transfer. Menghapusnya akan memutus tautan pasangan.</string>
+    <string name="tx_detail_unlink_delete_confirm">Putus &amp; hapus</string>
+    <string name="tx_detail_link_transfer_title">Tautkan transfer pasangan</string>
+    <string name="tx_detail_no_transfer_candidates">Tidak ada transaksi berlawanan arah dalam %1$s di akun lain.</string>
+    <string name="tx_detail_link_refund_title">Tautkan pembelian asli</string>
+    <string name="tx_detail_clear_link">Hapus tautan</string>
+
+    <!-- Akun -->
+    <string name="accounts_title">Akun</string>
+    <string name="accounts_add">Tambah akun</string>
+    <string name="accounts_total_balance">Total saldo</string>
+    <string name="accounts_empty_title">Belum ada akun</string>
+    <string name="accounts_empty_subtitle">Tambahkan akun bank, e-wallet, atau tunai untuk mulai mencatat.</string>
+    <string name="accounts_needs_check">Perlu dicek</string>
+    <string name="accounts_archived_title">Akun diarsipkan</string>
+    <string name="accounts_update_balance">Perbarui saldo</string>
+    <string name="accounts_edit_account">Ubah akun</string>
+    <string name="accounts_link_notification_app">Tautkan aplikasi notifikasi</string>
+    <string name="accounts_not_linked">Belum ditautkan</string>
+    <string name="accounts_linked_count">%1$d tertaut</string>
+    <string name="accounts_parser_rules">Aturan parser</string>
+    <string name="accounts_auto_capture_health">Kesehatan catat otomatis</string>
+    <string name="accounts_linked_apps">Aplikasi tertaut</string>
+    <string name="accounts_archive_account">Arsipkan akun</string>
+    <string name="accounts_new_account">Akun baru</string>
+    <string name="accounts_provider_label">Penyedia</string>
+    <string name="accounts_currency_hint">Mata uang (cth., IDR)</string>
+    <string name="accounts_current_balance">Saat ini %1$s</string>
+    <string name="accounts_actual_balance_label">Saldo aktual (%1$s)</string>
+    <string name="accounts_adjustment">Penyesuaian</string>
+    <string name="accounts_no_change">Tidak ada perubahan</string>
+    <string name="accounts_adjustment_note">Hanya memperbarui saldo Anda — tidak memengaruhi pengeluaran.</string>
+    <string name="accounts_adjustment_placeholder">cth. Biaya parkir terlewat</string>
+    <string name="accounts_save_balance">Simpan saldo</string>
+    <string name="accounts_android_package_name">Nama paket Android</string>
+    <string name="accounts_display_name">Nama tampilan</string>
+    <string name="accounts_hint_optional">Petunjuk akun (opsional)</string>
+    <string name="accounts_link_app_button">Tautkan aplikasi</string>
+
+    <!-- Ringkasan (Insights) -->
+    <string name="insights_title">Ringkasan</string>
+    <string name="insights_total_spending">Total pengeluaran</string>
+    <string name="insights_no_spending">Belum ada pengeluaran pada %1$s.</string>
+    <string name="insights_budgets">Anggaran</string>
+    <string name="insights_add_budget">+ Tambah</string>
+    <string name="insights_no_budgets">Belum ada anggaran.</string>
+    <string name="insights_cd_delete_budget">Hapus anggaran</string>
+    <string name="insights_more_title">Ringkasan lengkap · %1$s</string>
+    <string name="insights_all_categories">Semua kategori</string>
+    <string name="insights_top_merchants">Merchant teratas</string>
+    <string name="insights_transfer_fees">Biaya transfer</string>
+    <plurals name="insights_transactions_count">
+        <item quantity="other">%1$d transaksi</item>
+    </plurals>
+    <plurals name="insights_category_share">
+        <item quantity="other">%1$d transaksi · %2$d%%</item>
+    </plurals>
+    <string name="insights_set_budget_title">Atur anggaran bulanan</string>
+    <string name="insights_account_scope">Cakupan akun</string>
+    <string name="insights_all_accounts">Semua akun</string>
+    <string name="insights_monthly_limit_label">Batas bulanan (%1$s)</string>
+    <string name="insights_save_budget">Simpan anggaran</string>
+
+    <!-- Perlu Tinjauan -->
+    <string name="review_title">Perlu tinjauan</string>
+    <string name="review_details_title">Tinjau detail</string>
+    <string name="review_all_caught_up">Semua beres</string>
+    <string name="review_empty_subtitle">Tidak ada notifikasi yang menunggu ditinjau.</string>
+    <string name="review_amount_needed">Nominal diperlukan</string>
+    <string name="review_text_hidden">Teks notifikasi disembunyikan oleh Android. Ketuk di bawah untuk mengisi nominal.</string>
+    <string name="review_details_category">Detail &amp; kategori</string>
+    <string name="review_remember_hint">Ingat petunjuk \"%1$s\" untuk akun ini</string>
+    <string name="review_remember_format">Ingat format notifikasi ini</string>
+    <string name="review_pattern_template">Templat pola</string>
+
+    <!-- Pengaturan & Sub-layar -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_capture_working">Berjalan lancar</string>
+    <string name="settings_capture_paused">Dijeda — ketuk untuk memeriksa</string>
+    <string name="settings_capture_attention">Perlu perhatian</string>
+    <string name="settings_capture_manual">Mode manual</string>
+    <string name="settings_last_backed_up">Terakhir dicadangkan %1$s</string>
+    <string name="settings_not_backed_up_yet">Belum pernah dicadangkan</string>
+    <string name="settings_erase_all_data">Hapus semua data</string>
+    <string name="settings_footer_version">W-Track %1$s</string>
+    <string name="settings_post_restore_prompt">Cadangan dipulihkan — izinkan Akses Notifikasi untuk melanjutkan pencatatan otomatis.</string>
+    <string name="settings_auto_capture">Catat otomatis</string>
+    <string name="settings_backup_export">Cadangan &amp; ekspor</string>
+    <string name="settings_categories_rules">Kategori &amp; aturan</string>
+    <plurals name="settings_categories_count">
+        <item quantity="other">%1$d kategori</item>
+    </plurals>
+    <plurals name="settings_rules_count">
+        <item quantity="other">%1$d aturan</item>
+    </plurals>
+    <string name="settings_appearance">Tampilan</string>
+    <string name="settings_currency_security">Mata uang &amp; keamanan</string>
+    <string name="settings_lock_on_suffix"> · Kunci aktif</string>
+    <string name="settings_about">Tentang</string>
+
+    <string name="settings_backup_desc">Cadangan dienkripsi dengan frasa sandi Anda dan disimpan di lokasi pilihan Anda.</string>
+    <plurals name="settings_backup_pending_review_warning">
+        <item quantity="other">%1$d item yang masih di Perlu Tinjauan tidak akan disertakan sebelum dikonfirmasi.</item>
+    </plurals>
+    <string name="settings_back_up_now">Cadangkan sekarang</string>
+    <string name="settings_scheduled_folder">Folder terjadwal</string>
+    <string name="settings_choose_backup_folder">Pilih folder cadangan</string>
+    <string name="settings_folder_label">Folder: %1$s</string>
+    <string name="settings_backup_reminders">Pengingat cadangan</string>
+    <string name="settings_every_n_days">Setiap %1$dh</string>
+    <string name="settings_back_up_here">Cadangkan di sini</string>
+    <string name="settings_reminder_frequency">Frekuensi pengingat</string>
+    <string name="settings_n_days">%1$dh</string>
+    <string name="settings_n_tx">%1$d tx</string>
+    <string name="settings_export_csv_unencrypted">Ekspor CSV (tanpa enkripsi)</string>
+
+    <string name="settings_auto_categorization_rules">Aturan kategorisasi otomatis</string>
+    <string name="settings_custom_notification_patterns">Pola notifikasi kustom</string>
+    <string name="settings_appearance_desc">Pilih tampilan W-Track di perangkat Anda.</string>
+    <string name="settings_main_currency">Mata uang utama</string>
+    <string name="settings_app_lock">Kunci aplikasi</string>
+    <string name="settings_app_lock_desc">Minta sidik jari, wajah, atau PIN saat membuka.</string>
+    <string name="settings_app_lock_setup_hint">Atur kunci layar di Pengaturan Android terlebih dahulu.</string>
+    <string name="settings_lock_immediate">Segera</string>
+    <string name="settings_lock_1_min">1 mnt</string>
+    <string name="settings_lock_5_min">5 mnt</string>
+    <string name="settings_status_reminders">Pengingat status</string>
+    <string name="settings_status_reminders_desc">Beri tahu jika pencatatan berhenti atau ada item perlu ditinjau.</string>
+    <string name="settings_keep_history">Simpan riwayat notifikasi</string>
+    <string name="settings_dont_keep">Jangan simpan</string>
+    <string name="settings_pause_warning_after">Peringatan jeda setelah</string>
+    <string name="settings_n_hours">%1$dj</string>
+
+    <string name="settings_protect_backup_title">Lindungi cadangan dengan frasa sandi</string>
+    <string name="settings_protect_backup_desc">Pilih frasa sandi (minimal 8 karakter). Simpan baik-baik — tidak dapat direset.</string>
+    <string name="settings_save_backup">Simpan cadangan</string>
+    <string name="settings_csv_warning_title">Ekspor CSV tanpa enkripsi?</string>
+    <string name="settings_csv_warning_desc">File CSV dapat dibaca oleh aplikasi apa pun. Gunakan cadangan terenkripsi untuk penyimpanan aman.</string>
+    <string name="settings_csv_export_action">Ekspor CSV</string>
+    <string name="settings_wipe_step1_title">Hapus semua data lokal?</string>
+    <string name="settings_wipe_step1_desc">Ini akan menghapus permanen seluruh transaksi, akun, log, dan pengaturan dari perangkat ini.</string>
+    <string name="settings_wipe_step2_title">Ketik %1$s untuk konfirmasi</string>
+    <string name="settings_wipe_confirm_action">Hapus semuanya</string>
+
+    <!-- Layar Aturan & Kategori -->
+    <string name="rules_title">Aturan Kategorisasi</string>
+    <string name="rules_empty_title">Belum ada aturan kategorisasi.</string>
+    <string name="rules_empty_desc">Buat aturan untuk menetapkan kategori secara otomatis berdasarkan kunci merchant, kata kunci, dan arah transaksi.</string>
+    <string name="rules_cd_delete">Hapus aturan</string>
+    <string name="rules_create_title">Buat Aturan Kategorisasi</string>
+    <string name="rules_merchant_key_label">Kunci merchant (opsional)</string>
+    <string name="rules_desc_keyword_label">Kata kunci keterangan (opsional)</string>
+    <string name="rules_direction_filter">Filter Arah</string>
+    <string name="rules_target_category">Kategori Target</string>
+    <string name="rules_save">Simpan Aturan</string>
+    <string name="rules_summary_merchant"> · merchant=%1$s</string>
+    <string name="rules_summary_desc"> · ket=%1$s</string>
+
+    <string name="categories_title">Kategori</string>
+    <string name="categories_rename">Ubah nama</string>
+    <string name="categories_archive">Arsipkan</string>
+    <string name="categories_new_title">Kategori Baru</string>
+    <string name="categories_name_label">Nama Kategori</string>
+    <string name="categories_direction_scope">Cakupan Arah</string>
+    <string name="categories_create">Buat</string>
+    <string name="categories_rename_title">Ubah Nama Kategori</string>
+    <string name="categories_rename_label">Nama kategori</string>
+
+    <!-- Layar Diagnostik -->
+    <string name="diagnostics_technical_details">Detail teknis ›</string>
+    <string name="diagnostics_technical_title">Detail teknis</string>
+    <string name="diagnostics_status_active">Aktif</string>
+    <string name="diagnostics_status_attention">Perlu perhatian</string>
+    <string name="diagnostics_hero_active">Semua siap</string>
+    <string name="diagnostics_hero_attention">Aktifkan akses</string>
+    <string name="diagnostics_listening_to">Memantau %1$s</string>
+    <string name="diagnostics_listening_fallback">Membaca notifikasi bank &amp; e-wallet secara otomatis</string>
+    <string name="diagnostics_tap_to_allow">Ketuk untuk mengizinkan</string>
+    <string name="diagnostics_monitored_apps">Aplikasi dipantau</string>
+    <plurals name="diagnostics_supported_apps_count">
+        <item quantity="other">%1$d aplikasi didukung</item>
+    </plurals>
+    <string name="diagnostics_battery_background">Baterai &amp; latar belakang</string>
+    <string name="diagnostics_battery_subtitle">Perbaiki jika notifikasi berhenti masuk</string>
+    <string name="diagnostics_battery_guide">Jika notifikasi berhenti masuk saat aplikasi ditutup:\n\n1. Buka Info Aplikasi → Baterai dan izinkan daya latar belakang.\n2. Pada perangkat dengan pembatasan latar belakang ketat (mis. vivo, Xiaomi, OPPO, Realme, Samsung), aktifkan Autostart / baterai Tanpa Batas.\n3. Di Android 13+, ketuk ⋮ → Izinkan pengaturan terbatas sebelum mengaktifkan Akses Notifikasi.</string>
+    <string name="diagnostics_permission_granted">Izin diberikan</string>
+    <string name="diagnostics_listener_connected">Listener terhubung</string>
+    <string name="diagnostics_last_heartbeat">Heartbeat terakhir</string>
+    <string name="diagnostics_not_recorded">Belum tercatat</string>
+    <string name="diagnostics_m3a_title">Koleksi Sampel M3a (%1$d tersimpan)</string>
+    <string name="diagnostics_extra_redact">Nama tambahan untuk disamarkan (opsional)</string>
+    <string name="diagnostics_export_json">Ekspor JSON</string>
+    <string name="diagnostics_reparse">Parse ulang</string>
+    <string name="diagnostics_purge">Bersihkan</string>
+    <string name="diagnostics_parser_updates">Pembaruan parser</string>
+    <string name="diagnostics_scan_retained">Pindai event tersimpan</string>
+    <string name="diagnostics_proposal_item">%1$s · Tx #%2$d (v%3$d → v%4$d)</string>
+    <string name="diagnostics_gate_g1_title">Evaluator Gate G1</string>
+    <string name="diagnostics_gate_provider_label">Nama penyedia</string>
+    <string name="diagnostics_gate_provider_hint">cth. Bank Jago</string>
+    <string name="diagnostics_gate_days">Hari</string>
+    <string name="diagnostics_gate_days_hint">cth. 14</string>
+    <string name="diagnostics_gate_a">A</string>
+    <string name="diagnostics_gate_a_hint">cth. 35</string>
+    <string name="diagnostics_gate_b">B</string>
+    <string name="diagnostics_gate_b_hint">cth. 34</string>
+    <string name="diagnostics_gate_c">C</string>
+    <string name="diagnostics_gate_c_hint">cth. 33</string>
+    <string name="diagnostics_gate_d">D</string>
+    <string name="diagnostics_gate_d_hint">cth. 32</string>
+    <string name="diagnostics_gate_wrong">Salah</string>
+    <string name="diagnostics_gate_wrong_hint">cth. 0</string>
+    <string name="diagnostics_check_thresholds">Periksa ambang batas</string>
+    <string name="diagnostics_verdict">Hasil: %1$s — %2$s</string>
+    <string name="diagnostics_capture_gaps">Celah pencatatan (%1$d)</string>
+    <string name="diagnostics_no_gaps">Tidak ada celah pencatatan tercatat.</string>
+    <string name="diagnostics_logs_7d">Log (7 hari)</string>
+
+    <!-- Layar Parser Kustom -->
+    <string name="custom_parsers_title">Parser Notifikasi</string>
+    <string name="custom_parsers_add_pattern">Tambah Pola</string>
+    <string name="custom_parsers_intro_title">Ajari W-Track Bank atau E-Wallet Apa Saja</string>
+    <string name="custom_parsers_intro_body">Tempel contoh notifikasi di sini (atau centang \"Ingat format notifikasi ini\" saat meninjau di Perlu Tinjauan). Pola yang cocok akan mencatat notifikasi berikutnya secara otomatis di perangkat tanpa ekspor JSON.</string>
+    <string name="custom_parsers_empty_title">Belum ada pola parser kustom.</string>
+    <string name="custom_parsers_empty_body">Aplikasi yang baru ditautkan sudah mendeteksi nominal otomatis ke Perlu Tinjauan. Tambahkan pola di sini kapan saja dengan menempel contoh notifikasi.</string>
+    <string name="custom_parsers_paste_sample_cta">Tempel Contoh &amp; Buat Pola</string>
+    <string name="custom_parsers_cd_edit">Ubah pola</string>
+    <string name="custom_parsers_cd_delete">Hapus pola</string>
+    <string name="custom_parsers_teach_title">Ajari Pola Notifikasi</string>
+    <string name="custom_parsers_edit_title">Ubah Pola Notifikasi</string>
+    <string name="custom_parsers_source_package">Paket Aplikasi Sumber</string>
+    <string name="custom_parsers_package_id_label">ID paket Android (cth. com.gojek.app)</string>
+    <string name="custom_parsers_paste_section">Tempel Contoh Notifikasi (Opsional)</string>
+    <string name="custom_parsers_sample_title_label">Judul contoh (opsional)</string>
+    <string name="custom_parsers_sample_body_label">Teks notifikasi contoh</string>
+    <string name="custom_parsers_sample_placeholder">cth. Pembayaran Rp25.000 ke Kopi Kenangan berhasil</string>
+    <string name="custom_parsers_autogenerate">Buat Pola Otomatis dari Contoh</string>
+    <string name="custom_parsers_template_label">Templat pola ({AMOUNT} wajib)</string>
+    <string name="custom_parsers_template_placeholder">Pembayaran {AMOUNT} ke {MERCHANT} berhasil</string>
+    <string name="custom_parsers_placeholders_hint">Placeholder: {AMOUNT} (wajib), {MERCHANT} (pihak terkait), {REF}, {IGNORE}</string>
+    <string name="custom_parsers_name_label">Nama pola (opsional)</string>
+    <string name="custom_parsers_title_filter_label">Filter judul (opsional, cth. QRIS)</string>
+    <string name="custom_parsers_tx_type">Jenis Transaksi</string>
+    <string name="custom_parsers_number_format">Format Angka</string>
+    <string name="custom_parsers_matched_preview">Cocok: %1$s · %2$s · %3$s</string>
+    <string name="custom_parsers_matched_merchant_suffix"> · Merchant: %1$s</string>
+    <string name="custom_parsers_save">Simpan Pola</string>
+
+    <!-- Layar Tentang -->
+    <string name="about_tagline">Pencatat pengeluaran privat &amp; lokal</string>
+    <string name="about_privacy_title">Lokal &amp; privat</string>
+    <string name="about_privacy_body">Seluruh transaksi, akun, dan cadangan tetap di perangkat Anda. Tanpa sinkronisasi cloud, tanpa iklan, dan tanpa pelacakan.</string>
+    <string name="about_github_title">Repositori GitHub</string>
+    <string name="about_github_subtitle">Kode sumber &amp; dokumentasi</string>
+    <string name="about_releases_title">Rilis &amp; catatan perubahan</string>
+    <string name="about_releases_subtitle">Periksa versi terbaru</string>
+    <string name="about_issues_title">Laporkan masalah</string>
+    <string name="about_issues_subtitle">Kirim masukan atau laporkan bug</string>
+    <string name="about_license_title">Lisensi</string>
+    <string name="about_license_subtitle">GNU General Public License v3.0</string>
+
+    <!-- Pesan Umpan Balik ViewModel -->
+    <string name="msg_capture_self_check_failed">Pemeriksaan pencatatan gagal.</string>
+    <string name="msg_account_name_required">Nama akun wajib diisi.</string>
+    <string name="msg_invalid_opening_balance">Format saldo awal tidak valid untuk %1$s.</string>
+    <string name="msg_account_added_named">Akun \"%1$s\" ditambahkan.</string>
+    <string name="msg_failed_create_account">Gagal membuat akun.</string>
+    <string name="msg_enter_backup_passphrase">Masukkan frasa sandi cadangan.</string>
+    <string name="msg_unable_open_backup_file">Tidak dapat membuka file cadangan yang dipilih.</string>
+    <string name="msg_restore_success_onboarding">Memulihkan %1$d akun dan %2$d transaksi. Berikan ulang Akses Notifikasi untuk melanjutkan pencatatan.</string>
+    <string name="msg_backup_restore_failed">Pemulihan cadangan gagal.</string>
+    <string name="msg_local_data_wiped_cleanly">Data lokal dihapus bersih.</string>
+    <string name="msg_failed_wipe_storage">Gagal menghapus penyimpanan lokal.</string>
+
+    <string name="msg_account_created">Akun dibuat.</string>
+    <string name="msg_account_updated">Akun diperbarui.</string>
+    <string name="msg_failed_update_account">Gagal memperbarui akun.</string>
+    <string name="msg_account_archived">Akun diarsipkan.</string>
+    <string name="msg_account_restored">Akun dipulihkan.</string>
+    <string name="msg_enter_android_package_id">Masukkan ID paket Android.</string>
+    <string name="msg_source_linked">Sumber %1$s masuk daftar izin dan ditautkan.</string>
+    <string name="msg_source_link_failed">Tidak dapat menautkan sumber (petunjuk mungkin sudah dipakai akun lain).</string>
+    <string name="msg_source_unlinked">Tautan sumber dihapus.</string>
+    <string name="msg_source_allowlisted">\"%1$s\" dimasukkan ke daftar izin.</string>
+    <string name="msg_source_removed_allowlist">\"%1$s\" dihapus dari daftar izin.</string>
+    <string name="msg_sample_collection_enabled">Koleksi sampel aktif selama 14 hari (disimpan terenkripsi di perangkat).</string>
+    <string name="msg_sample_collection_disabled">Koleksi sampel dinonaktifkan.</string>
+    <string name="msg_invalid_balance_input">Input saldo tidak valid untuk %1$s.</string>
+    <string name="msg_balance_matches">Saldo sesuai perkiraan (tidak perlu penyesuaian).</string>
+    <string name="msg_adjustment_recorded">Penyesuaian tercatat %1$s.</string>
+    <string name="msg_adjustment_failed">Gagal mencatat penyesuaian saldo.</string>
+
+    <string name="msg_select_account">Pilih akun.</string>
+    <string name="msg_invalid_amount_for_currency">Nominal tidak valid untuk %1$s.</string>
+    <string name="msg_tx_added">Transaksi ditambahkan.</string>
+    <string name="msg_tx_create_failed">Tidak dapat membuat transaksi.</string>
+    <string name="msg_invalid_amount_format">Format nominal tidak valid untuk %1$s.</string>
+    <string name="msg_tx_updated">Transaksi diperbarui.</string>
+    <string name="msg_update_failed">Pembaruan gagal.</string>
+    <string name="msg_category_updated_and_rule">Kategori diperbarui dan aturan disimpan (%1$d transaksi lama diperbarui).</string>
+    <string name="msg_category_updated">Kategori diperbarui.</string>
+    <string name="msg_category_update_failed">Gagal memperbarui kategori.</string>
+    <string name="msg_tx_voided">Transaksi dibatalkan.</string>
+    <string name="msg_tx_void_failed">Gagal membatalkan transaksi.</string>
+    <string name="msg_tx_restored">Transaksi dipulihkan.</string>
+    <string name="msg_tx_restore_failed">Gagal memulihkan transaksi.</string>
+    <string name="msg_manual_tx_deleted">Transaksi manual dihapus.</string>
+    <string name="msg_delete_captured_blocked">Tidak dapat menghapus transaksi tertangkap; batalkan saja.</string>
+    <string name="msg_transfer_linked">Pasangan transfer ditautkan.</string>
+    <string name="msg_transfer_link_failed">Gagal menautkan pasangan transfer.</string>
+    <string name="msg_transfer_unlinked">Tautan pasangan transfer diputus.</string>
+    <string name="msg_transfer_unlink_failed">Gagal memutus tautan transfer.</string>
+    <string name="msg_suggested_transfer_linked">Saran transfer ditautkan.</string>
+    <string name="msg_suggested_transfer_failed">Gagal menautkan saran transfer.</string>
+    <string name="msg_suggestion_dismissed">Saran transfer diabaikan.</string>
+    <string name="msg_suggestion_dismiss_failed">Gagal mengabaikan saran.</string>
+    <string name="msg_refund_unlinked">Tautan pengembalian dana diputus.</string>
+    <string name="msg_refund_linked">Pengembalian dana ditautkan ke transaksi asli.</string>
+    <string name="msg_refund_link_failed">Gagal menautkan pengembalian dana.</string>
+    <string name="msg_tag_added">Tag #%1$s ditambahkan.</string>
+    <string name="msg_tag_add_failed">Gagal menambahkan tag.</string>
+    <string name="msg_tag_removed">Tag dihapus.</string>
+    <string name="msg_tag_remove_failed">Gagal menghapus tag.</string>
+
+    <string name="msg_invalid_budget_limit">Batas anggaran tidak valid untuk %1$s.</string>
+    <string name="msg_budget_saved">Anggaran disimpan.</string>
+    <string name="msg_budget_save_failed">Gagal menyimpan anggaran.</string>
+    <string name="msg_budget_deleted">Anggaran dihapus.</string>
+
+    <string name="msg_enter_positive_amount">Masukkan nominal positif yang valid untuk %1$s.</string>
+    <string name="msg_review_saved_with_pattern">Transaksi disimpan &amp; pola diingat.</string>
+    <plurals name="msg_review_saved_with_pattern_and_autoparsed">
+        <item quantity="other">Transaksi disimpan &amp; pola diingat. %1$d notifikasi tertunda lainnya diproses otomatis.</item>
+    </plurals>
+    <string name="msg_review_saved_pattern_failed">Transaksi disimpan, tetapi pola gagal disimpan: %1$s</string>
+    <string name="msg_review_confirmed">Transaksi dikonfirmasi dan disimpan.</string>
+    <string name="msg_review_save_failed">Gagal menyimpan transaksi.</string>
+    <string name="msg_review_ignored">Event diabaikan dan payload dibersihkan.</string>
+    <string name="msg_review_ignore_failed">Gagal mengabaikan.</string>
+    <string name="msg_review_retry_done">Pemrosesan ulang selesai.</string>
+    <string name="msg_review_retry_failed">Gagal mencoba ulang.</string>
+
+    <string name="msg_base_currency_updated">Mata uang utama diubah ke %1$s.</string>
+    <string name="msg_backup_thresholds_updated">Ambang batas pengingat cadangan diperbarui.</string>
+    <string name="msg_scheduled_folder_cleared">Folder cadangan terjadwal dikosongkan.</string>
+    <string name="msg_scheduled_settings_updated">Pengaturan cadangan terjadwal diperbarui.</string>
+    <string name="msg_app_lock_enabled">Kunci Aplikasi diaktifkan.</string>
+    <string name="msg_app_lock_disabled">Kunci Aplikasi dinonaktifkan.</string>
+    <string name="msg_local_alerts_enabled">Pengingat status lokal diaktifkan.</string>
+    <string name="msg_local_alerts_disabled">Pengingat status lokal dinonaktifkan.</string>
+    <string name="msg_category_created">Kategori dibuat.</string>
+    <string name="msg_category_create_failed">Gagal membuat kategori.</string>
+    <string name="msg_category_renamed">Nama kategori diubah.</string>
+    <string name="msg_category_rename_failed">Gagal mengubah nama.</string>
+    <string name="msg_rule_deleted">Aturan dihapus.</string>
+    <string name="msg_rule_saved">Aturan disimpan.</string>
+    <string name="msg_rule_save_failed">Gagal menyimpan aturan.</string>
+    <string name="msg_sample_export_open_failed">Tidak dapat membuka tujuan ekspor sampel.</string>
+    <string name="msg_sample_exported">Mengekspor %1$d sampel anonim.</string>
+    <string name="msg_sample_exported_with_skipped">Mengekspor %1$d sampel anonim (%2$d notifikasi keamanan dilewati).</string>
+    <string name="msg_sample_export_failed">Ekspor sampel gagal.</string>
+    <string name="msg_sample_purged">Membersihkan %1$d payload sampel tersimpan dari penyimpanan terenkripsi.</string>
+    <string name="msg_sample_purge_failed">Gagal membersihkan sampel tersimpan.</string>
+    <string name="msg_sample_reparsed">Memproses ulang %1$d sampel tersimpan dengan parser aktif.</string>
+    <string name="msg_sample_reparse_none">Belum ada sampel tersimpan yang cocok dengan parser aktif.</string>
+    <string name="msg_sample_reparse_failed">Pemrosesan ulang sampel gagal.</string>
+    <string name="msg_reparse_none">Tidak ada usulan pembaruan parser untuk event tersimpan.</string>
+    <string name="msg_reparse_found">Ditemukan %1$d usulan pembaruan parser (PAR-11).</string>
+    <string name="msg_reparse_scan_failed">Pemindaian usulan pembaruan parser gagal.</string>
+    <string name="msg_reparse_applied">Pembaruan parser v%1$d diterapkan ke transaksi #%2$d.</string>
+    <string name="msg_reparse_skipped">Usulan dilewati (sudah diterapkan atau transaksi diubah pengguna).</string>
+    <string name="msg_reparse_apply_failed">Tidak dapat menerapkan usulan pembaruan parser.</string>
+    <string name="msg_logs_cleared">Log diagnostik dibersihkan.</string>
+    <string name="msg_backup_dest_open_failed">Tidak dapat membuka tujuan cadangan.</string>
+    <string name="msg_backup_exported_verified">Cadangan diekspor &amp; diverifikasi: %1$d transaksi, %2$d akun.</string>
+    <string name="msg_backup_export_failed">Ekspor cadangan gagal.</string>
+    <string name="msg_backup_file_open_failed">Tidak dapat membuka file cadangan.</string>
+    <string name="msg_restore_success_settings">Memulihkan %1$d akun, %2$d transaksi. Berikan ulang Akses Notifikasi untuk melanjutkan pencatatan.</string>
+    <string name="msg_restore_failed">Pemulihan gagal.</string>
+    <string name="msg_csv_dest_open_failed">Tidak dapat membuka tujuan CSV.</string>
+    <string name="msg_csv_exported">Mengekspor %1$d transaksi ke CSV.</string>
+    <string name="msg_csv_export_failed">Ekspor CSV gagal.</string>
+    <string name="msg_all_local_data_wiped">Seluruh data lokal dihapus.</string>
+    <string name="msg_wipe_failed">Penghapusan gagal.</string>
+
+    <string name="msg_custom_parser_saved">Pola parser kustom disimpan.</string>
+    <string name="msg_custom_parser_updated">Pola parser kustom diperbarui.</string>
+    <string name="msg_custom_parser_saved_autoparsed">Pola parser kustom disimpan. %1$d notifikasi tertunda diproses otomatis.</string>
+    <string name="msg_custom_parser_updated_autoparsed">Pola parser kustom diperbarui. %1$d notifikasi tertunda diproses otomatis.</string>
+    <string name="msg_custom_parser_save_failed">Gagal menyimpan pola parser kustom.</string>
+    <string name="msg_custom_parser_deleted">Pola parser kustom dihapus.</string>
+
+    <!-- Notifikasi Status Lokal -->
+    <string name="notif_channel_name">Pengingat Status W-Track</string>
+    <string name="notif_channel_description">Notifikasi status lokal opsional untuk antrean tinjauan, kesehatan pencatatan, dan pengingat cadangan W-Track.</string>
+    <string name="notif_needs_review_title">W-Track Perlu Tinjauan</string>
+    <plurals name="notif_needs_review_body">
+        <item quantity="other">%1$d notifikasi perlu ditinjau di W-Track.</item>
+    </plurals>
+    <string name="notif_capture_paused_title">Pencatatan W-Track Dijeda</string>
+    <string name="notif_capture_paused_body">Pencatatan notifikasi terjeda. Ketuk untuk membuka W-Track dan memeriksa akses listener.</string>
+    <string name="notif_backup_reminder_title">Pengingat Cadangan W-Track</string>
+    <string name="notif_backup_reminder_body">Saatnya membuat cadangan terenkripsi W-Track agar catatan keuangan tetap aman.</string>
+</resources>

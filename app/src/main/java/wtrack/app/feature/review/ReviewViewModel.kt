@@ -10,8 +10,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import wtrack.app.R
 import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.Category
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
@@ -26,14 +28,15 @@ import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.repository.UpsertCustomParserRuleRequest
 import wtrack.app.domain.time.Clock
 import wtrack.app.domain.usecase.ResolveNeedsReviewUseCase
+import wtrack.app.feature.common.UiText
 import wtrack.integration.Direction
 
 data class ReviewUiState(
     val items: List<NeedsReviewItem> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
-    val defaultCurrency: String = "IDR",
-    val actionMessage: String? = null,
+    val defaultCurrency: String = CurrencyRegistry.DEFAULT_CURRENCY,
+    val actionMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -47,7 +50,7 @@ class ReviewViewModel @Inject constructor(
     private val clock: Clock,
 ) : ViewModel() {
 
-    private val actionMessage = MutableStateFlow<String?>(null)
+    private val actionMessage = MutableStateFlow<UiText?>(null)
 
     val uiState: StateFlow<ReviewUiState> = combine(
         needsReviewRepository.items,
@@ -109,7 +112,7 @@ class ReviewViewModel @Inject constructor(
             val minor = MoneyFormatter.parseMajorInput(amountMajorInput, normalizedCurrency)
                 ?.takeIf { it > 0L }
                 ?: run {
-                    actionMessage.value = "Enter a valid positive amount for $normalizedCurrency."
+                    actionMessage.value = UiText.Resource(R.string.msg_enter_positive_amount, normalizedCurrency)
                     return@launch
                 }
             runCatching {
@@ -148,20 +151,26 @@ class ReviewViewModel @Inject constructor(
                         customParserRuleRepository.retryPendingReviewForSource(item.sourceId)
                     }
                     ruleOutcome.onSuccess { autoParsedOthers ->
-                        actionMessage.value = buildString {
-                            append("Transaction saved & pattern remembered.")
-                            if (autoParsedOthers > 0) {
-                                append(" Auto-parsed $autoParsedOthers more pending notification(s).")
-                            }
+                        actionMessage.value = if (autoParsedOthers > 0) {
+                            UiText.PluralResource(
+                                R.plurals.msg_review_saved_with_pattern_and_autoparsed,
+                                autoParsedOthers,
+                                autoParsedOthers,
+                            )
+                        } else {
+                            UiText.Resource(R.string.msg_review_saved_with_pattern)
                         }
                     }.onFailure { err ->
-                        actionMessage.value = "Transaction saved, but pattern was not saved: ${err.message}"
+                        actionMessage.value = UiText.Resource(
+                            R.string.msg_review_saved_pattern_failed,
+                            err.message?.takeIf { it.isNotBlank() } ?: err::class.java.simpleName,
+                        )
                     }
                 } else {
-                    actionMessage.value = "Transaction confirmed and saved."
+                    actionMessage.value = UiText.Resource(R.string.msg_review_confirmed)
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to save transaction."
+                actionMessage.value = UiText.fromError(err, R.string.msg_review_save_failed)
             }
         }
     }
@@ -169,16 +178,16 @@ class ReviewViewModel @Inject constructor(
     fun ignore(itemId: Long) {
         viewModelScope.launch {
             runCatching { resolveNeedsReviewUseCase.ignore(itemId) }
-                .onSuccess { actionMessage.value = "Event ignored and payload purged." }
-                .onFailure { actionMessage.value = it.message ?: "Ignore failed." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_review_ignored) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_review_ignore_failed) }
         }
     }
 
     fun retry(itemId: Long) {
         viewModelScope.launch {
             runCatching { resolveNeedsReviewUseCase.retry(itemId) }
-                .onSuccess { actionMessage.value = "Re-run completed." }
-                .onFailure { actionMessage.value = it.message ?: "Retry failed." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_review_retry_done) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_review_retry_failed) }
         }
     }
 

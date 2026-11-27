@@ -68,6 +68,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 }
                 buildFeatures {
                     compose = true
+                    buildConfig = true
                 }
                 lint {
                     abortOnError = true
@@ -82,6 +83,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     val versionNameProp = providers.gradleProperty("wtrack.versionName").orNull?.takeIf { it.isNotBlank() }
                     versionCode = versionCodeProp ?: 1010099
                     versionName = versionNameProp ?: "1.1.0"
+                    buildConfigField("String", "REPO_URL", "\"https://github.com/Adomancer/W-Track\"")
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                     vectorDrawables.useSupportLibrary = true
                 }

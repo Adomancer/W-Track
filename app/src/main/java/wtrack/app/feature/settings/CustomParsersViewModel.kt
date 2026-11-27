@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import wtrack.app.R
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.CustomParserRule
 import wtrack.app.domain.model.DomainTransactionType
@@ -20,13 +22,14 @@ import wtrack.app.domain.repository.GeneratedParserTemplate
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.repository.SourceAndEventRepository
 import wtrack.app.domain.repository.UpsertCustomParserRuleRequest
+import wtrack.app.feature.common.UiText
 import wtrack.integration.Direction
 
 data class CustomParsersUiState(
     val rules: List<CustomParserRule> = emptyList(),
     val sources: List<TransactionSource> = emptyList(),
-    val defaultCurrency: String = "IDR",
-    val actionMessage: String? = null,
+    val defaultCurrency: String = CurrencyRegistry.DEFAULT_CURRENCY,
+    val actionMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -36,7 +39,7 @@ class CustomParsersViewModel @Inject constructor(
     settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
-    private val actionMessage = MutableStateFlow<String?>(null)
+    private val actionMessage = MutableStateFlow<UiText?>(null)
 
     val uiState: StateFlow<CustomParsersUiState> = combine(
         customParserRuleRepository.rules,
@@ -119,14 +122,18 @@ class CustomParsersViewModel @Inject constructor(
                 )
                 customParserRuleRepository.retryPendingReviewForSource(cleanedSource)
             }.onSuccess { autoParsed ->
-                actionMessage.value = buildString {
-                    append(if (id == null) "Custom parser pattern saved." else "Custom parser pattern updated.")
-                    if (autoParsed > 0) {
-                        append(" Auto-parsed $autoParsed pending notification(s).")
-                    }
+                actionMessage.value = when {
+                    id == null && autoParsed > 0 ->
+                        UiText.Resource(R.string.msg_custom_parser_saved_autoparsed, autoParsed)
+                    id == null ->
+                        UiText.Resource(R.string.msg_custom_parser_saved)
+                    autoParsed > 0 ->
+                        UiText.Resource(R.string.msg_custom_parser_updated_autoparsed, autoParsed)
+                    else ->
+                        UiText.Resource(R.string.msg_custom_parser_updated)
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to save custom parser pattern."
+                actionMessage.value = UiText.fromError(err, R.string.msg_custom_parser_save_failed)
             }
         }
     }
@@ -140,7 +147,7 @@ class CustomParsersViewModel @Inject constructor(
     fun deleteRule(id: Long) {
         viewModelScope.launch {
             customParserRuleRepository.delete(id)
-            actionMessage.value = "Custom parser pattern deleted."
+            actionMessage.value = UiText.Resource(R.string.msg_custom_parser_deleted)
         }
     }
 

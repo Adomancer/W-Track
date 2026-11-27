@@ -369,6 +369,7 @@ class FakeSettingsRepository(initial: AppSettings = AppSettings(onboardingComple
 class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {
     var wiped = false
     var logs = mutableListOf("2026-11-21T00:00:00Z [INIT] OK")
+    var catalogEntries: List<ProviderCatalogEntry> = emptyList()
     override suspend fun exportEncryptedBackup(
         passphrase: String,
         outputStream: OutputStream,
@@ -380,7 +381,7 @@ class FakeBackupAndDiagnosticsPort : BackupAndDiagnosticsPort {
     override suspend fun wipeAllDataAndReset() { wiped = true; logs.clear() }
     override fun readDiagnosticLogLines(limit: Int): List<String> = logs.takeLast(limit)
     override fun clearDiagnosticLogs() { logs.clear() }
-    override fun providerCatalogEntries(): List<ProviderCatalogEntry> = emptyList()
+    override fun providerCatalogEntries(): List<ProviderCatalogEntry> = catalogEntries
     override suspend fun refreshAllowlistCache() {}
     override suspend fun countRetainedM3aSamples(): Int = 0
     override suspend fun exportAnonymizedM3aSamples(

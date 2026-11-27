@@ -34,7 +34,10 @@ import wtrack.app.domain.usecase.ValidationOutcome
 import wtrack.integration.Direction
 import wtrack.integration.NotificationEvent
 import wtrack.integration.ParseResult
+import wtrack.integration.providers.bca.BcaTransactionParser
 import wtrack.integration.providers.catalog.ProviderCatalog
+import wtrack.integration.providers.dana.DanaTransactionParser
+import wtrack.integration.providers.jago.JagoTransactionParser
 
 class WtrackBackupAndDiagnosticsPort(
     private val holder: WtrackDatabaseHolder,
@@ -304,26 +307,10 @@ class WtrackBackupAndDiagnosticsPort(
         val listenerConnected = captureStatusTracker?.isListenerConnected?.value == true
         val databaseReady = holder.healthState.value is DatabaseHealthState.Ready
         val parserCount = parserRegistry.registeredCount()
-        val syntheticEvent = NotificationEvent(
-            sourceId = "com.jago.digitalBanking",
-            packageName = "com.jago.digitalBanking",
-            title = "Jago",
-            text = "SelfCheck has sent Rp50.000 to you.",
-            bigText = null,
-            subText = null,
-            channelId = "foreground",
-            isGroupSummary = false,
-            isContentRedacted = false,
-            postedAtEpochMillis = clock.nowEpochMillis(),
-            notificationKey = "wtrack_self_check",
-            notificationId = 0,
-            notificationTag = null,
-            sourceEventReference = null,
+        val dryRunPassed = runBuiltInParserSelfCheck(
+            parserRegistry = parserRegistry,
+            nowEpochMillis = clock.nowEpochMillis(),
         )
-        val dryRunResult = parserRegistry.resolve(syntheticEvent)?.parse(syntheticEvent)
-        val dryRunPassed = dryRunResult is ParseResult.Success &&
-            dryRunResult.transaction.amountMinor == 5_000_000L &&
-            dryRunResult.transaction.direction == Direction.INFLOW
 
         val summary = when {
             !databaseReady -> "Encrypted database is not ready."
@@ -341,5 +328,69 @@ class WtrackBackupAndDiagnosticsPort(
             dryRunParserPassed = dryRunPassed,
             summary = summary,
         )
+    }
+}
+
+internal data class BuiltInSelfCheckProbe(
+    val sourceId: String,
+    val title: String,
+    val text: String,
+    val expectedAmountMinor: Long,
+    val expectedDirection: Direction,
+)
+
+internal val builtInSelfCheckProbes: List<BuiltInSelfCheckProbe> = listOf(
+    BuiltInSelfCheckProbe(
+        sourceId = JagoTransactionParser.SOURCE_ID,
+        title = "Jago",
+        text = "SelfCheck has sent Rp50.000 to you.",
+        expectedAmountMinor = 5_000_000L,
+        expectedDirection = Direction.INFLOW,
+    ),
+    BuiltInSelfCheckProbe(
+        sourceId = DanaTransactionParser.SOURCE_ID,
+        title = "DANA",
+        text = "Rp50.000 telah diterima dari SelfCheck",
+        expectedAmountMinor = 5_000_000L,
+        expectedDirection = Direction.INFLOW,
+    ),
+    BuiltInSelfCheckProbe(
+        sourceId = BcaTransactionParser.MYBCA_SOURCE_ID,
+        title = "myBCA",
+        text = "You received IDR 50,000.00 from SelfCheck at Transfer category.",
+        expectedAmountMinor = 5_000_000L,
+        expectedDirection = Direction.INFLOW,
+    ),
+)
+
+internal suspend fun runBuiltInParserSelfCheck(
+    parserRegistry: ParserRegistry,
+    nowEpochMillis: Long,
+): Boolean {
+    val matchingProbes = builtInSelfCheckProbes.filter { probe ->
+        parserRegistry.parserVersionForSource(probe.sourceId) != null
+    }
+    if (matchingProbes.isEmpty()) return false
+    return matchingProbes.all { probe ->
+        val syntheticEvent = NotificationEvent(
+            sourceId = probe.sourceId,
+            packageName = probe.sourceId,
+            title = probe.title,
+            text = probe.text,
+            bigText = null,
+            subText = null,
+            channelId = "foreground",
+            isGroupSummary = false,
+            isContentRedacted = false,
+            postedAtEpochMillis = nowEpochMillis,
+            notificationKey = "wtrack_self_check_${probe.sourceId}",
+            notificationId = 0,
+            notificationTag = null,
+            sourceEventReference = null,
+        )
+        val dryRunResult = parserRegistry.resolve(syntheticEvent)?.parse(syntheticEvent)
+        dryRunResult is ParseResult.Success &&
+            dryRunResult.transaction.amountMinor == probe.expectedAmountMinor &&
+            dryRunResult.transaction.direction == probe.expectedDirection
     }
 }

@@ -22,8 +22,10 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.SouthWest
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
@@ -103,7 +106,7 @@ fun WtrackBrandMark(
     ) {
         Icon(
             painter = painterResource(id = R.drawable.ic_wtrack_mark_mono),
-            contentDescription = "W-Track",
+            contentDescription = stringResource(R.string.app_name),
             tint = Color.White,
             modifier = Modifier.size(size * 0.72f),
         )
@@ -224,7 +227,7 @@ fun WtrackTopBar(
                 IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.action_back),
                         tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
@@ -249,7 +252,7 @@ fun WtrackTopBar(
 
 @Composable
 fun ActionFeedbackBanner(
-    message: String,
+    message: UiText,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -267,13 +270,13 @@ fun ActionFeedbackBanner(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = message,
+                text = message.asString(),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             TextButton(onClick = onDismiss) {
-                Text("OK", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.action_ok), fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -393,16 +396,21 @@ fun v2CategoryIcon(
 ): ImageVector {
     val norm = categoryName.trim().lowercase()
     return when {
-        isTransfer || "transfer" in norm -> Icons.Outlined.SwapHoriz
-        isIncome || "salary" in norm || "income" in norm -> Icons.Outlined.SouthWest
-        isUncategorized || "needs category" in norm || "uncategorized" in norm -> Icons.Outlined.LocalOffer
-        "food" in norm || "dining" in norm || "coffee" in norm -> Icons.Outlined.LocalCafe
-        "transport" in norm || "fuel" in norm || "ride" in norm -> Icons.Outlined.DirectionsCar
-        "bill" in norm || "util" in norm || "electric" in norm -> Icons.Outlined.Bolt
-        "shop" in norm -> Icons.Outlined.ShoppingBag
+        isTransfer || containsAnyKeyword(norm, "transfer", "pindah", "mutasi") -> Icons.Outlined.SwapHoriz
+        isIncome || containsAnyKeyword(norm, "salary", "income", "gaji", "pemasukan", "pendapatan", "bonus") -> Icons.Outlined.SouthWest
+        isUncategorized || containsAnyKeyword(norm, "needs category", "uncategorized", "belum dikategorikan", "tanpa kategori") -> Icons.Outlined.LocalOffer
+        containsAnyKeyword(norm, "food", "dining", "coffee", "makan", "minum", "kopi", "kuliner", "jajan") -> Icons.Outlined.LocalCafe
+        containsAnyKeyword(norm, "transport", "fuel", "ride", "bensin", "bbm", "parkir", "tol", "ojek", "grab", "gojek") -> Icons.Outlined.DirectionsCar
+        containsAnyKeyword(norm, "bill", "util", "electric", "tagihan", "listrik", "pln", "air", "pdam", "internet", "pulsa", "wifi") -> Icons.Outlined.Bolt
+        containsAnyKeyword(norm, "shop", "belanja", "mart", "grocery", "groceries", "kebutuhan") -> Icons.Outlined.ShoppingBag
+        containsAnyKeyword(norm, "health", "kesehatan", "dokter", "obat", "apotek") -> Icons.Outlined.FavoriteBorder
+        containsAnyKeyword(norm, "entertain", "hiburan", "nonton", "game", "musik") -> Icons.Outlined.Movie
         else -> Icons.AutoMirrored.Outlined.ReceiptLong
     }
 }
+
+private fun containsAnyKeyword(text: String, vararg keywords: String): Boolean =
+    keywords.any { it in text }
 
 @Composable
 fun V2TransactionRow(
@@ -459,7 +467,7 @@ fun V2TransactionRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = if (isVoided) "Voided · $category" else category,
+                text = if (isVoided) stringResource(R.string.label_voided_category, category) else category,
                 style = MaterialTheme.typography.bodyMedium,
                 color = categoryColor,
                 maxLines = 1,

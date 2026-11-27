@@ -58,12 +58,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.abs
+import wtrack.app.R
+import wtrack.app.core.i18n.AppLocaleHelper
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
 import wtrack.app.domain.model.DomainTransactionType
@@ -79,6 +83,7 @@ import wtrack.app.feature.common.V2TransactionRow
 import wtrack.app.feature.common.WtrackTopBar
 import wtrack.app.feature.common.formatCurrency
 import wtrack.app.feature.common.isValidMoneyInput
+import wtrack.app.feature.common.labelRes
 import wtrack.app.feature.common.v2CategoryIcon
 import wtrack.integration.Direction
 
@@ -132,14 +137,14 @@ fun ActivityScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Activity",
+                    text = stringResource(R.string.activity_title),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 if (state.accounts.isNotEmpty()) {
                     V2CircleIconButton(
                         icon = Icons.Outlined.Add,
-                        contentDescription = "Add transaction",
+                        contentDescription = stringResource(R.string.activity_cd_add_tx),
                         onClick = { showCreateSheet = true },
                     )
                 }
@@ -172,7 +177,7 @@ fun ActivityScreen(
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                         if (state.filter.query.isEmpty()) {
                             Text(
-                                text = "Search",
+                                text = stringResource(R.string.activity_search_placeholder),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = ext.mutedText,
                             )
@@ -195,7 +200,7 @@ fun ActivityScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Close,
-                                contentDescription = "Clear search",
+                                contentDescription = stringResource(R.string.activity_cd_clear_search),
                                 tint = ext.mutedText,
                                 modifier = Modifier.size(16.dp),
                             )
@@ -206,7 +211,7 @@ fun ActivityScreen(
                 Box {
                     V2CircleIconButton(
                         icon = Icons.Outlined.Tune,
-                        contentDescription = "Filters",
+                        contentDescription = stringResource(R.string.activity_cd_filters),
                         onClick = { showFiltersSheet = true },
                         size = 44.dp,
                     )
@@ -232,12 +237,12 @@ fun ActivityScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = "No matching transactions",
+                        text = stringResource(R.string.activity_empty_title),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "Try clearing your search or filters, or tap + to add an entry.",
+                        text = stringResource(R.string.activity_empty_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -285,12 +290,12 @@ fun ActivityScreen(
                             val tx = item.transaction
                             val isPaired = item.transferPair != null
                             val isInflow = !isPaired && tx.direction == Direction.INFLOW
-                            val title = tx.merchantName ?: tx.description ?: tx.transactionType.name
+                            val title = tx.merchantName ?: tx.description ?: stringResource(tx.transactionType.labelRes())
                             val isUncategorized = !isPaired &&
                                 (item.categoryName.isBlank() || item.categoryName.equals("Uncategorized", ignoreCase = true))
                             val displayCategory = when {
-                                isPaired -> "Transfer"
-                                isUncategorized -> "Needs category"
+                                isPaired -> stringResource(R.string.label_transfer)
+                                isUncategorized -> stringResource(R.string.label_needs_category)
                                 else -> item.categoryName
                             }
                             val amountText = if (isPaired) {
@@ -344,7 +349,7 @@ fun ActivityScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Filters", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.activity_filters_title), style = MaterialTheme.typography.titleLarge)
                     TextButton(
                         onClick = {
                             viewModel.updateFilter {
@@ -360,27 +365,27 @@ fun ActivityScreen(
                                 )
                             }
                         },
-                    ) { Text("Reset") }
+                    ) { Text(stringResource(R.string.action_reset)) }
                 }
 
-                Text("Date", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_date), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ActivityDateFilter.entries.forEach { range ->
                         FilterChip(
                             selected = state.filter.dateFilter == range,
                             onClick = { viewModel.updateFilter { it.copy(dateFilter = range) } },
-                            label = { Text(range.label) },
+                            label = { Text(stringResource(range.labelRes)) },
                         )
                     }
                 }
 
                 if (state.accounts.isNotEmpty()) {
-                    Text("Account", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.label_account), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = state.filter.accountId == null,
                             onClick = { viewModel.updateFilter { it.copy(accountId = null) } },
-                            label = { Text("All") },
+                            label = { Text(stringResource(R.string.label_all)) },
                         )
                         state.accounts.forEach { acc ->
                             FilterChip(
@@ -394,21 +399,21 @@ fun ActivityScreen(
                     }
                 }
 
-                Text("Status", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_status), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = state.filter.uncategorizedOnly,
                         onClick = { viewModel.updateFilter { it.copy(uncategorizedOnly = !it.uncategorizedOnly) } },
-                        label = { Text("Needs category") },
+                        label = { Text(stringResource(R.string.activity_filter_needs_category)) },
                     )
                     FilterChip(
                         selected = state.filter.showVoided,
                         onClick = { viewModel.updateFilter { it.copy(showVoided = !it.showVoided) } },
-                        label = { Text("Include voided") },
+                        label = { Text(stringResource(R.string.activity_filter_include_voided)) },
                     )
                 }
 
-                Text("Direction", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_direction), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Direction.entries.forEach { d ->
                         FilterChip(
@@ -416,12 +421,12 @@ fun ActivityScreen(
                             onClick = {
                                 viewModel.updateFilter { it.copy(direction = if (it.direction == d) null else d) }
                             },
-                            label = { Text(d.name) },
+                            label = { Text(stringResource(d.labelRes())) },
                         )
                     }
                 }
 
-                Text("Type", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_type), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DomainTransactionType.entries.forEach { t ->
                         FilterChip(
@@ -429,13 +434,13 @@ fun ActivityScreen(
                             onClick = {
                                 viewModel.updateFilter { it.copy(type = if (it.type == t) null else t) }
                             },
-                            label = { Text(t.name) },
+                            label = { Text(stringResource(t.labelRes())) },
                         )
                     }
                 }
 
                 if (state.categories.isNotEmpty()) {
-                    Text("Category", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.label_category), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         state.categories.forEach { cat ->
                             FilterChip(
@@ -450,7 +455,7 @@ fun ActivityScreen(
                 }
 
                 if (state.tags.isNotEmpty()) {
-                    Text("Tags", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.label_tags), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         state.tags.forEach { tag ->
                             FilterChip(
@@ -470,7 +475,7 @@ fun ActivityScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                ) { Text("Done", style = MaterialTheme.typography.titleMedium) }
+                ) { Text(stringResource(R.string.action_done), style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -498,7 +503,7 @@ fun ActivityScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Add transaction", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.activity_add_tx_title), style = MaterialTheme.typography.titleLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     state.accounts.forEach { acc ->
                         FilterChip(
@@ -512,23 +517,31 @@ fun ActivityScreen(
                     value = amountInput,
                     onValueChange = { amountInput = it },
                     currency = selectedCurrency,
-                    label = "Amount ($selectedCurrency)",
+                    label = stringResource(R.string.activity_amount_label, selectedCurrency),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Direction.entries.forEach { d ->
-                        FilterChip(selected = direction == d, onClick = { direction = d }, label = { Text(d.name) })
+                        FilterChip(
+                            selected = direction == d,
+                            onClick = { direction = d },
+                            label = { Text(stringResource(d.labelRes())) },
+                        )
                     }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DomainTransactionType.entries.filter { it != DomainTransactionType.ADJUSTMENT }.forEach { t ->
-                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.name) })
+                        FilterChip(
+                            selected = type == t,
+                            onClick = { type = t },
+                            label = { Text(stringResource(t.labelRes())) },
+                        )
                     }
                 }
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Merchant / description") },
+                    label = { Text(stringResource(R.string.activity_merchant_desc_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -536,7 +549,7 @@ fun ActivityScreen(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Note (optional)") },
+                    label = { Text(stringResource(R.string.label_note_optional)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -560,7 +573,7 @@ fun ActivityScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                ) { Text("Save", style = MaterialTheme.typography.titleMedium) }
+                ) { Text(stringResource(R.string.action_save), style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -576,6 +589,7 @@ fun TransactionDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
+    val activeLocale = AppLocaleHelper.activeLocale(LocalContext.current)
     val item = state.allItems.firstOrNull { it.transaction.id == transactionId }
         ?: run {
             Scaffold(
@@ -583,7 +597,7 @@ fun TransactionDetailScreen(
                 topBar = { WtrackTopBar(title = "", onBack = onBack) },
             ) { inner ->
                 Column(modifier = Modifier.padding(inner).padding(24.dp)) {
-                    Text("Transaction not found.", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.tx_detail_not_found), style = MaterialTheme.typography.bodyLarge)
                 }
             }
             return
@@ -599,7 +613,10 @@ fun TransactionDetailScreen(
     var confirmPairedDelete by remember { mutableStateOf(false) }
     var showMoreDetails by remember { mutableStateOf(false) }
 
-    val displayTitle = tx.merchantName ?: tx.description ?: tx.transactionType.name
+    val displayTitle = tx.merchantName ?: tx.description ?: stringResource(tx.transactionType.labelRes())
+    val displayAccountName = item.accountName.ifBlank {
+        stringResource(R.string.label_account_fallback, tx.accountId)
+    }
     val isPaired = item.transferPair != null
     val isInflow = !isPaired && tx.direction == Direction.INFLOW
     val signed = if (tx.direction == Direction.INFLOW) tx.amountMinor else -tx.amountMinor
@@ -624,7 +641,7 @@ fun TransactionDetailScreen(
                 trailing = {
                     TextButton(onClick = { showEditSheet = true }) {
                         Text(
-                            text = "Edit",
+                            text = stringResource(R.string.action_edit),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -650,7 +667,7 @@ fun TransactionDetailScreen(
                         },
                     ) {
                         Text(
-                            text = "Void transaction",
+                            text = stringResource(R.string.tx_detail_void_action),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -658,7 +675,7 @@ fun TransactionDetailScreen(
                 } else {
                     TextButton(onClick = { viewModel.restoreTransaction(tx.id) }) {
                         Text(
-                            text = "Restore transaction",
+                            text = stringResource(R.string.tx_detail_restore_action),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -727,24 +744,24 @@ fun TransactionDetailScreen(
             // 4 core rows + "More details ›"
             item(key = "details") {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    DetailRow(label = "Account") {
+                    DetailRow(label = stringResource(R.string.label_account)) {
                         Text(
-                            text = item.accountName,
+                            text = displayAccountName,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                     HorizontalDivider(color = ext.divider)
-                    DetailRow(label = "Date") {
+                    DetailRow(label = stringResource(R.string.label_date)) {
                         Text(
-                            text = UiDateHelper.formatDateTime(tx.occurredAt),
+                            text = UiDateHelper.formatDateTime(tx.occurredAt, locale = activeLocale),
                             style = MaterialTheme.typography.bodyLarge.tabularNums(),
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                     HorizontalDivider(color = ext.divider)
                     DetailRow(
-                        label = "Category",
+                        label = stringResource(R.string.label_category),
                         onClick = { showCategorySheet = true },
                     ) {
                         Row(
@@ -752,7 +769,7 @@ fun TransactionDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = if (isUncategorized) "Needs category" else item.categoryName,
+                                text = if (isUncategorized) stringResource(R.string.label_needs_category) else item.categoryName,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (isUncategorized) ext.mutedText else MaterialTheme.colorScheme.onBackground,
                             )
@@ -766,11 +783,11 @@ fun TransactionDetailScreen(
                     }
                     HorizontalDivider(color = ext.divider)
                     DetailRow(
-                        label = "Note",
+                        label = stringResource(R.string.label_note),
                         onClick = { showEditSheet = true },
                     ) {
                         Text(
-                            text = tx.note?.takeIf { it.isNotBlank() } ?: "Add note",
+                            text = tx.note?.takeIf { it.isNotBlank() } ?: stringResource(R.string.tx_detail_add_note),
                             style = MaterialTheme.typography.bodyLarge,
                             color = if (tx.note.isNullOrBlank()) ext.mutedText else MaterialTheme.colorScheme.onBackground,
                             maxLines = 1,
@@ -787,7 +804,7 @@ fun TransactionDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "More details",
+                            text = stringResource(R.string.tx_detail_more_details),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -814,7 +831,7 @@ fun TransactionDetailScreen(
                             if (tx.retainedPayloadPreview != null) {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
-                                        text = "Captured notification",
+                                        text = stringResource(R.string.tx_detail_captured_notif),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -831,21 +848,29 @@ fun TransactionDetailScreen(
                                     snap.transactionType == tx.transactionType &&
                                     snap.accountId == tx.accountId
                                 Text(
-                                    text = if (unchanged) "Original captured amount unchanged" else "Edited after capture",
+                                    text = stringResource(
+                                        if (unchanged) R.string.tx_detail_original_unchanged else R.string.tx_detail_edited_after_capture,
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = if (unchanged) ext.inflow else ext.warning,
                                 )
                             }
                             if (tx.parserVersion != null) {
                                 Text(
-                                    text = "Parser v${tx.parserVersion}${tx.appliedRuleId?.let { " · Auto-rule #$it" } ?: ""}",
+                                    text = tx.appliedRuleId?.let { ruleId ->
+                                        stringResource(R.string.tx_detail_parser_version_with_rule, tx.parserVersion, ruleId)
+                                    } ?: stringResource(R.string.tx_detail_parser_version, tx.parserVersion),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = ext.mutedText,
                                 )
                             }
                             if (item.transferPair != null) {
                                 Text(
-                                    text = "Paired transfer ↔ ${item.counterpartAccountName ?: "Account"} (Fee ${formatCurrency(item.transferPair.feeMinor, tx.currency)})",
+                                    text = stringResource(
+                                        R.string.tx_detail_paired_transfer,
+                                        item.counterpartAccountName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.label_account),
+                                        formatCurrency(item.transferPair.feeMinor, tx.currency),
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium.tabularNums(),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -866,7 +891,7 @@ fun TransactionDetailScreen(
                                     )
                                 }
                                 StatusPill(
-                                    label = "+ Tag",
+                                    label = stringResource(R.string.tx_detail_add_tag_pill),
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
@@ -884,13 +909,13 @@ fun TransactionDetailScreen(
                                         onClick = { showTransferPicker = true },
                                         shape = RoundedCornerShape(999.dp),
                                         modifier = Modifier.weight(1f),
-                                    ) { Text("Link transfer") }
+                                    ) { Text(stringResource(R.string.tx_detail_link_transfer)) }
                                 } else if (item.transferPair != null) {
                                     OutlinedButton(
                                         onClick = { viewModel.unlinkTransfer(item.transferPair.id) },
                                         shape = RoundedCornerShape(999.dp),
                                         modifier = Modifier.weight(1f),
-                                    ) { Text("Unlink transfer") }
+                                    ) { Text(stringResource(R.string.tx_detail_unlink_transfer)) }
                                 }
 
                                 if (tx.transactionType == DomainTransactionType.REFUND && tx.direction == Direction.INFLOW) {
@@ -898,7 +923,17 @@ fun TransactionDetailScreen(
                                         onClick = { showRefundPicker = true },
                                         shape = RoundedCornerShape(999.dp),
                                         modifier = Modifier.weight(1f),
-                                    ) { Text(if (tx.relatedTransactionId == null) "Link original" else "Change original") }
+                                    ) {
+                                        Text(
+                                            stringResource(
+                                                if (tx.relatedTransactionId == null) {
+                                                    R.string.tx_detail_link_original
+                                                } else {
+                                                    R.string.tx_detail_change_original
+                                                },
+                                            ),
+                                        )
+                                    }
                                 }
                             }
 
@@ -913,7 +948,7 @@ fun TransactionDetailScreen(
                                         }
                                     },
                                 ) {
-                                    Text("Delete manual entry", color = MaterialTheme.colorScheme.error)
+                                    Text(stringResource(R.string.tx_detail_delete_manual), color = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
@@ -944,9 +979,9 @@ fun TransactionDetailScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Edit transaction", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.tx_detail_edit_title), style = MaterialTheme.typography.titleLarge)
                 if (state.accounts.isNotEmpty()) {
-                    Text("Account", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.label_account), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         state.accounts.forEach { acc ->
                             FilterChip(
@@ -961,33 +996,41 @@ fun TransactionDetailScreen(
                     value = editAmount,
                     onValueChange = { editAmount = it },
                     currency = tx.currency,
-                    label = "Amount (${tx.currency})",
+                    label = stringResource(R.string.activity_amount_label, tx.currency),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = editDateTime,
                     onValueChange = { editDateTime = it },
-                    label = { Text("Date & time (yyyy-MM-dd HH:mm)") },
+                    label = { Text(stringResource(R.string.tx_detail_datetime_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Direction.entries.forEach { d ->
-                        FilterChip(selected = editDirection == d, onClick = { editDirection = d }, label = { Text(d.name) })
+                        FilterChip(
+                            selected = editDirection == d,
+                            onClick = { editDirection = d },
+                            label = { Text(stringResource(d.labelRes())) },
+                        )
                     }
                 }
                 if (tx.transactionType != DomainTransactionType.ADJUSTMENT) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         DomainTransactionType.entries.filter { it != DomainTransactionType.ADJUSTMENT }.forEach { t ->
-                            FilterChip(selected = editType == t, onClick = { editType = t }, label = { Text(t.name) })
+                            FilterChip(
+                                selected = editType == t,
+                                onClick = { editType = t },
+                                label = { Text(stringResource(t.labelRes())) },
+                            )
                         }
                     }
                 }
                 OutlinedTextField(
                     value = editDescription,
                     onValueChange = { editDescription = it },
-                    label = { Text("Merchant / description") },
+                    label = { Text(stringResource(R.string.activity_merchant_desc_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -995,7 +1038,7 @@ fun TransactionDetailScreen(
                 OutlinedTextField(
                     value = editNote,
                     onValueChange = { editNote = it },
-                    label = { Text("Note") },
+                    label = { Text(stringResource(R.string.label_note)) },
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1021,7 +1064,7 @@ fun TransactionDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                ) { Text("Save changes", style = MaterialTheme.typography.titleMedium) }
+                ) { Text(stringResource(R.string.tx_detail_save_changes), style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -1044,7 +1087,7 @@ fun TransactionDetailScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Category", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.label_category), style = MaterialTheme.typography.titleLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     state.categories.forEach { cat ->
                         FilterChip(
@@ -1056,12 +1099,12 @@ fun TransactionDetailScreen(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = saveRuleChecked, onCheckedChange = { saveRuleChecked = it })
-                    Text("Remember for future transactions here", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.tx_detail_remember_rule), style = MaterialTheme.typography.bodyMedium)
                 }
                 if (saveRuleChecked) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = backfillChecked, onCheckedChange = { backfillChecked = it })
-                        Text("Apply to past uncategorized ones", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.tx_detail_apply_backfill), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
                 Button(
@@ -1073,7 +1116,7 @@ fun TransactionDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                ) { Text("Save", style = MaterialTheme.typography.titleMedium) }
+                ) { Text(stringResource(R.string.action_save), style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -1094,7 +1137,7 @@ fun TransactionDetailScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Tags", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.label_tags), style = MaterialTheme.typography.titleLarge)
                 if (availableSuggestions.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         availableSuggestions.forEach { suggestion ->
@@ -1117,7 +1160,7 @@ fun TransactionDetailScreen(
                     OutlinedTextField(
                         value = newTagInput,
                         onValueChange = { newTagInput = it },
-                        label = { Text("New tag") },
+                        label = { Text(stringResource(R.string.tx_detail_new_tag)) },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f),
@@ -1131,7 +1174,7 @@ fun TransactionDetailScreen(
                             viewModel.addTagToTransaction(tx.id, tag)
                         },
                         shape = RoundedCornerShape(999.dp),
-                    ) { Text("Add") }
+                    ) { Text(stringResource(R.string.action_add)) }
                 }
                 Spacer(Modifier.height(12.dp))
             }
@@ -1141,8 +1184,8 @@ fun TransactionDetailScreen(
     if (confirmPairedVoid) {
         AlertDialog(
             onDismissRequest = { confirmPairedVoid = false },
-            title = { Text("Unlink transfer & void?") },
-            text = { Text("This transaction is part of a transfer pair. Voiding it will unlink the pair.") },
+            title = { Text(stringResource(R.string.tx_detail_unlink_void_title)) },
+            text = { Text(stringResource(R.string.tx_detail_unlink_void_body)) },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -1150,17 +1193,17 @@ fun TransactionDetailScreen(
                         confirmPairedVoid = false
                         viewModel.voidTransaction(tx.id)
                     },
-                ) { Text("Unlink & void") }
+                ) { Text(stringResource(R.string.tx_detail_unlink_void_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { confirmPairedVoid = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmPairedVoid = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
     if (confirmPairedDelete) {
         AlertDialog(
             onDismissRequest = { confirmPairedDelete = false },
-            title = { Text("Unlink transfer & delete?") },
-            text = { Text("This manual transaction is part of a transfer pair. Deleting it will unlink the pair.") },
+            title = { Text(stringResource(R.string.tx_detail_unlink_delete_title)) },
+            text = { Text(stringResource(R.string.tx_detail_unlink_delete_body)) },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -1169,9 +1212,9 @@ fun TransactionDetailScreen(
                         viewModel.deleteManual(tx.id)
                         onBack()
                     },
-                ) { Text("Unlink & delete") }
+                ) { Text(stringResource(R.string.tx_detail_unlink_delete_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { confirmPairedDelete = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmPairedDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
@@ -1189,13 +1232,16 @@ fun TransactionDetailScreen(
         }
         AlertDialog(
             onDismissRequest = { showTransferPicker = false },
-            title = { Text("Link matching transfer") },
+            title = { Text(stringResource(R.string.tx_detail_link_transfer_title)) },
             text = {
                 if (candidates.isEmpty()) {
-                    Text("No matching opposite-direction transactions in ${tx.currency} on another account.")
+                    Text(stringResource(R.string.tx_detail_no_transfer_candidates, tx.currency))
                 } else {
                     LazyColumn {
                         items(candidates, key = { it.transaction.id }) { c ->
+                            val candidateAccName = c.accountName.ifBlank {
+                                stringResource(R.string.label_account_fallback, c.transaction.accountId)
+                            }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1210,7 +1256,10 @@ fun TransactionDetailScreen(
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("${c.accountName} · ${UiDateHelper.formatDate(c.transaction.occurredAt)}", modifier = Modifier.weight(1f))
+                                Text(
+                                    "$candidateAccName · ${UiDateHelper.formatDate(c.transaction.occurredAt, locale = activeLocale)}",
+                                    modifier = Modifier.weight(1f),
+                                )
                                 Text(formatCurrency(c.transaction.amountMinor, c.transaction.currency), fontWeight = FontWeight.SemiBold)
                             }
                         }
@@ -1218,7 +1267,7 @@ fun TransactionDetailScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showTransferPicker = false }) { Text("Close") } },
+            dismissButton = { TextButton(onClick = { showTransferPicker = false }) { Text(stringResource(R.string.action_close)) } },
         )
     }
 
@@ -1229,16 +1278,19 @@ fun TransactionDetailScreen(
         }
         AlertDialog(
             onDismissRequest = { showRefundPicker = false },
-            title = { Text("Link original purchase") },
+            title = { Text(stringResource(R.string.tx_detail_link_refund_title)) },
             text = {
                 LazyColumn {
                     item {
                         TextButton(onClick = {
                             showRefundPicker = false
                             viewModel.linkRefund(tx.id, null)
-                        }) { Text("Clear link") }
+                        }) { Text(stringResource(R.string.tx_detail_clear_link)) }
                     }
                     items(originals, key = { it.transaction.id }) { c ->
+                        val fallbackName = c.accountName.ifBlank {
+                            stringResource(R.string.label_account_fallback, c.transaction.accountId)
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1249,14 +1301,14 @@ fun TransactionDetailScreen(
                                 .padding(vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(c.transaction.merchantName ?: c.transaction.description ?: c.accountName, modifier = Modifier.weight(1f))
+                            Text(c.transaction.merchantName ?: c.transaction.description ?: fallbackName, modifier = Modifier.weight(1f))
                             Text(formatCurrency(c.transaction.amountMinor, c.transaction.currency), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showRefundPicker = false }) { Text("Close") } },
+            dismissButton = { TextButton(onClick = { showRefundPicker = false }) { Text(stringResource(R.string.action_close)) } },
         )
     }
 }

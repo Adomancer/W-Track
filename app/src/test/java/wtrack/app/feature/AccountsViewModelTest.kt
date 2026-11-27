@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 import wtrack.app.domain.model.AccountType
+import wtrack.app.domain.model.AppSettings
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.usecase.BalanceCheckpointEvaluator
 import wtrack.app.domain.usecase.CorrectBalanceUseCase
@@ -23,6 +24,7 @@ class AccountsViewModelTest {
         val txRepo = FakeTransactionRepository()
         val sourceRepo = FakeSourceAndEventRepository()
         val customParserRepo = FakeCustomParserRuleRepository()
+        val settingsRepo = FakeSettingsRepository()
         val clock = FakeClock()
 
         val vm = AccountsViewModel(
@@ -30,6 +32,7 @@ class AccountsViewModelTest {
             sourceRepository = sourceRepo,
             transactionRepository = txRepo,
             customParserRuleRepository = customParserRepo,
+            settingsRepository = settingsRepo,
             backupPort = FakeBackupAndDiagnosticsPort(),
             checkpointEvaluator = BalanceCheckpointEvaluator(),
             correctBalanceUseCase = CorrectBalanceUseCase(accRepo, txRepo, clock),
@@ -75,6 +78,61 @@ class AccountsViewModelTest {
             assertThat(txRepo.txsFlow.value.last().transactionType).isEqualTo(DomainTransactionType.ADJUSTMENT)
             assertThat(txRepo.txsFlow.value.last().direction).isEqualTo(Direction.INFLOW)
             assertThat(txRepo.txsFlow.value.last().amountMinor).isEqualTo(5_000_000L)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun tracksBaseCurrencyFromSettingsAndUsesItAsCreateFallback() = runTest {
+        val accRepo = FakeAccountRepository()
+        val txRepo = FakeTransactionRepository()
+        val sourceRepo = FakeSourceAndEventRepository()
+        val customParserRepo = FakeCustomParserRuleRepository()
+        val settingsRepo = FakeSettingsRepository(AppSettings(baseCurrency = "USD", onboardingCompleted = true))
+        val clock = FakeClock()
+
+        val vm = AccountsViewModel(
+            accountRepository = accRepo,
+            sourceRepository = sourceRepo,
+            transactionRepository = txRepo,
+            customParserRuleRepository = customParserRepo,
+            settingsRepository = settingsRepo,
+            backupPort = FakeBackupAndDiagnosticsPort(),
+            checkpointEvaluator = BalanceCheckpointEvaluator(),
+            correctBalanceUseCase = CorrectBalanceUseCase(accRepo, txRepo, clock),
+            clock = clock,
+        )
+
+        vm.uiState.test {
+            var latest = awaitItem()
+            while (latest.baseCurrency != "USD") {
+                latest = awaitItem()
+            }
+            assertThat(latest.baseCurrency).isEqualTo("USD")
+
+            // Blank currency falls back to settings.baseCurrency ("USD"), not hardcoded "IDR"
+            vm.createAccount("Dollar Checking", "Bank", AccountType.BANK, "  ", "100.50")
+            latest = awaitItem()
+            while (latest.activeAccounts.isEmpty()) {
+                latest = awaitItem()
+            }
+            val usdAccount = latest.activeAccounts.single().account
+            assertThat(usdAccount.currency).isEqualTo("USD")
+            assertThat(usdAccount.estimatedBalanceMinor).isEqualTo(10_050L)
+
+            // Updating baseCurrency in settings updates AccountsUiState reactively and normalizes lowercase input
+            settingsRepo.setBaseCurrency("SGD")
+            latest = awaitItem()
+            while (latest.baseCurrency != "SGD") {
+                latest = awaitItem()
+            }
+            vm.createAccount("Singapore Cash", "Cash", AccountType.CASH, " sgd ", "25.00")
+            latest = awaitItem()
+            while (latest.activeAccounts.size < 2) {
+                latest = awaitItem()
+            }
+            assertThat(latest.activeAccounts.last().account.currency).isEqualTo("SGD")
+            assertThat(latest.activeAccounts.last().account.estimatedBalanceMinor).isEqualTo(2_500L)
             cancelAndIgnoreRemainingEvents()
         }
     }

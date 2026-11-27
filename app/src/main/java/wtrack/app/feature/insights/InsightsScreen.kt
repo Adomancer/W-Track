@@ -47,11 +47,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.roundToInt
+import wtrack.app.R
+import wtrack.app.core.i18n.AppLocaleHelper
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
 import wtrack.app.feature.common.ActionFeedbackBanner
@@ -114,12 +119,12 @@ fun InsightsScreen(
                         IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.action_back),
                             )
                         }
                     }
                     Text(
-                        text = "Insights",
+                        text = stringResource(R.string.insights_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
@@ -131,7 +136,7 @@ fun InsightsScreen(
                     IconButton(onClick = viewModel::previousMonth, modifier = Modifier.size(26.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                            contentDescription = "Previous month",
+                            contentDescription = stringResource(R.string.dashboard_cd_prev_month),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp),
                         )
@@ -148,7 +153,7 @@ fun InsightsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = "Next month",
+                            contentDescription = stringResource(R.string.dashboard_cd_next_month),
                             tint = if (state.canAdvanceMonth) MaterialTheme.colorScheme.onSurfaceVariant else ext.mutedText.copy(alpha = 0.4f),
                             modifier = Modifier.size(16.dp),
                         )
@@ -161,7 +166,7 @@ fun InsightsScreen(
         item(key = "hero-spending") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Total spending",
+                    text = stringResource(R.string.insights_total_spending),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -188,7 +193,7 @@ fun InsightsScreen(
 
                 if (positiveCategories.isEmpty()) {
                     Text(
-                        text = "No spending recorded in ${state.monthLabel}.",
+                        text = stringResource(R.string.insights_no_spending, state.monthLabel),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ext.mutedText,
                         modifier = Modifier.weight(1f),
@@ -245,14 +250,14 @@ fun InsightsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Budgets",
+                        text = stringResource(R.string.insights_budgets),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         if (state.categories.isNotEmpty()) {
                             Text(
-                                text = "+ Add",
+                                text = stringResource(R.string.insights_add_budget),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
@@ -263,7 +268,7 @@ fun InsightsScreen(
                         }
                         if (state.summary.merchantTrends.isNotEmpty() || state.summary.categoryBreakdowns.size > 3) {
                             Text(
-                                text = "See all",
+                                text = stringResource(R.string.action_see_all),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
@@ -277,7 +282,7 @@ fun InsightsScreen(
 
                 if (state.budgets.isEmpty()) {
                     Text(
-                        text = "No budgets set yet.",
+                        text = stringResource(R.string.insights_no_budgets),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ext.mutedText,
                     )
@@ -298,7 +303,7 @@ fun InsightsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = bp.categoryName,
+                                    text = bp.categoryName.ifBlank { stringResource(R.string.label_category_fallback) },
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onBackground,
                                     maxLines = 1,
@@ -320,7 +325,7 @@ fun InsightsScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.DeleteOutline,
-                                            contentDescription = "Delete budget",
+                                            contentDescription = stringResource(R.string.insights_cd_delete_budget),
                                             tint = ext.mutedText,
                                             modifier = Modifier.size(16.dp),
                                         )
@@ -346,6 +351,7 @@ fun InsightsScreen(
 
     // One tap deeper: Top Merchants & Full Category Breakdown
     if (showMoreInsightsSheet) {
+        val activeLocale = AppLocaleHelper.activeLocale(LocalContext.current)
         ModalBottomSheet(
             onDismissRequest = { showMoreInsightsSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -358,11 +364,14 @@ fun InsightsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Text("More insights · ${state.monthLabel}", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.insights_more_title, state.monthLabel), style = MaterialTheme.typography.titleLarge)
 
                 if (state.summary.categoryBreakdowns.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SectionHeader(title = "All categories", trailingText = "${state.summary.categoryBreakdowns.size}")
+                        SectionHeader(
+                            title = stringResource(R.string.insights_all_categories),
+                            trailingText = "${state.summary.categoryBreakdowns.size}",
+                        )
                         state.summary.categoryBreakdowns.forEachIndexed { idx, cat ->
                             val sharePct = if (cat.netSpendMinor > 0L) {
                                 ((cat.netSpendMinor.toDouble() / totalCategorySpend) * 100.0).roundToInt()
@@ -383,7 +392,12 @@ fun InsightsScreen(
                                     Column {
                                         Text(cat.categoryName, style = MaterialTheme.typography.titleMedium)
                                         Text(
-                                            text = "${cat.transactionCount} transactions · $sharePct%",
+                                            text = pluralStringResource(
+                                                R.plurals.insights_category_share,
+                                                cat.transactionCount,
+                                                cat.transactionCount,
+                                                sharePct,
+                                            ),
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -403,7 +417,10 @@ fun InsightsScreen(
 
                 if (state.summary.merchantTrends.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SectionHeader(title = "Top merchants", trailingText = "${state.summary.merchantTrends.size}")
+                        SectionHeader(
+                            title = stringResource(R.string.insights_top_merchants),
+                            trailingText = "${state.summary.merchantTrends.size}",
+                        )
                         state.summary.merchantTrends.forEachIndexed { idx, trend ->
                             Row(
                                 modifier = Modifier
@@ -420,7 +437,11 @@ fun InsightsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
-                                        text = "${trend.transactionCount} transactions",
+                                        text = pluralStringResource(
+                                            R.plurals.insights_transactions_count,
+                                            trend.transactionCount,
+                                            trend.transactionCount,
+                                        ),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -439,7 +460,7 @@ fun InsightsScreen(
 
                 if (state.summary.derivedFees.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SectionHeader(title = "Transfer fees")
+                        SectionHeader(title = stringResource(R.string.insights_transfer_fees))
                         state.summary.derivedFees.forEach { fee ->
                             Row(
                                 modifier = Modifier
@@ -448,7 +469,7 @@ fun InsightsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    text = UiDateHelper.formatDate(fee.occurredAt),
+                                    text = UiDateHelper.formatDate(fee.occurredAt, locale = activeLocale),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -483,9 +504,9 @@ fun InsightsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Set monthly budget", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.insights_set_budget_title), style = MaterialTheme.typography.titleLarge)
 
-                Text("Category", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_category), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -500,7 +521,7 @@ fun InsightsScreen(
                 }
 
                 if (state.accounts.isNotEmpty()) {
-                    Text("Account scope", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.insights_account_scope), style = MaterialTheme.typography.labelLarge)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -508,7 +529,7 @@ fun InsightsScreen(
                         FilterChip(
                             selected = selectedAccountId == null,
                             onClick = { selectedAccountId = null },
-                            label = { Text("All accounts") },
+                            label = { Text(stringResource(R.string.insights_all_accounts)) },
                         )
                         state.accounts.forEach { acc ->
                             FilterChip(
@@ -524,7 +545,7 @@ fun InsightsScreen(
                     value = limitInput,
                     onValueChange = { limitInput = it },
                     currency = state.baseCurrency,
-                    label = "Monthly limit (${state.baseCurrency})",
+                    label = stringResource(R.string.insights_monthly_limit_label, state.baseCurrency),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -538,7 +559,7 @@ fun InsightsScreen(
                         onClick = { showBudgetSheet = false },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(999.dp),
-                    ) { Text("Cancel") }
+                    ) { Text(stringResource(R.string.action_cancel)) }
                     Button(
                         enabled = isValidMoneyInput(limitInput, state.baseCurrency),
                         onClick = {
@@ -547,7 +568,7 @@ fun InsightsScreen(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(999.dp),
-                    ) { Text("Save budget") }
+                    ) { Text(stringResource(R.string.insights_save_budget)) }
                 }
             }
         }

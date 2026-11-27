@@ -5,12 +5,14 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
+import wtrack.app.R
 import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.AccountType
 import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.NeedsReviewItem
 import wtrack.app.domain.usecase.ResolveNeedsReviewUseCase
+import wtrack.app.feature.common.UiText
 import wtrack.app.feature.review.ReviewViewModel
 import wtrack.integration.Direction
 import wtrack.integration.ReviewReason
@@ -66,7 +68,7 @@ class ReviewViewModelTest {
 
             vm.retry(7L)
             assertThat(reviewRepo.retriedIds).containsExactly(7L)
-            assertThat(awaitItem().actionMessage).isEqualTo("Re-run completed.")
+            assertThat(awaitItem().actionMessage).isEqualTo(UiText.Resource(R.string.msg_review_retry_done))
 
             // Malformed or non-positive amounts must be rejected cleanly
             vm.saveResolved(
@@ -82,7 +84,9 @@ class ReviewViewModelTest {
             )
             val rejected = awaitItem()
             assertThat(rejected.items).hasSize(1)
-            assertThat(rejected.actionMessage).contains("valid positive amount")
+            assertThat(rejected.actionMessage).isEqualTo(
+                UiText.Resource(R.string.msg_enter_positive_amount, "IDR")
+            )
 
             vm.saveResolved(
                 item = reviewItem,
@@ -108,7 +112,9 @@ class ReviewViewModelTest {
             assertThat(customParserRepo.rulesFlow.value).hasSize(1)
             assertThat(customParserRepo.rulesFlow.value.single().templatePattern).isEqualTo("Paid {AMOUNT} at {MERCHANT}")
             assertThat(customParserRepo.retriedSources).containsExactly("pkg.bank")
-            assertThat(afterSave.actionMessage).contains("Auto-parsed 2 more")
+            assertThat(afterSave.actionMessage).isEqualTo(
+                UiText.PluralResource(R.plurals.msg_review_saved_with_pattern_and_autoparsed, 2, 2)
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }

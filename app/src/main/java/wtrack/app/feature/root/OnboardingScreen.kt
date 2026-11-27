@@ -48,14 +48,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import java.io.InputStream
+import wtrack.app.R
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.AccountType
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.feature.common.ActionFeedbackBanner
 import wtrack.app.feature.common.MoneyAmountTextField
+import wtrack.app.feature.common.ProviderPresets
 import wtrack.app.feature.common.V2SettingRow
 import wtrack.app.feature.common.V2StatusDot
 import wtrack.app.feature.common.WtrackBrandMark
@@ -92,18 +96,6 @@ fun OnboardingScreen(
         }
     }
 
-    val quickProviders = remember {
-        listOf(
-            "Jago" to AccountType.BANK,
-            "myBCA" to AccountType.BANK,
-            "Mandiri" to AccountType.BANK,
-            "DANA" to AccountType.EWALLET,
-            "OVO" to AccountType.EWALLET,
-            "GoPay" to AccountType.EWALLET,
-            "Cash" to AccountType.CASH,
-        )
-    }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -123,14 +115,14 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
-                        ) { Text("Get started", style = MaterialTheme.typography.titleMedium) }
+                        ) { Text(stringResource(R.string.onboarding_get_started), style = MaterialTheme.typography.titleMedium) }
                         TextButton(
                             onClick = { restoreLauncher.launch(arrayOf("*/*")) },
                             enabled = !state.isBusy,
                             modifier = Modifier.height(44.dp),
                         ) {
                             Text(
-                                text = "Restore backup",
+                                text = stringResource(R.string.onboarding_restore_backup),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -144,7 +136,7 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
-                        ) { Text("Continue", style = MaterialTheme.typography.titleMedium) }
+                        ) { Text(stringResource(R.string.action_continue), style = MaterialTheme.typography.titleMedium) }
                     }
 
                     else -> {
@@ -155,7 +147,7 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
-                        ) { Text("Finish", style = MaterialTheme.typography.titleMedium) }
+                        ) { Text(stringResource(R.string.onboarding_finish), style = MaterialTheme.typography.titleMedium) }
                     }
                 }
             }
@@ -182,7 +174,7 @@ fun OnboardingScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                         )
                     }
                 }
@@ -204,7 +196,7 @@ fun OnboardingScreen(
                     }
                 }
                 Text(
-                    text = "${stepIndex + 1} of 3",
+                    text = stringResource(R.string.onboarding_step_progress, stepIndex + 1, 3),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -222,12 +214,12 @@ fun OnboardingScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         WtrackBrandMark(size = 48.dp, cornerRadius = 14.dp)
                         Text(
-                            text = "Private by\ndefault.",
+                            text = stringResource(R.string.onboarding_hero_title),
                             style = MaterialTheme.typography.displaySmall,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Text(
-                            text = "Automatic local ledger from your bank & e-wallet alerts.",
+                            text = stringResource(R.string.onboarding_hero_subtitle),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -235,18 +227,18 @@ fun OnboardingScreen(
 
                     Column(modifier = Modifier.fillMaxWidth()) {
                         TrustLineRow(
-                            title = "Stays on your phone",
-                            subtitle = "No cloud servers, no bank logins",
+                            title = stringResource(R.string.onboarding_trust1_title),
+                            subtitle = stringResource(R.string.onboarding_trust1_subtitle),
                         )
                         HorizontalDivider(color = ext.divider)
                         TrustLineRow(
-                            title = "Only apps you choose",
-                            subtitle = "OTPs and login codes are ignored",
+                            title = stringResource(R.string.onboarding_trust2_title),
+                            subtitle = stringResource(R.string.onboarding_trust2_subtitle),
                         )
                         HorizontalDivider(color = ext.divider)
                         TrustLineRow(
-                            title = "You stay in control",
-                            subtitle = "Uncertain alerts wait for your confirmation",
+                            title = stringResource(R.string.onboarding_trust3_title),
+                            subtitle = stringResource(R.string.onboarding_trust3_subtitle),
                         )
                     }
                 }
@@ -254,12 +246,12 @@ fun OnboardingScreen(
                 1 -> {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "Turn on auto-capture",
+                            text = stringResource(R.string.onboarding_step2_title),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Text(
-                            text = "Allow notification access so W-Track can read alerts on your device.",
+                            text = stringResource(R.string.onboarding_step2_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -268,8 +260,10 @@ fun OnboardingScreen(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         HorizontalDivider(color = ext.divider)
                         V2SettingRow(
-                            title = "Notification access",
-                            trailingText = if (state.captureSummary.isPermissionGranted) "Allowed" else "Turn on",
+                            title = stringResource(R.string.onboarding_notification_access),
+                            trailingText = stringResource(
+                                if (state.captureSummary.isPermissionGranted) R.string.label_allowed else R.string.label_turn_on,
+                            ),
                             trailingColor = if (state.captureSummary.isPermissionGranted) ext.inflow else ext.warning,
                             onClick = {
                                 context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -277,9 +271,13 @@ fun OnboardingScreen(
                         )
                         HorizontalDivider(color = ext.divider)
                         V2SettingRow(
-                            title = "Run quick check",
-                            subtitle = state.selfCheckResult?.summary ?: "Verify capture is ready",
-                            trailingText = if (state.selfCheckResult?.dryRunParserPassed == true) "Ready" else null,
+                            title = stringResource(R.string.onboarding_run_quick_check),
+                            subtitle = state.selfCheckResult?.summary ?: stringResource(R.string.onboarding_verify_capture),
+                            trailingText = if (state.selfCheckResult?.dryRunParserPassed == true) {
+                                stringResource(R.string.label_ready)
+                            } else {
+                                null
+                            },
                             trailingColor = ext.inflow,
                             onClick = onRunSelfCheck,
                         )
@@ -287,13 +285,18 @@ fun OnboardingScreen(
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val supportedNames = state.supportedProviders.joinToString(", ") { it.displayName }
                         Text(
-                            text = "Supported out of the box: Bank Jago, myBCA, DANA.",
+                            text = if (supportedNames.isNotBlank()) {
+                                stringResource(R.string.onboarding_supported_providers, supportedNames)
+                            } else {
+                                stringResource(R.string.onboarding_supported_fallback)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = "Need help with battery or restricted settings? ›",
+                            text = stringResource(R.string.onboarding_battery_help_link),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
@@ -307,24 +310,24 @@ fun OnboardingScreen(
                 else -> {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "Currency & first account",
+                            text = stringResource(R.string.onboarding_step3_title),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Text(
-                            text = "Pick your main currency and optionally add your first account.",
+                            text = stringResource(R.string.onboarding_step3_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Currency", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.label_currency), style = MaterialTheme.typography.labelLarge)
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            listOf("IDR", "USD", "SGD", "MYR", "EUR", "JPY").forEach { code ->
+                            CurrencyRegistry.supportedCodes.forEach { code ->
                                 FilterChip(
                                     selected = selectedCurrency == code,
                                     onClick = {
@@ -339,27 +342,27 @@ fun OnboardingScreen(
 
                     if (!state.hasAccounts) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("First account", style = MaterialTheme.typography.labelLarge)
+                            Text(stringResource(R.string.onboarding_first_account), style = MaterialTheme.typography.labelLarge)
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                quickProviders.forEach { (preset, presetType) ->
+                                ProviderPresets.quickAccountProviders.forEach { preset ->
                                     FilterChip(
-                                        selected = accountProvider.equals(preset, ignoreCase = true),
+                                        selected = accountProvider.equals(preset.displayName, ignoreCase = true),
                                         onClick = {
-                                            accountProvider = preset
-                                            accountType = presetType
-                                            if (accountName.isBlank()) accountName = preset
+                                            accountProvider = preset.displayName
+                                            accountType = preset.accountType
+                                            if (accountName.isBlank()) accountName = preset.displayName
                                         },
-                                        label = { Text(preset) },
+                                        label = { Text(preset.displayName) },
                                     )
                                 }
                             }
                             OutlinedTextField(
                                 value = accountName,
                                 onValueChange = { accountName = it },
-                                label = { Text("Account name") },
+                                label = { Text(stringResource(R.string.onboarding_account_name)) },
                                 singleLine = true,
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.fillMaxWidth(),
@@ -368,7 +371,7 @@ fun OnboardingScreen(
                                 value = openingBalance,
                                 onValueChange = { openingBalance = it },
                                 currency = selectedCurrency,
-                                label = "Opening balance (optional)",
+                                label = stringResource(R.string.onboarding_opening_balance),
                                 allowZero = true,
                                 allowNegative = true,
                                 isOptional = true,
@@ -384,7 +387,7 @@ fun OnboardingScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
-                            ) { Text("Save account") }
+                            ) { Text(stringResource(R.string.onboarding_save_account)) }
                         }
                     } else {
                         Row(
@@ -397,7 +400,7 @@ fun OnboardingScreen(
                                 tint = ext.inflow,
                             )
                             Text(
-                                text = "First account added.",
+                                text = stringResource(R.string.onboarding_first_account_added),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = ext.inflow,
                             )
@@ -411,10 +414,10 @@ fun OnboardingScreen(
     if (showBatteryGuide) {
         AlertDialog(
             onDismissRequest = { showBatteryGuide = false },
-            title = { Text("Battery & restricted settings") },
+            title = { Text(stringResource(R.string.onboarding_battery_dialog_title)) },
             text = {
                 Text(
-                    "If Android 13+ blocks Notification Access for sideloaded apps, open App Info → ⋮ → Allow restricted settings.\n\nIf alerts stop arriving in the background, allow high background power and Autostart in App Info → Battery.",
+                    stringResource(R.string.onboarding_battery_dialog_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -425,10 +428,10 @@ fun OnboardingScreen(
                         data = Uri.fromParts("package", context.packageName, null)
                     }
                     context.startActivity(appInfoIntent)
-                }) { Text("Open App Info") }
+                }) { Text(stringResource(R.string.action_open_app_info)) }
             },
             dismissButton = {
-                TextButton(onClick = { showBatteryGuide = false }) { Text("Close") }
+                TextButton(onClick = { showBatteryGuide = false }) { Text(stringResource(R.string.action_close)) }
             },
         )
     }
@@ -437,12 +440,12 @@ fun OnboardingScreen(
         val uri = pendingRestoreUri!!
         AlertDialog(
             onDismissRequest = { pendingRestoreUri = null },
-            title = { Text("Restore backup") },
+            title = { Text(stringResource(R.string.onboarding_restore_dialog_title)) },
             text = {
                 OutlinedTextField(
                     value = restorePassphrase,
                     onValueChange = { restorePassphrase = it },
-                    label = { Text("Backup passphrase") },
+                    label = { Text(stringResource(R.string.onboarding_backup_passphrase)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
@@ -454,9 +457,9 @@ fun OnboardingScreen(
                     val pw = restorePassphrase
                     pendingRestoreUri = null
                     onRestoreBackup(pw) { context.contentResolver.openInputStream(uri) }
-                }) { Text("Restore") }
+                }) { Text(stringResource(R.string.action_restore)) }
             },
-            dismissButton = { TextButton(onClick = { pendingRestoreUri = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { pendingRestoreUri = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

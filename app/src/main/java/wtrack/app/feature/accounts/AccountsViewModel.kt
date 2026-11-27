@@ -10,9 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import wtrack.app.R
 import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.AccountSource
 import wtrack.app.domain.model.AccountType
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.model.Transaction
 import wtrack.app.domain.model.TransactionSource
@@ -21,6 +23,7 @@ import wtrack.app.domain.repository.BackupAndDiagnosticsPort
 import wtrack.app.domain.repository.CreateAccountRequest
 import wtrack.app.domain.repository.CustomParserRuleRepository
 import wtrack.app.domain.repository.ProviderCatalogEntry
+import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.repository.SourceAndEventRepository
 import wtrack.app.domain.repository.TransactionRepository
 import wtrack.app.domain.repository.UpdateAccountRequest
@@ -28,6 +31,7 @@ import wtrack.app.domain.time.Clock
 import wtrack.app.domain.usecase.BalanceCheckpointEvaluation
 import wtrack.app.domain.usecase.BalanceCheckpointEvaluator
 import wtrack.app.domain.usecase.CorrectBalanceUseCase
+import wtrack.app.feature.common.UiText
 
 data class LinkedSourceUi(
     val link: AccountSource,
@@ -46,8 +50,9 @@ data class AccountsUiState(
     val sources: List<TransactionSource> = emptyList(),
     val providerCatalog: List<ProviderCatalogEntry> = emptyList(),
     val customRuleCountsBySource: Map<String, Int> = emptyMap(),
+    val baseCurrency: String = CurrencyRegistry.DEFAULT_CURRENCY,
     val nowEpochMillis: Long = 0L,
-    val actionMessage: String? = null,
+    val actionMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -56,13 +61,14 @@ class AccountsViewModel @Inject constructor(
     private val sourceRepository: SourceAndEventRepository,
     transactionRepository: TransactionRepository,
     customParserRuleRepository: CustomParserRuleRepository,
+    private val settingsRepository: SettingsRepository,
     private val backupPort: BackupAndDiagnosticsPort,
     private val checkpointEvaluator: BalanceCheckpointEvaluator,
     private val correctBalanceUseCase: CorrectBalanceUseCase,
     private val clock: Clock,
 ) : ViewModel() {
 
-    private val actionMessage = MutableStateFlow<String?>(null)
+    private val actionMessage = MutableStateFlow<UiText?>(null)
 
     private val repoSnapshot = combine(
         accountRepository.accounts,
@@ -86,8 +92,9 @@ class AccountsViewModel @Inject constructor(
 
     val uiState: StateFlow<AccountsUiState> = combine(
         repoSnapshot,
+        settingsRepository.settings,
         actionMessage,
-    ) { snap, message ->
+    ) { snap, settings, message ->
         val sourcesById = snap.sources.associateBy { it.id }
         val cards = snap.accounts.map { account ->
             val links = snap.accountSources
@@ -106,6 +113,7 @@ class AccountsViewModel @Inject constructor(
             sources = snap.sources,
             providerCatalog = backupPort.providerCatalogEntries(),
             customRuleCountsBySource = snap.customRuleCountsBySource,
+            baseCurrency = settings.baseCurrency.ifBlank { CurrencyRegistry.DEFAULT_CURRENCY },
             nowEpochMillis = clock.nowEpochMillis(),
             actionMessage = message,
         )
@@ -123,12 +131,13 @@ class AccountsViewModel @Inject constructor(
         openingBalanceInput: String,
     ) {
         viewModelScope.launch {
-            val normalizedCurrency = currency.trim().uppercase().ifEmpty { "IDR" }
+            val defaultCurrency = settingsRepository.current().baseCurrency.ifBlank { CurrencyRegistry.DEFAULT_CURRENCY }
+            val normalizedCurrency = currency.trim().uppercase().ifEmpty { defaultCurrency }
             val openingMinor = if (openingBalanceInput.isBlank()) {
                 null
             } else {
                 MoneyFormatter.parseMajorInput(openingBalanceInput, normalizedCurrency) ?: run {
-                    actionMessage.value = "Invalid opening balance format for $normalizedCurrency."
+                    actionMessage.value = UiText.Resource(R.string.msg_invalid_opening_balance, normalizedCurrency)
                     return@launch
                 }
             }
@@ -145,9 +154,9 @@ class AccountsViewModel @Inject constructor(
                     ),
                 )
             }.onSuccess {
-                actionMessage.value = "Account created."
+                actionMessage.value = UiText.Resource(R.string.msg_account_created)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to create account."
+                actionMessage.value = UiText.fromError(err, R.string.msg_failed_create_account)
             }
         }
     }
@@ -157,9 +166,9 @@ class AccountsViewModel @Inject constructor(
             runCatching {
                 accountRepository.update(UpdateAccountRequest(id, name, provider, type, currency))
             }.onSuccess {
-                actionMessage.value = "Account updated."
+                actionMessage.value = UiText.Resource(R.string.msg_account_updated)
             }.onFailure {
-                actionMessage.value = it.message ?: "Failed to update account."
+                actionMessage.value = UiText.fromError(it, R.string.msg_failed_update_account)
             }
         }
     }
@@ -167,14 +176,14 @@ class AccountsViewModel @Inject constructor(
     fun archiveAccount(id: Long) {
         viewModelScope.launch {
             accountRepository.archive(id)
-            actionMessage.value = "Account archived."
+            actionMessage.value = UiText.Resource(R.string.msg_account_archived)
         }
     }
 
     fun restoreAccount(id: Long) {
         viewModelScope.launch {
             accountRepository.restore(id)
-            actionMessage.value = "Account restored."
+            actionMessage.value = UiText.Resource(R.string.msg_account_restored)
         }
     }
 
@@ -187,7 +196,7 @@ class AccountsViewModel @Inject constructor(
         viewModelScope.launch {
             val cleanedPkg = packageName.trim()
             if (cleanedPkg.isEmpty()) {
-                actionMessage.value = "Enter an Android package ID."
+                actionMessage.value = UiText.Resource(R.string.msg_enter_android_package_id)
                 return@launch
             }
             runCatching {
@@ -201,9 +210,9 @@ class AccountsViewModel @Inject constructor(
                 accountRepository.linkAccountSource(accountId, cleanedPkg, accountHint)
                 backupPort.refreshAllowlistCache()
             }.onSuccess {
-                actionMessage.value = "Source $cleanedPkg allowlisted and linked."
+                actionMessage.value = UiText.Resource(R.string.msg_source_linked, cleanedPkg)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Could not link source (hint may already belong to another account)."
+                actionMessage.value = UiText.fromError(err, R.string.msg_source_link_failed)
             }
         }
     }
@@ -211,7 +220,7 @@ class AccountsViewModel @Inject constructor(
     fun unlinkSource(linkId: Long) {
         viewModelScope.launch {
             accountRepository.unlinkAccountSource(linkId)
-            actionMessage.value = "Source link removed."
+            actionMessage.value = UiText.Resource(R.string.msg_source_unlinked)
         }
     }
 
@@ -219,7 +228,11 @@ class AccountsViewModel @Inject constructor(
         viewModelScope.launch {
             sourceRepository.setAllowlisted(packageName, allowlisted)
             backupPort.refreshAllowlistCache()
-            actionMessage.value = if (allowlisted) "$packageName allowlisted." else "$packageName removed from allowlist."
+            actionMessage.value = if (allowlisted) {
+                UiText.Resource(R.string.msg_source_allowlisted, packageName)
+            } else {
+                UiText.Resource(R.string.msg_source_removed_allowlist, packageName)
+            }
         }
     }
 
@@ -228,9 +241,9 @@ class AccountsViewModel @Inject constructor(
             val until = if (enable14Days) clock.nowEpochMillis() + 14L * 86_400_000L else null
             sourceRepository.setSampleCollectionUntil(sourceId, until)
             actionMessage.value = if (enable14Days) {
-                "Sample collection enabled for 14 days (stored encrypted locally)."
+                UiText.Resource(R.string.msg_sample_collection_enabled)
             } else {
-                "Sample collection disabled."
+                UiText.Resource(R.string.msg_sample_collection_disabled)
             }
         }
     }
@@ -238,19 +251,22 @@ class AccountsViewModel @Inject constructor(
     fun correctBalance(accountId: Long, currency: String, actualMajorInput: String, note: String?) {
         viewModelScope.launch {
             val minor = MoneyFormatter.parseMajorInput(actualMajorInput, currency) ?: run {
-                actionMessage.value = "Invalid balance input for $currency."
+                actionMessage.value = UiText.Resource(R.string.msg_invalid_balance_input, currency)
                 return@launch
             }
             runCatching {
                 correctBalanceUseCase(accountId, minor, note)
             }.onSuccess { result ->
                 actionMessage.value = if (result.adjustmentTransactionId == null) {
-                    "Balance matches estimate (no adjustment required)."
+                    UiText.Resource(R.string.msg_balance_matches)
                 } else {
-                    "Recorded adjustment ${MoneyFormatter.format(result.deltaMinor, currency, signed = true)}."
+                    UiText.Resource(
+                        R.string.msg_adjustment_recorded,
+                        MoneyFormatter.format(result.deltaMinor, currency, signed = true),
+                    )
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to record balance adjustment."
+                actionMessage.value = UiText.fromError(err, R.string.msg_adjustment_failed)
             }
         }
     }

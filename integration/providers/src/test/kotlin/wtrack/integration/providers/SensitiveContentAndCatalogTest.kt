@@ -71,6 +71,20 @@ class SensitiveContentAndCatalogTest {
             .containsExactly("com.jago.digitalBanking", "id.dana", "com.bca.mybca.omni.android")
     }
 
+    @Test
+    fun providerCatalogNotesAreCleanAndFreeOfDevDeviceArtifacts() {
+        val devMarkers = listOf("iQOO", "Z10R", "I2505", "ADB")
+        val versionTokenRegex = Regex("""\bv\d+\.\d+""")
+
+        ProviderCatalog.initialPoCTargets.forEach { target ->
+            assertThat(target.notes.trim()).isNotEmpty()
+            devMarkers.forEach { marker ->
+                assertThat(target.notes.contains(marker, ignoreCase = true)).isFalse()
+            }
+            assertThat(versionTokenRegex.containsMatchIn(target.notes)).isFalse()
+        }
+    }
+
     private fun testEvent(
         title: String?,
         text: String,

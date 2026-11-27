@@ -43,10 +43,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import wtrack.app.R
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.CustomNumberLocale
 import wtrack.app.domain.model.CustomParserRule
@@ -54,21 +56,14 @@ import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
 import wtrack.app.domain.repository.CustomParserTestOutcome
 import wtrack.app.feature.common.ActionFeedbackBanner
+import wtrack.app.feature.common.ProviderPresets
 import wtrack.app.feature.common.StatusPill
 import wtrack.app.feature.common.WtrackCard
 import wtrack.app.feature.common.WtrackTopBar
+import wtrack.app.feature.common.exampleLabelRes
+import wtrack.app.feature.common.labelRes
+import wtrack.app.feature.common.shortLabelRes
 import wtrack.integration.Direction
-
-private val commonWalletQuickPackages = listOf(
-    "GoPay / Gojek" to "com.gojek.app",
-    "OVO" to "ovo.id",
-    "Shopee" to "com.shopee.id",
-    "SeaBank" to "id.co.seabank.id",
-    "blu" to "com.bcadigital.blu",
-    "Livin'" to "id.bmri.livin",
-    "BRImo" to "id.co.bri.brimo",
-    "wondr BNI" to "id.co.bni.wondr",
-)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -95,7 +90,7 @@ fun CustomParsersScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         WtrackTopBar(
-            title = "Notification Parsers",
+            title = stringResource(R.string.custom_parsers_title),
             onBack = onBack,
             trailing = {
                 Button(
@@ -107,7 +102,7 @@ fun CustomParsersScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Add Pattern")
+                    Text(" " + stringResource(R.string.custom_parsers_add_pattern))
                 }
             },
         )
@@ -140,11 +135,11 @@ fun CustomParsersScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
-                            text = "Teach W-Track Any Bank or E-Wallet",
+                            text = stringResource(R.string.custom_parsers_intro_title),
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
-                            text = "Paste a sample notification here (or check \"Remember this pattern\" when resolving in Needs Review). Matching patterns auto-parse future alerts locally with zero JSON exports.",
+                            text = stringResource(R.string.custom_parsers_intro_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -159,9 +154,9 @@ fun CustomParsersScreen(
                             modifier = Modifier.padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text("No custom parser patterns yet.", style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.custom_parsers_empty_title), style = MaterialTheme.typography.titleSmall)
                             Text(
-                                text = "Newly linked apps already auto-detect amounts into Needs Review. Add a pattern here anytime by pasting an example notification.",
+                                text = stringResource(R.string.custom_parsers_empty_body),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ext.mutedText,
                             )
@@ -173,7 +168,7 @@ fun CustomParsersScreen(
                                 shape = RoundedCornerShape(12.dp),
                             ) {
                                 Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text(" Paste Sample & Create Pattern")
+                                Text(" " + stringResource(R.string.custom_parsers_paste_sample_cta))
                             }
                         }
                     }
@@ -220,7 +215,7 @@ fun CustomParsersScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Edit,
-                                            contentDescription = "Edit pattern",
+                                            contentDescription = stringResource(R.string.custom_parsers_cd_edit),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp),
                                         )
@@ -231,7 +226,7 @@ fun CustomParsersScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.DeleteOutline,
-                                            contentDescription = "Delete pattern",
+                                            contentDescription = stringResource(R.string.custom_parsers_cd_delete),
                                             tint = ext.mutedText,
                                             modifier = Modifier.size(18.dp),
                                         )
@@ -241,12 +236,12 @@ fun CustomParsersScreen(
 
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 StatusPill(
-                                    label = rule.direction.name,
+                                    label = stringResource(rule.direction.labelRes()),
                                     containerColor = if (rule.direction == Direction.INFLOW) ext.inflowContainer else MaterialTheme.colorScheme.errorContainer,
                                     contentColor = if (rule.direction == Direction.INFLOW) ext.onInflowContainer else MaterialTheme.colorScheme.onErrorContainer,
                                 )
-                                StatusPill(label = rule.transactionType.name)
-                                StatusPill(label = "${rule.currency} · ${if (rule.numberLocale == CustomNumberLocale.INDONESIAN) "ID" else "EN"}")
+                                StatusPill(label = stringResource(rule.transactionType.labelRes()))
+                                StatusPill(label = "${rule.currency} · ${stringResource(rule.numberLocale.shortLabelRes())}")
                             }
 
                             Surface(
@@ -320,12 +315,12 @@ fun CustomParsersScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = if (existing == null) "Teach Notification Pattern" else "Edit Notification Pattern",
+                    text = stringResource(if (existing == null) R.string.custom_parsers_teach_title else R.string.custom_parsers_edit_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
 
                 if (state.sources.isNotEmpty() || existing == null) {
-                    Text("Source App Package", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.custom_parsers_source_package), style = MaterialTheme.typography.labelLarge)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -337,14 +332,14 @@ fun CustomParsersScreen(
                                 label = { Text(src.displayName) },
                             )
                         }
-                        commonWalletQuickPackages
-                            .filter { (_, pkg) -> state.sources.none { it.packageName == pkg } }
+                        ProviderPresets.commonWalletPackages
+                            .filter { preset -> state.sources.none { it.packageName == preset.packageName } }
                             .take(6)
-                            .forEach { (label, pkg) ->
+                            .forEach { preset ->
                                 FilterChip(
-                                    selected = sourceId == pkg,
-                                    onClick = { sourceId = pkg },
-                                    label = { Text(label) },
+                                    selected = sourceId == preset.packageName,
+                                    onClick = { sourceId = preset.packageName },
+                                    label = { Text(preset.displayName) },
                                 )
                             }
                     }
@@ -353,7 +348,7 @@ fun CustomParsersScreen(
                 OutlinedTextField(
                     value = sourceId,
                     onValueChange = { sourceId = it },
-                    label = { Text("Android package ID (e.g. com.gojek.app)") },
+                    label = { Text(stringResource(R.string.custom_parsers_package_id_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -369,11 +364,11 @@ fun CustomParsersScreen(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text("Paste Sample Notification (Optional)", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.custom_parsers_paste_section), style = MaterialTheme.typography.labelLarge)
                         OutlinedTextField(
                             value = sampleTitle,
                             onValueChange = { sampleTitle = it },
-                            label = { Text("Sample title (optional)") },
+                            label = { Text(stringResource(R.string.custom_parsers_sample_title_label)) },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
@@ -381,8 +376,8 @@ fun CustomParsersScreen(
                         OutlinedTextField(
                             value = sampleBody,
                             onValueChange = { sampleBody = it },
-                            label = { Text("Sample notification text") },
-                            placeholder = { Text("e.g. Pembayaran Rp25.000 ke Kopi Kenangan berhasil") },
+                            label = { Text(stringResource(R.string.custom_parsers_sample_body_label)) },
+                            placeholder = { Text(stringResource(R.string.custom_parsers_sample_placeholder)) },
                             minLines = 2,
                             maxLines = 4,
                             shape = RoundedCornerShape(12.dp),
@@ -409,7 +404,7 @@ fun CustomParsersScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text(" Auto-Generate Pattern from Sample")
+                            Text(" " + stringResource(R.string.custom_parsers_autogenerate))
                         }
                     }
                 }
@@ -417,14 +412,14 @@ fun CustomParsersScreen(
                 OutlinedTextField(
                     value = templatePattern,
                     onValueChange = { templatePattern = it },
-                    label = { Text("Pattern template ({AMOUNT} required)") },
-                    placeholder = { Text("Pembayaran {AMOUNT} ke {MERCHANT} berhasil") },
+                    label = { Text(stringResource(R.string.custom_parsers_template_label)) },
+                    placeholder = { Text(stringResource(R.string.custom_parsers_template_placeholder)) },
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = "Placeholders: {AMOUNT} (required), {MERCHANT} (counterparty), {REF}, {IGNORE}",
+                    text = stringResource(R.string.custom_parsers_placeholders_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = ext.mutedText,
                 )
@@ -432,7 +427,7 @@ fun CustomParsersScreen(
                 OutlinedTextField(
                     value = ruleName,
                     onValueChange = { ruleName = it },
-                    label = { Text("Pattern name (optional)") },
+                    label = { Text(stringResource(R.string.custom_parsers_name_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -441,13 +436,13 @@ fun CustomParsersScreen(
                 OutlinedTextField(
                     value = titleContains,
                     onValueChange = { titleContains = it },
-                    label = { Text("Title filter (optional, e.g. QRIS)") },
+                    label = { Text(stringResource(R.string.custom_parsers_title_filter_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Text("Direction", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_direction), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Direction.entries.forEach { d ->
                         FilterChip(
@@ -458,12 +453,12 @@ fun CustomParsersScreen(
                                     txType = DomainTransactionType.OTHER
                                 }
                             },
-                            label = { Text(d.name) },
+                            label = { Text(stringResource(d.labelRes())) },
                         )
                     }
                 }
 
-                Text("Transaction Type", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.custom_parsers_tx_type), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -472,7 +467,11 @@ fun CustomParsersScreen(
                         .filter { it != DomainTransactionType.ADJUSTMENT }
                         .filter { it != DomainTransactionType.REFUND || direction == Direction.INFLOW }
                         .forEach { t ->
-                            FilterChip(selected = txType == t, onClick = { txType = t }, label = { Text(t.name) })
+                            FilterChip(
+                                selected = txType == t,
+                                onClick = { txType = t },
+                                label = { Text(stringResource(t.labelRes())) },
+                            )
                         }
                 }
 
@@ -480,7 +479,7 @@ fun CustomParsersScreen(
                     OutlinedTextField(
                         value = currency,
                         onValueChange = { currency = it.uppercase() },
-                        label = { Text("Currency") },
+                        label = { Text(stringResource(R.string.label_currency)) },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f),
@@ -488,24 +487,24 @@ fun CustomParsersScreen(
                     OutlinedTextField(
                         value = accountHint,
                         onValueChange = { accountHint = it },
-                        label = { Text("Account hint (optional)") },
+                        label = { Text(stringResource(R.string.accounts_hint_optional)) },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f),
                     )
                 }
 
-                Text("Number Format", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.custom_parsers_number_format), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = locale == CustomNumberLocale.INDONESIAN,
                         onClick = { locale = CustomNumberLocale.INDONESIAN },
-                        label = { Text("ID (50.000)") },
+                        label = { Text(stringResource(CustomNumberLocale.INDONESIAN.exampleLabelRes())) },
                     )
                     FilterChip(
                         selected = locale == CustomNumberLocale.ENGLISH,
                         onClick = { locale = CustomNumberLocale.ENGLISH },
-                        label = { Text("EN (50,000.00)") },
+                        label = { Text(stringResource(CustomNumberLocale.ENGLISH.exampleLabelRes())) },
                     )
                 }
 
@@ -514,9 +513,14 @@ fun CustomParsersScreen(
                         is CustomParserTestOutcome.Matched -> Triple(
                             ext.inflowContainer,
                             ext.onInflowContainer,
-                            "Matched: ${MoneyFormatter.format(testOutcome.amountMinor, testOutcome.currency)} · " +
-                                "${testOutcome.direction.name} · ${testOutcome.transactionType.name}" +
-                                (testOutcome.merchantRaw?.let { " · Merchant: $it" } ?: ""),
+                            stringResource(
+                                R.string.custom_parsers_matched_preview,
+                                MoneyFormatter.format(testOutcome.amountMinor, testOutcome.currency),
+                                stringResource(testOutcome.direction.labelRes()),
+                                stringResource(testOutcome.transactionType.labelRes()),
+                            ) + (testOutcome.merchantRaw?.let {
+                                stringResource(R.string.custom_parsers_matched_merchant_suffix, it)
+                            } ?: ""),
                         )
                         is CustomParserTestOutcome.Rejected -> Triple(
                             MaterialTheme.colorScheme.errorContainer,
@@ -553,7 +557,7 @@ fun CustomParsersScreen(
                         onClick = { showEditor = false },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                    ) { Text("Cancel") }
+                    ) { Text(stringResource(R.string.action_cancel)) }
                     Button(
                         enabled = sourceId.isNotBlank() && templatePattern.isNotBlank(),
                         onClick = {
@@ -574,7 +578,7 @@ fun CustomParsersScreen(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                    ) { Text("Save Pattern") }
+                    ) { Text(stringResource(R.string.custom_parsers_save)) }
                 }
             }
         }

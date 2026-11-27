@@ -15,11 +15,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import wtrack.app.R
 import wtrack.app.core.coroutines.DispatcherProvider
 import wtrack.app.domain.model.AccountType
 import wtrack.app.domain.model.AppSettings
 import wtrack.app.domain.model.CaptureHealthSummary
 import wtrack.app.domain.model.CaptureStatus
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.DatabaseHealthState
 import wtrack.app.domain.model.LockedReason
 import wtrack.app.domain.model.MoneyFormatter
@@ -31,9 +33,11 @@ import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CreateAccountRequest
 import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
+import wtrack.app.domain.repository.ProviderCatalogEntry
 import wtrack.app.domain.repository.SettingsRepository
 import wtrack.app.domain.time.Clock
 import wtrack.app.domain.usecase.AppLockStateMachine
+import wtrack.app.feature.common.UiText
 
 sealed interface RootUiState {
     data object Loading : RootUiState
@@ -42,15 +46,16 @@ sealed interface RootUiState {
         val reason: LockedReason,
         val detail: String,
         val isBusy: Boolean = false,
-        val actionMessage: String? = null,
+        val actionMessage: UiText? = null,
     ) : RootUiState
 
     data class Onboarding(
         val settings: AppSettings,
         val captureSummary: CaptureHealthSummary,
         val hasAccounts: Boolean,
+        val supportedProviders: List<ProviderCatalogEntry> = emptyList(),
         val isBusy: Boolean = false,
-        val actionMessage: String? = null,
+        val actionMessage: UiText? = null,
         val selfCheckResult: CaptureSelfCheckResult? = null,
         val isAppLocked: Boolean = false,
     ) : RootUiState
@@ -61,7 +66,7 @@ sealed interface RootUiState {
         val pendingReviewCount: Int,
         val captureSummary: CaptureHealthSummary,
         val showPostRestorePermissionPrompt: Boolean = false,
-        val actionMessage: String? = null,
+        val actionMessage: UiText? = null,
         val isAppLocked: Boolean = false,
     ) : RootUiState
 }
@@ -80,7 +85,7 @@ class MainRootViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val isBusy = MutableStateFlow(false)
-    private val actionMessage = MutableStateFlow<String?>(null)
+    private val actionMessage = MutableStateFlow<UiText?>(null)
     private val postRestorePrompt = MutableStateFlow(false)
     private val selfCheckFlow = MutableStateFlow<CaptureSelfCheckResult?>(null)
     private val appLockStateMachine = AppLockStateMachine()
@@ -130,6 +135,7 @@ class MainRootViewModel @Inject constructor(
                             settings = ops.settings,
                             captureSummary = ops.captureSummary,
                             hasAccounts = ops.hasAccounts,
+                            supportedProviders = backupPort.providerCatalogEntries(),
                             isBusy = aux.isBusy,
                             actionMessage = aux.actionMessage,
                             selfCheckResult = aux.selfCheckResult,
@@ -186,7 +192,7 @@ class MainRootViewModel @Inject constructor(
             }.onSuccess { res ->
                 selfCheckFlow.value = res
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Capture self-check failed."
+                actionMessage.value = UiText.fromError(err, R.string.msg_capture_self_check_failed)
             }
         }
     }
@@ -207,15 +213,16 @@ class MainRootViewModel @Inject constructor(
         viewModelScope.launch {
             val trimmedName = name.trim()
             if (trimmedName.isEmpty()) {
-                actionMessage.value = "Account name is required."
+                actionMessage.value = UiText.Resource(R.string.msg_account_name_required)
                 return@launch
             }
-            val normalizedCurrency = currency.trim().uppercase().ifEmpty { "IDR" }
+            val defaultCurrency = settingsRepository.current().baseCurrency.ifBlank { CurrencyRegistry.DEFAULT_CURRENCY }
+            val normalizedCurrency = currency.trim().uppercase().ifEmpty { defaultCurrency }
             val openingMinor = if (openingBalanceMajorInput.isBlank()) {
                 null
             } else {
                 MoneyFormatter.parseMajorInput(openingBalanceMajorInput, normalizedCurrency) ?: run {
-                    actionMessage.value = "Invalid opening balance format for $normalizedCurrency."
+                    actionMessage.value = UiText.Resource(R.string.msg_invalid_opening_balance, normalizedCurrency)
                     return@launch
                 }
             }
@@ -233,9 +240,9 @@ class MainRootViewModel @Inject constructor(
                 )
                 settingsRepository.setBaseCurrency(normalizedCurrency)
             }.onSuccess {
-                actionMessage.value = "Account \"$trimmedName\" added."
+                actionMessage.value = UiText.Resource(R.string.msg_account_added_named, trimmedName)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to create account."
+                actionMessage.value = UiText.fromError(err, R.string.msg_failed_create_account)
             }
         }
     }
@@ -248,14 +255,14 @@ class MainRootViewModel @Inject constructor(
 
     fun restoreFromBackup(passphrase: String, streamOpener: () -> InputStream?) {
         if (passphrase.isBlank()) {
-            actionMessage.value = "Enter backup passphrase."
+            actionMessage.value = UiText.Resource(R.string.msg_enter_backup_passphrase)
             return
         }
         viewModelScope.launch {
             isBusy.value = true
             runCatching {
                 withContext(dispatcherProvider.io) {
-                    val stream = streamOpener() ?: error("Unable to open selected backup file.")
+                    val stream = streamOpener() ?: throw MissingBackupStreamException()
                     stream.use { input ->
                         backupPort.restoreEncryptedBackup(passphrase, input)
                     }
@@ -264,9 +271,17 @@ class MainRootViewModel @Inject constructor(
                 settingsRepository.setOnboardingCompleted(true)
                 captureStatusRepository.refreshStatus()
                 postRestorePrompt.value = true
-                actionMessage.value = "Restored ${res.restoredAccounts} accounts and ${res.restoredTransactions} transactions. Re-grant Notification Access to resume capture."
+                actionMessage.value = UiText.Resource(
+                    R.string.msg_restore_success_onboarding,
+                    res.restoredAccounts,
+                    res.restoredTransactions,
+                )
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Backup restore failed."
+                actionMessage.value = if (err is MissingBackupStreamException) {
+                    UiText.Resource(R.string.msg_unable_open_backup_file)
+                } else {
+                    UiText.fromError(err, R.string.msg_backup_restore_failed)
+                }
             }
             isBusy.value = false
         }
@@ -285,9 +300,9 @@ class MainRootViewModel @Inject constructor(
                     backupPort.wipeAllDataAndReset()
                 }
             }.onSuccess {
-                actionMessage.value = "Local data wiped cleanly."
+                actionMessage.value = UiText.Resource(R.string.msg_local_data_wiped_cleanly)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to wipe local storage."
+                actionMessage.value = UiText.fromError(err, R.string.msg_failed_wipe_storage)
             }
             isBusy.value = false
         }
@@ -296,6 +311,8 @@ class MainRootViewModel @Inject constructor(
     fun clearMessage() {
         actionMessage.value = null
     }
+
+    private class MissingBackupStreamException : IllegalStateException()
 
     private data class OperationalSnapshot(
         val settings: AppSettings,
@@ -306,7 +323,7 @@ class MainRootViewModel @Inject constructor(
 
     private data class ReadyAuxState(
         val isBusy: Boolean,
-        val actionMessage: String?,
+        val actionMessage: UiText?,
         val showPostRestorePrompt: Boolean,
         val selfCheckResult: CaptureSelfCheckResult?,
         val isAppLocked: Boolean,

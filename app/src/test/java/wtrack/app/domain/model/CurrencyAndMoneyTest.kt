@@ -76,4 +76,18 @@ class CurrencyAndMoneyTest {
         assertThat(MoneyFormatter.formatForCsv(125_000_050L, "IDR")).isEqualTo("1250000.50")
         assertThat(MoneyFormatter.formatForCsv(1500L, "JPY")).isEqualTo("1500")
     }
+
+    @Test
+    fun supportedCodesAreUniqueNormalizedAndBackedByMatchingSpecs() {
+        assertThat(CurrencyRegistry.DEFAULT_CURRENCY).isEqualTo("IDR")
+        val codes = CurrencyRegistry.supportedCodes
+        assertThat(codes).isNotEmpty()
+        assertThat(codes.first()).isEqualTo(CurrencyRegistry.DEFAULT_CURRENCY)
+        assertThat(codes.distinct()).hasSize(codes.size)
+        assertThat(codes).containsAtLeast("IDR", "USD", "SGD", "MYR", "EUR", "JPY", "KRW")
+        codes.forEach { code ->
+            assertThat(code).matches("^[A-Z]{3}$")
+            assertThat(CurrencyRegistry.specFor(code).code).isEqualTo(code)
+        }
+    }
 }

@@ -61,18 +61,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import wtrack.app.R
+import wtrack.app.core.i18n.AppLocaleHelper
+import wtrack.app.core.theme.DarkColors
+import wtrack.app.core.theme.DarkWtrackExtendedColors
+import wtrack.app.core.theme.LightColors
+import wtrack.app.core.theme.LightWtrackExtendedColors
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.CaptureStatus
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.ThemeMode
 import wtrack.app.feature.common.ActionFeedbackBanner
 import wtrack.app.feature.common.UiDateHelper
 import wtrack.app.feature.common.V2SettingRow
 import wtrack.app.feature.common.WtrackTopBar
+import wtrack.app.feature.common.labelRes
 import wtrack.app.feature.root.canUseDeviceAppLock
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -154,24 +164,30 @@ fun SettingsScreen(
         viewModel.setLocalAlertsEnabled(granted)
     }
 
+    val activeLocale = AppLocaleHelper.activeLocale(context)
     val captureHealthy = state.captureSummary.appStatus == CaptureStatus.ACTIVE
     val captureSubtitle = when (state.captureSummary.appStatus) {
-        CaptureStatus.ACTIVE -> "Working smoothly"
-        CaptureStatus.DISCONNECTED -> "Paused — tap to check"
-        CaptureStatus.ATTENTION -> "Needs attention"
-        CaptureStatus.UNSUPPORTED -> "Manual mode"
+        CaptureStatus.ACTIVE -> stringResource(R.string.settings_capture_working)
+        CaptureStatus.DISCONNECTED -> stringResource(R.string.settings_capture_paused)
+        CaptureStatus.ATTENTION -> stringResource(R.string.settings_capture_attention)
+        CaptureStatus.UNSUPPORTED -> stringResource(R.string.settings_capture_manual)
     }
-    val lastBackupLabel = state.settings.lastBackupAt?.let { ts ->
-        "Last backed up ${UiDateHelper.formatDaysAgo(ts, System.currentTimeMillis()).lowercase()}"
-    } ?: "Not backed up yet"
-    val themeLabel = state.settings.themeMode.name.lowercase().replaceFirstChar(Char::uppercase)
+    val lastBackupLabel = if (state.settings.lastBackupAt > 0L) {
+        stringResource(
+            R.string.settings_last_backed_up,
+            UiDateHelper.formatDaysAgo(state.settings.lastBackupAt, System.currentTimeMillis()).lowercase(activeLocale),
+        )
+    } else {
+        stringResource(R.string.settings_not_backed_up_yet)
+    }
+    val themeLabel = stringResource(state.settings.themeMode.labelRes())
     val appVersion = remember(context) { getAppVersionName(context) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column {
-                WtrackTopBar(title = "Settings", onBack = onBack)
+                WtrackTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
                 if (state.isBusy) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
@@ -190,13 +206,13 @@ fun SettingsScreen(
                     enabled = !state.isBusy,
                 ) {
                     Text(
-                        text = "Erase all data",
+                        text = stringResource(R.string.settings_erase_all_data),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 Text(
-                    text = "W-Track $appVersion",
+                    text = stringResource(R.string.settings_footer_version, appVersion),
                     style = MaterialTheme.typography.labelSmall,
                     color = ext.mutedText,
                 )
@@ -223,7 +239,7 @@ fun SettingsScreen(
                 item(key = "post-restore") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Backup restored — allow Notification Access to resume auto-capture.",
+                            text = stringResource(R.string.settings_post_restore_prompt),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -233,8 +249,10 @@ fun SettingsScreen(
                                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                                 },
                                 shape = RoundedCornerShape(999.dp),
-                            ) { Text("Allow access") }
-                            TextButton(onClick = viewModel::dismissPostRestorePrompt) { Text("Dismiss") }
+                            ) { Text(stringResource(R.string.post_restore_allow_access)) }
+                            TextButton(onClick = viewModel::dismissPostRestorePrompt) {
+                                Text(stringResource(R.string.action_dismiss))
+                            }
                         }
                     }
                 }
@@ -245,7 +263,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "Auto-capture",
+                        title = stringResource(R.string.settings_auto_capture),
                         subtitle = captureSubtitle,
                         leadingDotColor = if (captureHealthy) ext.inflow else ext.warning,
                         onClick = onOpenDiagnostics,
@@ -254,39 +272,49 @@ fun SettingsScreen(
                 }
             }
 
-            // Block 2: 4 plain user-friendly settings rows
+            // Block 2: 5 plain user-friendly settings rows
             item(key = "settings-list") {
+                val categoriesSummary = pluralStringResource(
+                    R.plurals.settings_categories_count,
+                    state.categories.size,
+                    state.categories.size,
+                )
+                val rulesSummary = pluralStringResource(
+                    R.plurals.settings_rules_count,
+                    state.rules.size,
+                    state.rules.size,
+                )
                 Column(modifier = Modifier.fillMaxWidth()) {
                     V2SettingRow(
-                        title = "Backup & export",
+                        title = stringResource(R.string.settings_backup_export),
                         subtitle = lastBackupLabel,
                         onClick = { showBackupSheet = true },
                     )
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "Categories & rules",
-                        subtitle = "${state.categories.size} categories · ${state.rules.size} rules",
+                        title = stringResource(R.string.settings_categories_rules),
+                        subtitle = "$categoriesSummary · $rulesSummary",
                         onClick = { showCategoriesSheet = true },
                     )
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "Appearance",
+                        title = stringResource(R.string.settings_appearance),
                         subtitle = themeLabel,
                         onClick = { showAppearanceSheet = true },
                     )
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "Currency & security",
+                        title = stringResource(R.string.settings_currency_security),
                         subtitle = buildString {
                             append(state.settings.baseCurrency)
-                            if (state.settings.appLockEnabled) append(" · Lock on")
+                            if (state.settings.appLockEnabled) append(stringResource(R.string.settings_lock_on_suffix))
                         },
                         onClick = { showCurrencySecuritySheet = true },
                     )
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "About",
-                        subtitle = "Version $appVersion",
+                        title = stringResource(R.string.settings_about),
+                        subtitle = stringResource(R.string.label_version_format, appVersion),
                         onClick = onOpenAbout,
                     )
                 }
@@ -308,16 +336,20 @@ fun SettingsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("Backup & export", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.settings_backup_export), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    text = "Backups are encrypted with your passphrase and stored wherever you choose.",
+                    text = stringResource(R.string.settings_backup_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 if (state.pendingReviewCount > 0) {
                     Text(
-                        text = "${state.pendingReviewCount} item(s) still in Needs Review won't be included until confirmed.",
+                        text = pluralStringResource(
+                            R.plurals.settings_backup_pending_review_warning,
+                            state.pendingReviewCount,
+                            state.pendingReviewCount,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = ext.warning,
                     )
@@ -333,7 +365,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                ) { Text("Back up now", style = MaterialTheme.typography.titleMedium) }
+                ) { Text(stringResource(R.string.settings_back_up_now), style = MaterialTheme.typography.titleMedium) }
 
                 OutlinedButton(
                     onClick = {
@@ -345,11 +377,11 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
-                ) { Text("Restore backup") }
+                ) { Text(stringResource(R.string.onboarding_restore_backup)) }
 
                 HorizontalDivider(color = ext.divider)
 
-                Text("Scheduled folder", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.settings_scheduled_folder), style = MaterialTheme.typography.titleMedium)
                 val savedFolderUri = state.settings.scheduledBackupFolderUri
                 if (savedFolderUri == null) {
                     OutlinedButton(
@@ -357,16 +389,20 @@ fun SettingsScreen(
                         enabled = !state.isBusy,
                         shape = RoundedCornerShape(999.dp),
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Choose backup folder") }
+                    ) { Text(stringResource(R.string.settings_choose_backup_folder)) }
                 } else {
                     val folderLabel = Uri.parse(savedFolderUri).lastPathSegment ?: savedFolderUri
-                    Text("Folder: $folderLabel", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        stringResource(R.string.settings_folder_label, folderLabel),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Backup reminders", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_backup_reminders), style = MaterialTheme.typography.bodyLarge)
                         Switch(
                             checked = state.settings.scheduledBackupEnabled,
                             onCheckedChange = { enabled ->
@@ -389,7 +425,7 @@ fun SettingsScreen(
                                         days,
                                     )
                                 },
-                                label = { Text("Every ${days}d") },
+                                label = { Text(stringResource(R.string.settings_every_n_days, days)) },
                             )
                         }
                     }
@@ -403,29 +439,29 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(999.dp),
-                        ) { Text("Back up here") }
+                        ) { Text(stringResource(R.string.settings_back_up_here)) }
                         TextButton(
                             onClick = {
                                 viewModel.setScheduledBackupConfig(null, false, state.settings.scheduledBackupIntervalDays)
                             },
-                        ) { Text("Clear") }
+                        ) { Text(stringResource(R.string.action_clear)) }
                     }
                 }
 
-                Text("Reminder frequency", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.settings_reminder_frequency), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(7, 14, 30).forEach { days ->
                         FilterChip(
                             selected = state.settings.backupReminderDays == days,
                             onClick = { viewModel.setBackupReminderThresholds(days, state.settings.backupReminderTxCount) },
-                            label = { Text("${days}d") },
+                            label = { Text(stringResource(R.string.settings_n_days, days)) },
                         )
                     }
                     listOf(50, 100, 250).forEach { txCount ->
                         FilterChip(
                             selected = state.settings.backupReminderTxCount == txCount,
                             onClick = { viewModel.setBackupReminderThresholds(state.settings.backupReminderDays, txCount) },
-                            label = { Text("$txCount tx") },
+                            label = { Text(stringResource(R.string.settings_n_tx, txCount)) },
                         )
                     }
                 }
@@ -438,7 +474,7 @@ fun SettingsScreen(
                         showCsvWarning = true
                     },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) { Text("Export CSV (unencrypted)") }
+                ) { Text(stringResource(R.string.settings_export_csv_unencrypted)) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -457,12 +493,12 @@ fun SettingsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
             ) {
                 Text(
-                    text = "Categories & rules",
+                    text = stringResource(R.string.settings_categories_rules),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
                 V2SettingRow(
-                    title = "Categories",
+                    title = stringResource(R.string.categories_title),
                     trailingText = "${state.categories.size}",
                     onClick = {
                         showCategoriesSheet = false
@@ -471,7 +507,7 @@ fun SettingsScreen(
                 )
                 HorizontalDivider(color = ext.divider)
                 V2SettingRow(
-                    title = "Auto-categorization rules",
+                    title = stringResource(R.string.settings_auto_categorization_rules),
                     trailingText = "${state.rules.size}",
                     onClick = {
                         showCategoriesSheet = false
@@ -480,7 +516,7 @@ fun SettingsScreen(
                 )
                 HorizontalDivider(color = ext.divider)
                 V2SettingRow(
-                    title = "Custom notification patterns",
+                    title = stringResource(R.string.settings_custom_notification_patterns),
                     trailingText = "${state.customParserRuleCount}",
                     onClick = {
                         showCategoriesSheet = false
@@ -506,9 +542,9 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Appearance", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.settings_appearance), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        text = "Choose how W-Track looks on your device.",
+                        text = stringResource(R.string.settings_appearance_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -548,14 +584,14 @@ fun SettingsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Currency & security", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.settings_currency_security), style = MaterialTheme.typography.titleLarge)
 
-                Text("Main currency", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.settings_main_currency), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    listOf("IDR", "USD", "SGD", "MYR", "EUR", "JPY").forEach { cur ->
+                    CurrencyRegistry.supportedCodes.forEach { cur ->
                         FilterChip(
                             selected = state.settings.baseCurrency == cur,
                             onClick = { viewModel.setBaseCurrency(cur) },
@@ -572,9 +608,9 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("App lock", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.settings_app_lock), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "Require fingerprint, face, or PIN to open.",
+                            text = stringResource(R.string.settings_app_lock_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -593,18 +629,22 @@ fun SettingsScreen(
                 }
                 if (lockUnavailableHint || (!lockSupported && state.settings.appLockEnabled)) {
                     Text(
-                        text = "Set up a screen lock in Android Settings first.",
+                        text = stringResource(R.string.settings_app_lock_setup_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 if (state.settings.appLockEnabled) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(0 to "Immediate", 60 to "1 min", 300 to "5 min").forEach { (seconds, label) ->
+                        listOf(
+                            0 to R.string.settings_lock_immediate,
+                            60 to R.string.settings_lock_1_min,
+                            300 to R.string.settings_lock_5_min,
+                        ).forEach { (seconds, labelRes) ->
                             FilterChip(
                                 selected = state.settings.appLockTimeoutSeconds == seconds,
                                 onClick = { viewModel.setAppLock(true, seconds) },
-                                label = { Text(label) },
+                                label = { Text(stringResource(labelRes)) },
                             )
                         }
                     }
@@ -618,9 +658,9 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Status reminders", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.settings_status_reminders), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "Alert me if capture pauses or items need review.",
+                            text = stringResource(R.string.settings_status_reminders_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -644,23 +684,31 @@ fun SettingsScreen(
                     )
                 }
 
-                Text("Keep notification history", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.settings_keep_history), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(0, 7, 14, 30).forEach { days ->
                         FilterChip(
                             selected = state.settings.verificationWindowDays == days,
                             onClick = { viewModel.setVerificationWindowDays(days) },
-                            label = { Text(if (days == 0) "Don't keep" else "${days}d") },
+                            label = {
+                                Text(
+                                    if (days == 0) {
+                                        stringResource(R.string.settings_dont_keep)
+                                    } else {
+                                        stringResource(R.string.settings_n_days, days)
+                                    },
+                                )
+                            },
                         )
                     }
                 }
-                Text("Pause warning after", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.settings_pause_warning_after), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(1, 3, 6, 12).forEach { hours ->
                         FilterChip(
                             selected = state.settings.heartbeatStaleHours == hours,
                             onClick = { viewModel.setHeartbeatStaleHours(hours) },
-                            label = { Text("${hours}h") },
+                            label = { Text(stringResource(R.string.settings_n_hours, hours)) },
                         )
                     }
                 }
@@ -677,17 +725,17 @@ fun SettingsScreen(
                 pendingExportUri = null
                 pendingScheduledFolderUri = null
             },
-            title = { Text("Protect backup with a passphrase") },
+            title = { Text(stringResource(R.string.settings_protect_backup_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Choose a passphrase (at least 8 characters). Keep it safe — it cannot be reset.",
+                        text = stringResource(R.string.settings_protect_backup_desc),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
                         value = backupPassphrase,
                         onValueChange = { backupPassphrase = it },
-                        label = { Text("Passphrase") },
+                        label = { Text(stringResource(R.string.label_passphrase)) },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -696,7 +744,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = backupPassphraseConfirm,
                         onValueChange = { backupPassphraseConfirm = it },
-                        label = { Text("Confirm passphrase") },
+                        label = { Text(stringResource(R.string.label_confirm_passphrase)) },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -742,13 +790,13 @@ fun SettingsScreen(
                             )
                         }
                     },
-                ) { Text("Save backup") }
+                ) { Text(stringResource(R.string.settings_save_backup)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     pendingExportUri = null
                     pendingScheduledFolderUri = null
-                }) { Text("Cancel") }
+                }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -757,12 +805,12 @@ fun SettingsScreen(
         val uri = pendingRestoreUri!!
         AlertDialog(
             onDismissRequest = { pendingRestoreUri = null },
-            title = { Text("Restore backup") },
+            title = { Text(stringResource(R.string.onboarding_restore_dialog_title)) },
             text = {
                 OutlinedTextField(
                     value = backupPassphrase,
                     onValueChange = { backupPassphrase = it },
-                    label = { Text("Passphrase") },
+                    label = { Text(stringResource(R.string.label_passphrase)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
@@ -774,34 +822,34 @@ fun SettingsScreen(
                     val pw = backupPassphrase
                     pendingRestoreUri = null
                     viewModel.restoreEncryptedBackup(pw) { context.contentResolver.openInputStream(uri) }
-                }) { Text("Restore") }
+                }) { Text(stringResource(R.string.action_restore)) }
             },
-            dismissButton = { TextButton(onClick = { pendingRestoreUri = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { pendingRestoreUri = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
     if (showCsvWarning) {
         AlertDialog(
             onDismissRequest = { showCsvWarning = false },
-            title = { Text("Export unencrypted CSV?") },
+            title = { Text(stringResource(R.string.settings_csv_warning_title)) },
             text = {
-                Text("CSV files are readable by any app. Use encrypted backup for secure storage.")
+                Text(stringResource(R.string.settings_csv_warning_desc))
             },
             confirmButton = {
                 Button(onClick = {
                     showCsvWarning = false
                     exportCsvLauncher.launch("wtrack-transactions.csv")
-                }) { Text("Export CSV") }
+                }) { Text(stringResource(R.string.settings_csv_export_action)) }
             },
-            dismissButton = { TextButton(onClick = { showCsvWarning = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showCsvWarning = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
     if (showWipeStep1) {
         AlertDialog(
             onDismissRequest = { showWipeStep1 = false },
-            title = { Text("Erase all local data?") },
-            text = { Text("This permanently deletes all transactions, accounts, logs, and settings from this device.") },
+            title = { Text(stringResource(R.string.settings_wipe_step1_title)) },
+            text = { Text(stringResource(R.string.settings_wipe_step1_desc)) },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -810,16 +858,16 @@ fun SettingsScreen(
                         wipeConfirmInput = ""
                         showWipeStep2 = true
                     },
-                ) { Text("Continue") }
+                ) { Text(stringResource(R.string.action_continue)) }
             },
-            dismissButton = { TextButton(onClick = { showWipeStep1 = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showWipeStep1 = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
     if (showWipeStep2) {
         AlertDialog(
             onDismissRequest = { showWipeStep2 = false },
-            title = { Text("Type WIPE to confirm") },
+            title = { Text(stringResource(R.string.settings_wipe_step2_title, "WIPE")) },
             text = {
                 OutlinedTextField(
                     value = wipeConfirmInput,
@@ -837,9 +885,9 @@ fun SettingsScreen(
                         showWipeStep2 = false
                         viewModel.wipeAllData()
                     },
-                ) { Text("Erase everything") }
+                ) { Text(stringResource(R.string.settings_wipe_confirm_action)) }
             },
-            dismissButton = { TextButton(onClick = { showWipeStep2 = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showWipeStep2 = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -852,7 +900,7 @@ private fun AppearanceModeOption(
     modifier: Modifier = Modifier,
 ) {
     val ext = WtrackTheme.colors
-    val label = mode.name.lowercase().replaceFirstChar(Char::uppercase)
+    val label = stringResource(mode.labelRes())
     val shape = RoundedCornerShape(16.dp)
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else ext.divider
     val borderWidth = if (selected) 2.dp else 1.dp
@@ -933,10 +981,12 @@ private fun MiniThemePreview(
     dark: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val bg = if (dark) Color(0xFF0B1413) else Color(0xFFFFFFFF)
-    val ink = if (dark) Color(0xFFF2F7F6) else Color(0xFF101C1A)
-    val accent = if (dark) Color(0xFF1FA392) else Color(0xFF0B6E63)
-    val line = if (dark) Color(0xFF1C2B29) else Color(0xFFE6ECEA)
+    val scheme = if (dark) DarkColors else LightColors
+    val ext = if (dark) DarkWtrackExtendedColors else LightWtrackExtendedColors
+    val bg = scheme.background
+    val ink = scheme.onBackground
+    val accent = scheme.primary
+    val line = ext.divider
 
     Column(
         modifier = modifier

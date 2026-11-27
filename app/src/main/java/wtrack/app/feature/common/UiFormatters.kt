@@ -1,5 +1,6 @@
 package wtrack.app.feature.common
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -30,6 +33,8 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import wtrack.app.R
+import wtrack.app.core.i18n.AppLocaleHelper
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
 import wtrack.app.domain.model.CaptureStatus
@@ -37,53 +42,84 @@ import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.MoneyFormatter
 
 object UiDateHelper {
-    private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", Locale.ENGLISH)
-    private val dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
-    private val timeOnlyFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
-    private val dayMonthFormatter = DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)
     private val editableDateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
-    private val monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
-    private val shortMonthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
 
-    fun formatDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
-        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(dateTimeFormatter)
+    fun formatDateTime(
+        epochMillis: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        locale: Locale = AppLocaleHelper.activeLocale(),
+    ): String {
+        val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm", locale)
+        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
+    }
 
-    fun formatDate(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
-        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(dateFormatter)
+    fun formatDate(
+        epochMillis: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        locale: Locale = AppLocaleHelper.activeLocale(),
+    ): String {
+        val formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", locale)
+        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
+    }
 
-    fun formatTimeOnly(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
-        Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(timeOnlyFormatter)
+    fun formatTimeOnly(
+        epochMillis: Long,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        locale: Locale = AppLocaleHelper.activeLocale(),
+    ): String {
+        val formatter = DateTimeFormatter.ofPattern("HH:mm", locale)
+        return Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(formatter)
+    }
 
     fun formatDayGroupHeader(
+        context: Context,
         epochMillis: Long,
         nowEpochMillis: Long = System.currentTimeMillis(),
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): String {
+        val locale = AppLocaleHelper.activeLocale(context)
         val txDate = Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalDate()
         val today = Instant.ofEpochMilli(nowEpochMillis).atZone(zoneId).toLocalDate()
         return when (txDate) {
-            today -> "Today"
-            today.minusDays(1) -> "Yesterday"
+            today -> context.getString(R.string.date_today)
+            today.minusDays(1) -> context.getString(R.string.date_yesterday)
             else -> if (txDate.year == today.year) {
-                txDate.format(dayMonthFormatter)
+                txDate.format(DateTimeFormatter.ofPattern("dd MMM", locale))
             } else {
-                txDate.format(dateFormatter)
+                txDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", locale))
             }
         }
     }
 
+    @Composable
+    fun formatDayGroupHeader(
+        epochMillis: Long,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+        zoneId: ZoneId = ZoneId.systemDefault(),
+    ): String = formatDayGroupHeader(
+        context = LocalContext.current,
+        epochMillis = epochMillis,
+        nowEpochMillis = nowEpochMillis,
+        zoneId = zoneId,
+    )
+
     fun localDateOf(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): LocalDate =
         Instant.ofEpochMilli(epochMillis).atZone(zoneId).toLocalDate()
 
-    fun formatDaysAgo(epochMillis: Long, nowEpochMillis: Long): String {
-        if (epochMillis <= 0L) return "Never"
+    fun formatDaysAgo(context: Context, epochMillis: Long, nowEpochMillis: Long): String {
+        if (epochMillis <= 0L) return context.getString(R.string.date_never)
         val diffDays = ((nowEpochMillis - epochMillis) / 86_400_000L).coerceAtLeast(0L)
-        return when {
-            diffDays == 0L -> "Today"
-            diffDays == 1L -> "1 day ago"
-            else -> "$diffDays days ago"
+        return if (diffDays == 0L) {
+            context.getString(R.string.date_today)
+        } else {
+            val daysInt = diffDays.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            context.resources.getQuantityString(R.plurals.date_days_ago, daysInt, daysInt)
         }
     }
+
+    @Composable
+    fun formatDaysAgo(epochMillis: Long, nowEpochMillis: Long): String =
+        formatDaysAgo(LocalContext.current, epochMillis, nowEpochMillis)
 
     fun formatEditableDateTime(epochMillis: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
         Instant.ofEpochMilli(epochMillis).atZone(zoneId).format(editableDateTimeFormatter)
@@ -96,7 +132,12 @@ object UiDateHelper {
         }.getOrNull()
     }
 
-    fun monthWindow(nowEpochMillis: Long, monthOffset: Int, zoneId: ZoneId = ZoneId.systemDefault()): MonthWindow {
+    fun monthWindow(
+        nowEpochMillis: Long,
+        monthOffset: Int,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        locale: Locale = AppLocaleHelper.activeLocale(),
+    ): MonthWindow {
         val currentMonth = Instant.ofEpochMilli(nowEpochMillis).atZone(zoneId).toLocalDate()
         val targetYm = YearMonth.from(currentMonth).plusMonths(monthOffset.toLong())
         val prevYm = targetYm.minusMonths(1)
@@ -104,6 +145,8 @@ object UiDateHelper {
         val end = targetYm.plusMonths(1).atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
         val prevStart = prevYm.atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
         val firstDay = targetYm.atDay(1)
+        val monthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", locale)
+        val shortMonthYearFormatter = DateTimeFormatter.ofPattern("MMM yyyy", locale)
         return MonthWindow(
             label = firstDay.format(monthYearFormatter),
             shortLabel = firstDay.format(shortMonthYearFormatter),
@@ -125,27 +168,27 @@ data class MonthWindow(
 @Composable
 fun CaptureStatusPill(status: CaptureStatus, modifier: Modifier = Modifier) {
     val ext = WtrackTheme.colors
-    val (label, containerColor, contentColor, dotColor) = when (status) {
+    val (labelRes, containerColor, contentColor, dotColor) = when (status) {
         CaptureStatus.ACTIVE -> Quad(
-            "Active",
+            status.labelRes(),
             ext.inflowContainer,
             ext.onInflowContainer,
             ext.inflow,
         )
         CaptureStatus.DISCONNECTED -> Quad(
-            "Disconnected",
+            status.labelRes(),
             ext.transferContainer,
             ext.onTransferContainer,
             ext.transfer,
         )
         CaptureStatus.ATTENTION -> Quad(
-            "Attention",
+            status.labelRes(),
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
             MaterialTheme.colorScheme.error,
         )
         CaptureStatus.UNSUPPORTED -> Quad(
-            "Unsupported",
+            status.labelRes(),
             MaterialTheme.colorScheme.surfaceVariant,
             MaterialTheme.colorScheme.onSurfaceVariant,
             ext.mutedText,
@@ -168,7 +211,7 @@ fun CaptureStatusPill(status: CaptureStatus, modifier: Modifier = Modifier) {
                     .background(dotColor),
             )
             Text(
-                text = label,
+                text = stringResource(labelRes),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor,
@@ -178,10 +221,10 @@ fun CaptureStatusPill(status: CaptureStatus, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun PossibleGapPill(modifier: Modifier = Modifier, label: String = "Possible Gap") {
+fun PossibleGapPill(modifier: Modifier = Modifier, label: String? = null) {
     val ext = WtrackTheme.colors
     StatusPill(
-        label = label,
+        label = label ?: stringResource(R.string.label_possible_gap),
         containerColor = ext.warningContainer,
         contentColor = ext.onWarningContainer,
         borderColor = ext.warningBorder,
@@ -284,9 +327,9 @@ fun MoneyAmountTextField(
     val isInvalid = value.isNotBlank() &&
         !isValidMoneyInput(value, currency, allowZero = allowZero, allowNegative = allowNegative, isOptional = isOptional)
     val placeholderText = when {
-        spec.code == "IDR" -> "e.g. 50000 or 50.000"
-        spec.minorUnitDigits == 0 -> "e.g. 1500"
-        else -> "e.g. 50000 or 50.25"
+        spec.code == CurrencyRegistry.DEFAULT_CURRENCY -> stringResource(R.string.money_placeholder_idr)
+        spec.minorUnitDigits == 0 -> stringResource(R.string.money_placeholder_zero_decimal)
+        else -> stringResource(R.string.money_placeholder_decimal)
     }
 
     OutlinedTextField(
@@ -307,14 +350,14 @@ fun MoneyAmountTextField(
             when {
                 value.isBlank() -> Text(
                     text = when {
-                        spec.code == "IDR" -> "Type 50000, 50.000, or 50,000 (comma for sen: 50.000,50)"
-                        spec.minorUnitDigits == 0 -> "Type 1500 or 1,500"
-                        else -> "Type 50000, 50,000, or 50.25"
+                        spec.code == CurrencyRegistry.DEFAULT_CURRENCY -> stringResource(R.string.money_hint_idr)
+                        spec.minorUnitDigits == 0 -> stringResource(R.string.money_hint_zero_decimal)
+                        else -> stringResource(R.string.money_hint_decimal)
                     },
                 )
-                isInvalid -> Text("Invalid $currency amount (examples: 50000, 50.000, 50,000)")
+                isInvalid -> Text(stringResource(R.string.money_invalid_amount, currency))
                 parsedMinor != null -> Text(
-                    text = "Will save as: ${MoneyFormatter.format(parsedMinor, currency)}",
+                    text = stringResource(R.string.money_will_save_as, MoneyFormatter.format(parsedMinor, currency)),
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
                     style = MaterialTheme.typography.labelMedium.tabularNums(),

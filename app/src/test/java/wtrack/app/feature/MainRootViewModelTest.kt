@@ -23,6 +23,7 @@ import wtrack.app.domain.repository.CaptureStatusRepository
 import wtrack.app.domain.repository.CreateAccountRequest
 import wtrack.app.domain.repository.DatabaseHealthRepository
 import wtrack.app.domain.repository.NeedsReviewRepository
+import wtrack.app.domain.repository.ProviderCatalogEntry
 import wtrack.app.domain.repository.SaveReviewItemRequest
 import wtrack.app.domain.repository.UpdateAccountRequest
 import wtrack.app.domain.time.Clock
@@ -217,6 +218,66 @@ class MainRootViewModelTest {
             vm.onAppForegrounded()
             val relocked = awaitItem() as RootUiState.Ready
             assertThat(relocked.isAppLocked).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun onboardingExposesDynamicProvidersAndUsesSettingsBaseCurrencyAsFallback() = runTest {
+        val healthRepo = object : DatabaseHealthRepository {
+            override val state: Flow<DatabaseHealthState> = MutableStateFlow(DatabaseHealthState.Ready)
+            override suspend fun wipeAllDataAndReset() {}
+        }
+        val settingsRepo = FakeSettingsRepository(
+            AppSettings(baseCurrency = "EUR", onboardingCompleted = false),
+        )
+        val accountRepo = FakeAccountRepository()
+        val backupPort = FakeBackupAndDiagnosticsPort().apply {
+            catalogEntries = listOf(
+                ProviderCatalogEntry(
+                    priority = 1,
+                    id = "custom_bank",
+                    displayName = "Euro Bank",
+                    category = "Bank",
+                    candidatePackageIds = listOf("com.example.eurobank"),
+                    verifiedPackageId = "com.example.eurobank",
+                    verificationStatus = "VERIFIED_ACTIVE",
+                    notes = "Supports incoming transfers.",
+                ),
+            )
+        }
+        val vm = MainRootViewModel(
+            databaseHealthRepository = healthRepo,
+            settingsRepository = settingsRepo,
+            captureStatusRepository = FakeCaptureStatusRepository(),
+            needsReviewRepository = FakeNeedsReviewRepository(),
+            accountRepository = accountRepo,
+            backupPort = backupPort,
+            clock = FakeClock(),
+            dispatcherProvider = TestDispatcherProvider(mainDispatcherRule.dispatcher),
+        )
+
+        vm.uiState.test {
+            var current = awaitItem()
+            while (current !is RootUiState.Onboarding) {
+                current = awaitItem()
+            }
+            assertThat(current.supportedProviders.map { it.displayName }).containsExactly("Euro Bank")
+
+            vm.createInitialAccount(
+                name = "Main Euro",
+                provider = "Euro Bank",
+                accountType = wtrack.app.domain.model.AccountType.BANK,
+                currency = "  ",
+                openingBalanceMajorInput = "120.50",
+            )
+            var updated = awaitItem()
+            while (updated !is RootUiState.Onboarding || !updated.hasAccounts) {
+                updated = awaitItem()
+            }
+            val created = accountRepo.accountsFlow.value.single()
+            assertThat(created.currency).isEqualTo("EUR")
+            assertThat(created.estimatedBalanceMinor).isEqualTo(12_050L)
             cancelAndIgnoreRemainingEvents()
         }
     }

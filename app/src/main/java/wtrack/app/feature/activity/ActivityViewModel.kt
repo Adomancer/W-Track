@@ -1,5 +1,6 @@
 package wtrack.app.feature.activity
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,8 +11,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import wtrack.app.R
 import wtrack.app.domain.model.Account
 import wtrack.app.domain.model.Category
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.DerivedFeeRow
 import wtrack.app.domain.model.DomainTransactionType
 import wtrack.app.domain.model.MoneyFormatter
@@ -41,13 +44,14 @@ import wtrack.app.domain.usecase.UnlinkTransferUseCase
 import wtrack.app.domain.usecase.UpdateTransactionUseCase
 import wtrack.app.domain.usecase.VoidRestoreTransactionUseCase
 import wtrack.app.feature.common.UiDateHelper
+import wtrack.app.feature.common.UiText
 import wtrack.integration.Direction
 
-enum class ActivityDateFilter(val label: String) {
-    ALL("All dates"),
-    THIS_MONTH("This month"),
-    LAST_30_DAYS("Last 30d"),
-    PREVIOUS_MONTH("Prev month"),
+enum class ActivityDateFilter(@param:StringRes val labelRes: Int) {
+    ALL(R.string.date_filter_all),
+    THIS_MONTH(R.string.date_filter_this_month),
+    LAST_30_DAYS(R.string.date_filter_last_30_days),
+    PREVIOUS_MONTH(R.string.date_filter_previous_month),
 }
 
 data class ActivityFilterState(
@@ -86,8 +90,8 @@ data class ActivityUiState(
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
-    val baseCurrency: String = "IDR",
-    val actionMessage: String? = null,
+    val baseCurrency: String = CurrencyRegistry.DEFAULT_CURRENCY,
+    val actionMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -111,7 +115,7 @@ class ActivityViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val filterState = MutableStateFlow(ActivityFilterState())
-    private val actionMessage = MutableStateFlow<String?>(null)
+    private val actionMessage = MutableStateFlow<UiText?>(null)
     private val transferSuggestionEngine = TransferSuggestionEngine()
 
     private val dataSnapshot = combine(
@@ -165,8 +169,8 @@ class ActivityViewModel @Inject constructor(
             val counterpartAccountId = counterpartId?.let { txMap[it]?.accountId }
             ActivityTransactionItem(
                 transaction = tx,
-                accountName = accountMap[tx.accountId]?.name ?: "Account #${tx.accountId}",
-                categoryName = categoryMap[tx.categoryId]?.name ?: "Uncategorized",
+                accountName = accountMap[tx.accountId]?.name.orEmpty(),
+                categoryName = categoryMap[tx.categoryId]?.name.orEmpty(),
                 transferPair = pair,
                 counterpartAccountName = counterpartAccountId?.let { accountMap[it]?.name },
                 tags = txTagsMap[tx.id].orEmpty(),
@@ -214,10 +218,8 @@ class ActivityViewModel @Inject constructor(
             .map { suggestion ->
                 ActivityTransferSuggestionItem(
                     suggestion = suggestion,
-                    outgoingAccountName = accountMap[suggestion.outgoing.accountId]?.name
-                        ?: "Account #${suggestion.outgoing.accountId}",
-                    incomingAccountName = accountMap[suggestion.incoming.accountId]?.name
-                        ?: "Account #${suggestion.incoming.accountId}",
+                    outgoingAccountName = accountMap[suggestion.outgoing.accountId]?.name.orEmpty(),
+                    incomingAccountName = accountMap[suggestion.incoming.accountId]?.name.orEmpty(),
                 )
             }
 
@@ -255,13 +257,13 @@ class ActivityViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val account = uiState.value.accounts.firstOrNull { it.id == accountId } ?: run {
-                actionMessage.value = "Select an account."
+                actionMessage.value = UiText.Resource(R.string.msg_select_account)
                 return@launch
             }
             val minor = MoneyFormatter.parseMajorInput(amountMajorInput, account.currency)
                 ?.takeIf { it > 0L }
                 ?: run {
-                    actionMessage.value = "Invalid amount for ${account.currency}."
+                    actionMessage.value = UiText.Resource(R.string.msg_invalid_amount_for_currency, account.currency)
                     return@launch
                 }
             runCatching {
@@ -279,9 +281,9 @@ class ActivityViewModel @Inject constructor(
                     ),
                 )
             }.onSuccess {
-                actionMessage.value = "Transaction added."
+                actionMessage.value = UiText.Resource(R.string.msg_tx_added)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Could not create transaction."
+                actionMessage.value = UiText.fromError(err, R.string.msg_tx_create_failed)
             }
         }
     }
@@ -302,7 +304,7 @@ class ActivityViewModel @Inject constructor(
             val minor = MoneyFormatter.parseMajorInput(amountMajorInput, tx.currency)
                 ?.takeIf { it > 0L }
                 ?: run {
-                    actionMessage.value = "Invalid amount format for ${tx.currency}."
+                    actionMessage.value = UiText.Resource(R.string.msg_invalid_amount_format, tx.currency)
                     return@launch
                 }
             runCatching {
@@ -322,9 +324,9 @@ class ActivityViewModel @Inject constructor(
                     ),
                 )
             }.onSuccess {
-                actionMessage.value = "Transaction updated."
+                actionMessage.value = UiText.Resource(R.string.msg_tx_updated)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Update failed."
+                actionMessage.value = UiText.fromError(err, R.string.msg_update_failed)
             }
         }
     }
@@ -352,17 +354,17 @@ class ActivityViewModel @Inject constructor(
                             categoryId = categoryId,
                             applyBackfill = backfillUncategorized,
                         )
-                        "Category updated and rule saved (${result.backfilledCount} past updated)."
+                        UiText.Resource(R.string.msg_category_updated_and_rule, result.backfilledCount)
                     } else {
-                        "Category updated."
+                        UiText.Resource(R.string.msg_category_updated)
                     }
                 } else {
-                    "Category updated."
+                    UiText.Resource(R.string.msg_category_updated)
                 }
             }.onSuccess { msg ->
                 actionMessage.value = msg
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to update category."
+                actionMessage.value = UiText.fromError(err, R.string.msg_category_update_failed)
             }
         }
     }
@@ -370,56 +372,56 @@ class ActivityViewModel @Inject constructor(
     fun voidTransaction(id: Long) {
         viewModelScope.launch {
             runCatching { voidRestoreTransactionUseCase.void(id) }
-                .onSuccess { actionMessage.value = "Transaction voided." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to void transaction." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_tx_voided) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_tx_void_failed) }
         }
     }
 
     fun restoreTransaction(id: Long) {
         viewModelScope.launch {
             runCatching { voidRestoreTransactionUseCase.restore(id) }
-                .onSuccess { actionMessage.value = "Transaction restored." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to restore transaction." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_tx_restored) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_tx_restore_failed) }
         }
     }
 
     fun deleteManual(id: Long) {
         viewModelScope.launch {
             runCatching { deleteManualTransactionUseCase(id) }
-                .onSuccess { actionMessage.value = "Manual transaction deleted." }
-                .onFailure { actionMessage.value = it.message ?: "Cannot delete captured transaction; void instead." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_manual_tx_deleted) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_delete_captured_blocked) }
         }
     }
 
     fun linkTransfer(outgoingId: Long, incomingId: Long) {
         viewModelScope.launch {
             runCatching { linkTransferUseCase(outgoingId, incomingId) }
-                .onSuccess { actionMessage.value = "Transfer pair linked." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to link transfer pair." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_transfer_linked) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_transfer_link_failed) }
         }
     }
 
     fun unlinkTransfer(pairId: Long) {
         viewModelScope.launch {
             runCatching { unlinkTransferUseCase(pairId) }
-                .onSuccess { actionMessage.value = "Transfer pair unlinked." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to unlink transfer." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_transfer_unlinked) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_transfer_unlink_failed) }
         }
     }
 
     fun confirmTransferSuggestion(suggestion: TransferSuggestion) {
         viewModelScope.launch {
             runCatching { linkTransferUseCase(suggestion.outgoing.id, suggestion.incoming.id) }
-                .onSuccess { actionMessage.value = "Suggested transfer linked." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to link suggested transfer." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_suggested_transfer_linked) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_suggested_transfer_failed) }
         }
     }
 
     fun dismissTransferSuggestion(outgoingId: Long, incomingId: Long) {
         viewModelScope.launch {
             runCatching { transferRepository.dismissSuggestedPair(outgoingId, incomingId) }
-                .onSuccess { actionMessage.value = "Transfer suggestion dismissed." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to dismiss suggestion." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_suggestion_dismissed) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_suggestion_dismiss_failed) }
         }
     }
 
@@ -427,9 +429,13 @@ class ActivityViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linkRefundUseCase(refundTxId, originalTxId) }
                 .onSuccess {
-                    actionMessage.value = if (originalTxId == null) "Refund unlinked." else "Refund linked to original."
+                    actionMessage.value = if (originalTxId == null) {
+                        UiText.Resource(R.string.msg_refund_unlinked)
+                    } else {
+                        UiText.Resource(R.string.msg_refund_linked)
+                    }
                 }
-                .onFailure { actionMessage.value = it.message ?: "Failed to link refund." }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_refund_link_failed) }
         }
     }
 
@@ -438,16 +444,16 @@ class ActivityViewModel @Inject constructor(
         if (cleaned.isEmpty()) return
         viewModelScope.launch {
             runCatching { tagRepository.addTagToTransaction(txId, cleaned) }
-                .onSuccess { actionMessage.value = "Tag #$cleaned added." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to add tag." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_tag_added, cleaned) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_tag_add_failed) }
         }
     }
 
     fun removeTagFromTransaction(txId: Long, tagId: Long) {
         viewModelScope.launch {
             runCatching { tagRepository.removeTagFromTransaction(txId, tagId) }
-                .onSuccess { actionMessage.value = "Tag removed." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to remove tag." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_tag_removed) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_tag_remove_failed) }
         }
     }
 

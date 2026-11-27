@@ -23,8 +23,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import wtrack.app.BuildConfig
+import wtrack.app.R
+import wtrack.app.core.config.AppLinks
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.feature.common.V2SettingRow
 import wtrack.app.feature.common.WtrackBrandMark
@@ -41,8 +45,8 @@ internal fun getAppVersionName(context: Context): String {
             @Suppress("DEPRECATION")
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
-        packageInfo.versionName?.takeIf { it.isNotBlank() } ?: "1.0.0"
-    }.getOrDefault("1.0.0")
+        packageInfo.versionName?.takeIf { it.isNotBlank() } ?: BuildConfig.VERSION_NAME
+    }.getOrDefault(BuildConfig.VERSION_NAME)
 }
 
 @Composable
@@ -62,7 +66,7 @@ fun AboutScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            WtrackTopBar(title = "About", onBack = onBack)
+            WtrackTopBar(title = stringResource(R.string.settings_about), onBack = onBack)
         },
     ) { innerPadding ->
         Column(
@@ -84,18 +88,18 @@ fun AboutScreen(
                 WtrackBrandMark(size = 64.dp, cornerRadius = 18.dp)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "W-Track",
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
-                    text = "Private, local-first expense tracker",
+                    text = stringResource(R.string.about_tagline),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "Version $versionName",
+                    text = stringResource(R.string.label_version_format, versionName),
                     style = MaterialTheme.typography.bodySmall,
                     color = ext.mutedText,
                 )
@@ -111,13 +115,13 @@ fun AboutScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = "Local & private",
+                        text = stringResource(R.string.about_privacy_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "All transactions, accounts, and backups stay on your device. No cloud sync, no ads, and no tracking.",
+                        text = stringResource(R.string.about_privacy_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -128,27 +132,27 @@ fun AboutScreen(
             // Block 3: Useful links
             Column(modifier = Modifier.fillMaxWidth()) {
                 V2SettingRow(
-                    title = "GitHub repository",
-                    subtitle = "Source code & documentation",
-                    onClick = { openUrl("https://github.com/Adomancer/W-Track") },
+                    title = stringResource(R.string.about_github_title),
+                    subtitle = stringResource(R.string.about_github_subtitle),
+                    onClick = { openUrl(AppLinks.repositoryUrl) },
                 )
                 HorizontalDivider(color = ext.divider)
                 V2SettingRow(
-                    title = "Releases & changelog",
-                    subtitle = "Check for the latest version",
-                    onClick = { openUrl("https://github.com/Adomancer/W-Track/releases") },
+                    title = stringResource(R.string.about_releases_title),
+                    subtitle = stringResource(R.string.about_releases_subtitle),
+                    onClick = { openUrl(AppLinks.releasesUrl) },
                 )
                 HorizontalDivider(color = ext.divider)
                 V2SettingRow(
-                    title = "Report an issue",
-                    subtitle = "Share feedback or report a bug",
-                    onClick = { openUrl("https://github.com/Adomancer/W-Track/issues") },
+                    title = stringResource(R.string.about_issues_title),
+                    subtitle = stringResource(R.string.about_issues_subtitle),
+                    onClick = { openUrl(AppLinks.issuesUrl) },
                 )
                 HorizontalDivider(color = ext.divider)
                 V2SettingRow(
-                    title = "License",
-                    subtitle = "GNU General Public License v3.0",
-                    onClick = { openUrl("https://github.com/Adomancer/W-Track/blob/main/LICENSE") },
+                    title = stringResource(R.string.about_license_title),
+                    subtitle = stringResource(R.string.about_license_subtitle),
+                    onClick = { openUrl(AppLinks.licenseUrl) },
                 )
             }
         }

@@ -43,7 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.activity.compose.LocalActivity
+import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +60,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import wtrack.app.R
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.ThemeMode
 import wtrack.app.feature.accounts.AccountsScreen
@@ -81,19 +84,23 @@ import wtrack.app.feature.settings.RulesScreen
 import wtrack.app.feature.settings.SettingsScreen
 import wtrack.app.feature.settings.SettingsViewModel
 
-private sealed class WtrackRoute(val route: String, val label: String, val icon: ImageVector? = null) {
-    data object Dashboard : WtrackRoute("dashboard", "Home", Icons.Outlined.Home)
-    data object Activity : WtrackRoute("activity", "Activity", Icons.AutoMirrored.Outlined.ReceiptLong)
-    data object Accounts : WtrackRoute("accounts", "Accounts", Icons.Outlined.AccountBalanceWallet)
-    data object Insights : WtrackRoute("insights", "Insights", Icons.Outlined.BarChart)
-    data object Review : WtrackRoute("review", "Review")
-    data object Settings : WtrackRoute("settings", "Settings")
-    data object Rules : WtrackRoute("rules", "Rules")
-    data object Categories : WtrackRoute("categories", "Categories")
-    data object Diagnostics : WtrackRoute("diagnostics", "Diagnostics")
-    data object About : WtrackRoute("about", "About")
-    data object CustomParsers : WtrackRoute("custom_parsers?sourceId={sourceId}", "Parsers")
-    data object TransactionDetail : WtrackRoute("transaction_detail/{txId}", "Detail")
+private sealed class WtrackRoute(
+    val route: String,
+    @param:StringRes val labelRes: Int,
+    val icon: ImageVector? = null,
+) {
+    data object Dashboard : WtrackRoute("dashboard", R.string.nav_home, Icons.Outlined.Home)
+    data object Activity : WtrackRoute("activity", R.string.nav_activity, Icons.AutoMirrored.Outlined.ReceiptLong)
+    data object Accounts : WtrackRoute("accounts", R.string.nav_accounts, Icons.Outlined.AccountBalanceWallet)
+    data object Insights : WtrackRoute("insights", R.string.nav_insights, Icons.Outlined.BarChart)
+    data object Review : WtrackRoute("review", R.string.nav_review)
+    data object Settings : WtrackRoute("settings", R.string.nav_settings)
+    data object Rules : WtrackRoute("rules", R.string.nav_rules)
+    data object Categories : WtrackRoute("categories", R.string.nav_categories)
+    data object Diagnostics : WtrackRoute("diagnostics", R.string.nav_diagnostics)
+    data object About : WtrackRoute("about", R.string.nav_about)
+    data object CustomParsers : WtrackRoute("custom_parsers?sourceId={sourceId}", R.string.nav_parsers)
+    data object TransactionDetail : WtrackRoute("transaction_detail/{txId}", R.string.nav_detail)
 }
 
 private val topLevelTabs = listOf(
@@ -220,6 +227,7 @@ private fun WtrackMainScaffold(
                     ) {
                         topLevelTabs.forEach { tab ->
                             val selected = currentRoute == tab.route
+                            val tabLabel = stringResource(tab.labelRes)
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = {
@@ -230,13 +238,13 @@ private fun WtrackMainScaffold(
                                 icon = {
                                     Icon(
                                         imageVector = tab.icon!!,
-                                        contentDescription = tab.label,
+                                        contentDescription = tabLabel,
                                         modifier = Modifier.size(21.dp),
                                     )
                                 },
                                 label = {
                                     Text(
-                                        text = tab.label,
+                                        text = tabLabel,
                                         fontSize = 12.sp,
                                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                     )
@@ -273,7 +281,7 @@ private fun WtrackMainScaffold(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = "Backup restored — grant Notification Access to resume capture.",
+                            text = stringResource(R.string.post_restore_banner),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
@@ -283,8 +291,10 @@ private fun WtrackMainScaffold(
                                     context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                                 },
                                 shape = RoundedCornerShape(999.dp),
-                            ) { Text("Allow access") }
-                            TextButton(onClick = onDismissPostRestorePrompt) { Text("Dismiss") }
+                            ) { Text(stringResource(R.string.post_restore_allow_access)) }
+                            TextButton(onClick = onDismissPostRestorePrompt) {
+                                Text(stringResource(R.string.action_dismiss))
+                            }
                         }
                     }
                 }

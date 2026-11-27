@@ -38,14 +38,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import java.io.InputStream
-import wtrack.app.domain.model.LockedReason
+import wtrack.app.R
 import wtrack.app.feature.common.ActionFeedbackBanner
 import wtrack.app.feature.common.WtrackBrandMark
 import wtrack.app.feature.common.WtrackCard
+import wtrack.app.feature.common.titleRes
 
 @Composable
 fun DatabaseLockedScreen(
@@ -91,7 +93,7 @@ fun DatabaseLockedScreen(
                     modifier = Modifier.size(24.dp),
                 )
                 Text(
-                    text = "Encrypted Database Locked",
+                    text = stringResource(R.string.db_locked_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
@@ -106,13 +108,8 @@ fun DatabaseLockedScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val reasonTitle = when (state.reason) {
-                        LockedReason.KEY_MISSING -> "Wrapped Key Missing"
-                        LockedReason.KEY_INVALIDATED_OR_CORRUPT -> "Keystore Key Invalidated or Corrupt"
-                        LockedReason.DATABASE_OPEN_FAILED -> "Database Decryption Failed"
-                    }
                     Text(
-                        text = reasonTitle,
+                        text = stringResource(state.reason.titleRes()),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         fontWeight = FontWeight.SemiBold,
@@ -127,7 +124,7 @@ fun DatabaseLockedScreen(
                         shape = RoundedCornerShape(10.dp),
                     ) {
                         Text(
-                            text = "Your encrypted local database file has been preserved untouched. W-Track will never silently delete your ledger.",
+                            text = stringResource(R.string.db_locked_preserved_notice),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.padding(10.dp),
@@ -155,7 +152,7 @@ fun DatabaseLockedScreen(
                     .fillMaxWidth()
                     .height(50.dp),
             ) {
-                Text("Restore from Encrypted Backup (.wtrackbackup)")
+                Text(stringResource(R.string.db_locked_restore_button))
             }
 
             Spacer(Modifier.height(4.dp))
@@ -170,7 +167,7 @@ fun DatabaseLockedScreen(
                     .fillMaxWidth()
                     .height(48.dp),
             ) {
-                Text("Erase Local Data & Start Fresh")
+                Text(stringResource(R.string.db_locked_erase_button))
             }
         }
     }
@@ -179,12 +176,12 @@ fun DatabaseLockedScreen(
         val uri = pendingRestoreUri!!
         AlertDialog(
             onDismissRequest = { pendingRestoreUri = null },
-            title = { Text("Enter Backup Passphrase") },
+            title = { Text(stringResource(R.string.db_locked_enter_passphrase)) },
             text = {
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it },
-                    label = { Text("Passphrase") },
+                    label = { Text(stringResource(R.string.label_passphrase)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
@@ -196,10 +193,10 @@ fun DatabaseLockedScreen(
                     val pw = passphrase
                     pendingRestoreUri = null
                     onRestoreBackup(pw) { context.contentResolver.openInputStream(uri) }
-                }) { Text("Restore") }
+                }) { Text(stringResource(R.string.action_restore)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRestoreUri = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingRestoreUri = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -207,9 +204,9 @@ fun DatabaseLockedScreen(
     if (showWipeStep1) {
         AlertDialog(
             onDismissRequest = { showWipeStep1 = false },
-            title = { Text("Erase All Local Data?") },
+            title = { Text(stringResource(R.string.db_locked_wipe_step1_title)) },
             text = {
-                Text("This permanently deletes your encrypted ledger, accounts, categories, rules, and local Keystore key material. This cannot be undone without a backup file.")
+                Text(stringResource(R.string.db_locked_wipe_step1_body))
             },
             confirmButton = {
                 Button(
@@ -219,19 +216,19 @@ fun DatabaseLockedScreen(
                         wipeConfirmInput = ""
                         showWipeStep2 = true
                     },
-                ) { Text("Continue") }
+                ) { Text(stringResource(R.string.action_continue)) }
             },
-            dismissButton = { TextButton(onClick = { showWipeStep1 = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showWipeStep1 = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
     if (showWipeStep2) {
         AlertDialog(
             onDismissRequest = { showWipeStep2 = false },
-            title = { Text("Final Confirmation") },
+            title = { Text(stringResource(R.string.db_locked_wipe_step2_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Type WIPE to permanently delete all local financial data:")
+                    Text(stringResource(R.string.db_locked_wipe_step2_prompt, "WIPE"))
                     OutlinedTextField(
                         value = wipeConfirmInput,
                         onValueChange = { wipeConfirmInput = it },
@@ -249,9 +246,9 @@ fun DatabaseLockedScreen(
                         showWipeStep2 = false
                         onWipeAllData()
                     },
-                ) { Text("Erase Everything") }
+                ) { Text(stringResource(R.string.db_locked_wipe_confirm_button)) }
             },
-            dismissButton = { TextButton(onClick = { showWipeStep2 = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showWipeStep2 = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

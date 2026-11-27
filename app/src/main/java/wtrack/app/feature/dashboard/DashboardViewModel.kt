@@ -15,6 +15,7 @@ import wtrack.app.domain.model.AppSettings
 import wtrack.app.domain.model.CaptureHealthSummary
 import wtrack.app.domain.model.CaptureStatus
 import wtrack.app.domain.model.Category
+import wtrack.app.domain.model.CurrencyRegistry
 import wtrack.app.domain.model.Transaction
 import wtrack.app.domain.model.TransactionStatus
 import wtrack.app.domain.model.TransferPair
@@ -37,9 +38,9 @@ data class DashboardUiState(
     val monthLabel: String = "",
     val shortMonthLabel: String = "",
     val canAdvanceMonth: Boolean = false,
-    val baseCurrency: String = "IDR",
+    val baseCurrency: String = CurrencyRegistry.DEFAULT_CURRENCY,
     val summary: PeriodAggregateSummary = PeriodAggregateSummary(
-        baseCurrency = "IDR",
+        baseCurrency = CurrencyRegistry.DEFAULT_CURRENCY,
         totalIncomeMinor = 0L,
         totalExpenseMinor = 0L,
         netCashFlowMinor = 0L,

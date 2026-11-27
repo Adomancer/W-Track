@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import wtrack.app.R
 import wtrack.app.core.coroutines.DispatcherProvider
 import wtrack.app.domain.model.AppSettings
 import wtrack.app.domain.model.CaptureGap
@@ -34,6 +35,7 @@ import wtrack.app.domain.time.Clock
 import wtrack.app.domain.usecase.GateG1Evaluator
 import wtrack.app.domain.usecase.GateG1Report
 import wtrack.app.domain.usecase.ProviderMeasurementInput
+import wtrack.app.feature.common.UiText
 import wtrack.integration.Direction
 
 data class SettingsUiState(
@@ -57,7 +59,7 @@ data class SettingsUiState(
     val customParserRuleCount: Int = 0,
     val reparseProposals: List<ReparseProposal> = emptyList(),
     val isBusy: Boolean = false,
-    val actionMessage: String? = null,
+    val actionMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -79,7 +81,7 @@ class SettingsViewModel @Inject constructor(
     private val reparseProposalsFlow = MutableStateFlow<List<ReparseProposal>>(emptyList())
     private val sampleCountFlow = MutableStateFlow(0)
     private val isBusyFlow = MutableStateFlow(false)
-    private val actionMessage = MutableStateFlow<String?>(null)
+    private val actionMessage = MutableStateFlow<UiText?>(null)
     private val postRestorePrompt = MutableStateFlow(false)
 
     init {
@@ -150,7 +152,7 @@ class SettingsViewModel @Inject constructor(
     fun setBaseCurrency(currency: String) {
         viewModelScope.launch {
             settingsRepository.setBaseCurrency(currency)
-            actionMessage.value = "Base currency updated to ${currency.uppercase()}."
+            actionMessage.value = UiText.Resource(R.string.msg_base_currency_updated, currency.uppercase())
         }
     }
 
@@ -165,7 +167,7 @@ class SettingsViewModel @Inject constructor(
     fun setBackupReminderThresholds(days: Int, txCount: Int) {
         viewModelScope.launch {
             settingsRepository.setBackupReminderThresholds(days, txCount)
-            actionMessage.value = "Backup reminder thresholds updated."
+            actionMessage.value = UiText.Resource(R.string.msg_backup_thresholds_updated)
         }
     }
 
@@ -173,9 +175,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setScheduledBackupConfig(folderUri, enabled, intervalDays)
             actionMessage.value = if (folderUri.isNullOrBlank()) {
-                "Scheduled backup folder cleared."
+                UiText.Resource(R.string.msg_scheduled_folder_cleared)
             } else {
-                "Scheduled backup settings updated."
+                UiText.Resource(R.string.msg_scheduled_settings_updated)
             }
         }
     }
@@ -184,9 +186,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setAppLock(enabled, timeoutSeconds)
             actionMessage.value = if (enabled) {
-                "App Lock enabled."
+                UiText.Resource(R.string.msg_app_lock_enabled)
             } else {
-                "App Lock disabled."
+                UiText.Resource(R.string.msg_app_lock_disabled)
             }
         }
     }
@@ -195,9 +197,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.setLocalAlertsEnabled(enabled)
             actionMessage.value = if (enabled) {
-                "Local status alerts enabled."
+                UiText.Resource(R.string.msg_local_alerts_enabled)
             } else {
-                "Local status alerts disabled."
+                UiText.Resource(R.string.msg_local_alerts_disabled)
             }
         }
     }
@@ -205,16 +207,16 @@ class SettingsViewModel @Inject constructor(
     fun createCategory(name: String, directionScope: Direction?) {
         viewModelScope.launch {
             runCatching { categoryRepository.create(name, directionScope) }
-                .onSuccess { actionMessage.value = "Category created." }
-                .onFailure { actionMessage.value = it.message ?: "Failed to create category." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_category_created) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_category_create_failed) }
         }
     }
 
     fun renameCategory(id: Long, newName: String) {
         viewModelScope.launch {
             runCatching { categoryRepository.rename(id, newName) }
-                .onSuccess { actionMessage.value = "Category renamed." }
-                .onFailure { actionMessage.value = it.message ?: "Rename failed." }
+                .onSuccess { actionMessage.value = UiText.Resource(R.string.msg_category_renamed) }
+                .onFailure { actionMessage.value = UiText.fromError(it, R.string.msg_category_rename_failed) }
         }
     }
 
@@ -231,7 +233,7 @@ class SettingsViewModel @Inject constructor(
     fun deleteRule(id: Long) {
         viewModelScope.launch {
             ruleRepository.delete(id)
-            actionMessage.value = "Rule deleted."
+            actionMessage.value = UiText.Resource(R.string.msg_rule_deleted)
         }
     }
 
@@ -247,9 +249,9 @@ class SettingsViewModel @Inject constructor(
                     categoryId = categoryId,
                 )
             }.onSuccess {
-                actionMessage.value = "Rule saved."
+                actionMessage.value = UiText.Resource(R.string.msg_rule_saved)
             }.onFailure {
-                actionMessage.value = it.message ?: "Failed to save rule."
+                actionMessage.value = UiText.fromError(it, R.string.msg_rule_save_failed)
             }
         }
     }
@@ -277,20 +279,26 @@ class SettingsViewModel @Inject constructor(
             isBusyFlow.value = true
             runCatching {
                 withContext(dispatcherProvider.io) {
-                    val stream = streamOpener() ?: error("Could not open sample export destination.")
+                    val stream = streamOpener() ?: throw StreamOpenFailedException()
                     stream.use { output -> backupPort.exportAnonymizedM3aSamples(output, redactTerms) }
                 }
             }.onSuccess { result ->
                 sampleCountFlow.value = runCatching { backupPort.countRetainedM3aSamples() }.getOrDefault(0)
-                actionMessage.value = buildString {
-                    append("Exported ${result.exportedCount} anonymized sample(s)")
-                    if (result.skippedSecurityCount > 0) {
-                        append(" (skipped ${result.skippedSecurityCount} security notice(s))")
-                    }
-                    append(".")
+                actionMessage.value = if (result.skippedSecurityCount > 0) {
+                    UiText.Resource(
+                        R.string.msg_sample_exported_with_skipped,
+                        result.exportedCount,
+                        result.skippedSecurityCount,
+                    )
+                } else {
+                    UiText.Resource(R.string.msg_sample_exported, result.exportedCount)
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Sample export failed."
+                actionMessage.value = if (err is StreamOpenFailedException) {
+                    UiText.Resource(R.string.msg_sample_export_open_failed)
+                } else {
+                    UiText.fromError(err, R.string.msg_sample_export_failed)
+                }
             }
             isBusyFlow.value = false
         }
@@ -305,9 +313,9 @@ class SettingsViewModel @Inject constructor(
                 }
             }.onSuccess { purged ->
                 sampleCountFlow.value = 0
-                actionMessage.value = "Purged $purged retained sample payload(s) from encrypted storage."
+                actionMessage.value = UiText.Resource(R.string.msg_sample_purged, purged)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Failed to purge retained samples."
+                actionMessage.value = UiText.fromError(err, R.string.msg_sample_purge_failed)
             }
             isBusyFlow.value = false
         }
@@ -324,12 +332,12 @@ class SettingsViewModel @Inject constructor(
                 sampleCountFlow.value = runCatching { backupPort.countRetainedM3aSamples() }.getOrDefault(0)
                 logsFlow.value = backupPort.readDiagnosticLogLines(200)
                 actionMessage.value = if (reparsed > 0) {
-                    "Re-parsed $reparsed retained sample(s) using active parsers."
+                    UiText.Resource(R.string.msg_sample_reparsed, reparsed)
                 } else {
-                    "No retained samples matched an active parser yet."
+                    UiText.Resource(R.string.msg_sample_reparse_none)
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Sample re-parse failed."
+                actionMessage.value = UiText.fromError(err, R.string.msg_sample_reparse_failed)
             }
             isBusyFlow.value = false
         }
@@ -345,12 +353,12 @@ class SettingsViewModel @Inject constructor(
             }.onSuccess { proposals ->
                 reparseProposalsFlow.value = proposals
                 actionMessage.value = if (proposals.isEmpty()) {
-                    "No parser update proposals for retained events."
+                    UiText.Resource(R.string.msg_reparse_none)
                 } else {
-                    "Found ${proposals.size} parser update proposal(s) (PAR-11)."
+                    UiText.Resource(R.string.msg_reparse_found, proposals.size)
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Scan for re-parse proposals failed."
+                actionMessage.value = UiText.fromError(err, R.string.msg_reparse_scan_failed)
             }
             isBusyFlow.value = false
         }
@@ -367,13 +375,17 @@ class SettingsViewModel @Inject constructor(
                 if (applied) {
                     reparseProposalsFlow.value = reparseProposalsFlow.value.filterNot { it.eventId == proposal.eventId }
                     logsFlow.value = backupPort.readDiagnosticLogLines(200)
-                    actionMessage.value = "Applied parser v${proposal.newParserVersion} update to transaction #${proposal.transactionId}."
+                    actionMessage.value = UiText.Resource(
+                        R.string.msg_reparse_applied,
+                        proposal.newParserVersion,
+                        proposal.transactionId,
+                    )
                 } else {
                     reparseProposalsFlow.value = reparseProposalsFlow.value.filterNot { it.eventId == proposal.eventId }
-                    actionMessage.value = "Proposal skipped (already applied or transaction edited by user)."
+                    actionMessage.value = UiText.Resource(R.string.msg_reparse_skipped)
                 }
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Could not apply re-parse proposal."
+                actionMessage.value = UiText.fromError(err, R.string.msg_reparse_apply_failed)
             }
             isBusyFlow.value = false
         }
@@ -386,7 +398,7 @@ class SettingsViewModel @Inject constructor(
     fun clearDiagnosticLogs() {
         backupPort.clearDiagnosticLogs()
         logsFlow.value = emptyList()
-        actionMessage.value = "Diagnostic logs cleared."
+        actionMessage.value = UiText.Resource(R.string.msg_logs_cleared)
     }
 
     fun evaluateGateG1(inputs: List<ProviderMeasurementInput>) {
@@ -402,15 +414,23 @@ class SettingsViewModel @Inject constructor(
             isBusyFlow.value = true
             runCatching {
                 val res = withContext(dispatcherProvider.io) {
-                    val stream = streamOpener() ?: error("Could not open backup destination.")
+                    val stream = streamOpener() ?: throw StreamOpenFailedException()
                     backupPort.exportEncryptedBackup(passphrase, stream, verifyStreamOpener)
                 }
                 settingsRepository.recordBackupCompleted(clock.nowEpochMillis())
                 res
             }.onSuccess { res ->
-                actionMessage.value = "Backup exported & verified: ${res.transactionCount} transactions, ${res.accountCount} accounts."
+                actionMessage.value = UiText.Resource(
+                    R.string.msg_backup_exported_verified,
+                    res.transactionCount,
+                    res.accountCount,
+                )
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Backup export failed."
+                actionMessage.value = if (err is StreamOpenFailedException) {
+                    UiText.Resource(R.string.msg_backup_dest_open_failed)
+                } else {
+                    UiText.fromError(err, R.string.msg_backup_export_failed)
+                }
             }
             isBusyFlow.value = false
         }
@@ -421,15 +441,23 @@ class SettingsViewModel @Inject constructor(
             isBusyFlow.value = true
             runCatching {
                 withContext(dispatcherProvider.io) {
-                    val stream = streamOpener() ?: error("Could not open backup file.")
+                    val stream = streamOpener() ?: throw StreamOpenFailedException()
                     stream.use { input -> backupPort.restoreEncryptedBackup(passphrase, input) }
                 }
             }.onSuccess { res ->
                 captureStatusRepository.refreshStatus()
                 postRestorePrompt.value = true
-                actionMessage.value = "Restored ${res.restoredAccounts} accounts, ${res.restoredTransactions} transactions. Re-grant Notification Access to resume capture."
+                actionMessage.value = UiText.Resource(
+                    R.string.msg_restore_success_settings,
+                    res.restoredAccounts,
+                    res.restoredTransactions,
+                )
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Restore failed."
+                actionMessage.value = if (err is StreamOpenFailedException) {
+                    UiText.Resource(R.string.msg_backup_file_open_failed)
+                } else {
+                    UiText.fromError(err, R.string.msg_restore_failed)
+                }
             }
             isBusyFlow.value = false
         }
@@ -440,13 +468,17 @@ class SettingsViewModel @Inject constructor(
             isBusyFlow.value = true
             runCatching {
                 withContext(dispatcherProvider.io) {
-                    val stream = streamOpener() ?: error("Could not open CSV destination.")
+                    val stream = streamOpener() ?: throw StreamOpenFailedException()
                     stream.use { output -> backupPort.exportCsv(output) }
                 }
             }.onSuccess { count ->
-                actionMessage.value = "Exported $count transactions to CSV."
+                actionMessage.value = UiText.Resource(R.string.msg_csv_exported, count)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "CSV export failed."
+                actionMessage.value = if (err is StreamOpenFailedException) {
+                    UiText.Resource(R.string.msg_csv_dest_open_failed)
+                } else {
+                    UiText.fromError(err, R.string.msg_csv_export_failed)
+                }
             }
             isBusyFlow.value = false
         }
@@ -462,13 +494,15 @@ class SettingsViewModel @Inject constructor(
             }.onSuccess {
                 logsFlow.value = emptyList()
                 sampleCountFlow.value = 0
-                actionMessage.value = "All local data wiped."
+                actionMessage.value = UiText.Resource(R.string.msg_all_local_data_wiped)
             }.onFailure { err ->
-                actionMessage.value = err.message ?: "Wipe failed."
+                actionMessage.value = UiText.fromError(err, R.string.msg_wipe_failed)
             }
             isBusyFlow.value = false
         }
     }
+
+    private class StreamOpenFailedException : IllegalStateException()
 
     fun clearMessage() {
         actionMessage.value = null

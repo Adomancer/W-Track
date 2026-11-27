@@ -1,4 +1,661 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">W-Track</string>
+
+    <!-- Common Actions & Labels -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_add">Add</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_close">Close</string>
+    <string name="action_done">Done</string>
+    <string name="action_ok">OK</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_back">Back</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_apply">Apply</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_ignore">Ignore</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_see_all">See all</string>
+    <string name="action_unlink">Unlink</string>
+    <string name="action_later">Later</string>
+    <string name="action_open_app_info">Open App Info</string>
+
+    <string name="label_all">All</string>
+    <string name="label_any">Any</string>
+    <string name="label_both">Both</string>
+    <string name="label_account">Account</string>
+    <string name="label_account_fallback">Account #%1$d</string>
+    <string name="label_category">Category</string>
+    <string name="label_category_fallback">Category</string>
+    <string name="label_date">Date</string>
+    <string name="label_note">Note</string>
+    <string name="label_note_optional">Note (optional)</string>
+    <string name="label_direction">Direction</string>
+    <string name="label_type">Type</string>
+    <string name="label_status">Status</string>
+    <string name="label_tags">Tags</string>
+    <string name="label_currency">Currency</string>
+    <string name="label_passphrase">Passphrase</string>
+    <string name="label_confirm_passphrase">Confirm passphrase</string>
+    <string name="label_needs_category">Needs category</string>
+    <string name="label_uncategorized">Uncategorized</string>
+    <string name="label_transfer">Transfer</string>
+    <string name="label_manual">Manual</string>
+    <string name="label_system">System</string>
+    <string name="label_custom">Custom</string>
+    <string name="label_archived">Archived</string>
+    <string name="label_active">Active</string>
+    <string name="label_paused">Paused</string>
+    <string name="label_allowed">Allowed</string>
+    <string name="label_turn_on">Turn on</string>
+    <string name="label_ready">Ready</string>
+    <string name="label_version_format">Version %1$s</string>
+    <string name="label_voided_category">Voided · %1$s</string>
+    <string name="label_possible_gap">Possible Gap</string>
+
+    <!-- Enums -->
+    <string name="direction_outflow">Expense</string>
+    <string name="direction_inflow">Income</string>
+
+    <string name="tx_type_purchase">Purchase</string>
+    <string name="tx_type_transfer">Transfer</string>
+    <string name="tx_type_fee">Fee</string>
+    <string name="tx_type_refund">Refund</string>
+    <string name="tx_type_cash">Cash</string>
+    <string name="tx_type_adjustment">Adjustment</string>
+    <string name="tx_type_other">Other</string>
+
+    <string name="account_type_bank">Bank</string>
+    <string name="account_type_ewallet">E-Wallet</string>
+    <string name="account_type_credit_card">Credit Card</string>
+    <string name="account_type_cash">Cash</string>
+    <string name="account_type_other">Other</string>
+
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <string name="capture_status_active">Active</string>
+    <string name="capture_status_disconnected">Disconnected</string>
+    <string name="capture_status_attention">Attention</string>
+    <string name="capture_status_unsupported">Unsupported</string>
+
+    <string name="date_filter_all">All dates</string>
+    <string name="date_filter_this_month">This month</string>
+    <string name="date_filter_last_30_days">Last 30d</string>
+    <string name="date_filter_previous_month">Prev month</string>
+
+    <string name="number_locale_id_short">ID</string>
+    <string name="number_locale_en_short">EN</string>
+    <string name="number_locale_id_example">ID (50.000)</string>
+    <string name="number_locale_en_example">EN (50,000.00)</string>
+
+    <!-- Dates -->
+    <string name="date_today">Today</string>
+    <string name="date_yesterday">Yesterday</string>
+    <string name="date_never">Never</string>
+    <plurals name="date_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+
+    <!-- Money Input -->
+    <string name="money_placeholder_idr">e.g. 50000 or 50.000</string>
+    <string name="money_placeholder_zero_decimal">e.g. 1500</string>
+    <string name="money_placeholder_decimal">e.g. 50000 or 50.25</string>
+    <string name="money_hint_idr">Type 50000, 50.000, or 50,000 (comma for sen: 50.000,50)</string>
+    <string name="money_hint_zero_decimal">Type 1500 or 1,500</string>
+    <string name="money_hint_decimal">Type 50000, 50,000, or 50.25</string>
+    <string name="money_invalid_amount">Invalid %1$s amount (examples: 50000, 50.000, 50,000)</string>
+    <string name="money_will_save_as">Will save as: %1$s</string>
+
+    <!-- Navigation Tabs -->
+    <string name="nav_home">Home</string>
+    <string name="nav_activity">Activity</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_review">Review</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_rules">Rules</string>
+    <string name="nav_categories">Categories</string>
+    <string name="nav_diagnostics">Diagnostics</string>
+    <string name="nav_about">About</string>
+    <string name="nav_parsers">Parsers</string>
+    <string name="nav_detail">Detail</string>
+
+    <!-- Root / App Lock / Database Locked -->
+    <string name="post_restore_banner">Backup restored — grant Notification Access to resume capture.</string>
+    <string name="post_restore_allow_access">Allow access</string>
+
+    <string name="app_lock_title">W-Track is Locked</string>
+    <string name="app_lock_subtitle">Authenticate with biometrics or your device PIN/pattern to view your ledger.</string>
+    <string name="app_lock_unlock_button">Unlock W-Track</string>
+    <string name="app_lock_prompt_subtitle">Verify your identity to access your private financial ledger</string>
+    <string name="app_lock_no_host">Unable to attach biometric prompt to host window.</string>
+    <string name="app_lock_not_enrolled">No biometric or device PIN/pattern is enrolled on this device.</string>
+    <string name="app_lock_auth_cancelled">Authentication cancelled.</string>
+    <string name="app_lock_auth_failed">Authentication not recognized. Try again.</string>
+
+    <string name="db_locked_title">Encrypted Database Locked</string>
+    <string name="locked_reason_key_missing">Wrapped Key Missing</string>
+    <string name="locked_reason_key_invalid">Keystore Key Invalidated or Corrupt</string>
+    <string name="locked_reason_db_open_failed">Database Decryption Failed</string>
+    <string name="db_locked_preserved_notice">Your encrypted local database file has been preserved untouched. W-Track will never silently delete your ledger.</string>
+    <string name="db_locked_restore_button">Restore from Encrypted Backup (.wtrackbackup)</string>
+    <string name="db_locked_erase_button">Erase Local Data &amp; Start Fresh</string>
+    <string name="db_locked_enter_passphrase">Enter Backup Passphrase</string>
+    <string name="db_locked_wipe_step1_title">Erase All Local Data?</string>
+    <string name="db_locked_wipe_step1_body">This permanently deletes your encrypted ledger, accounts, categories, rules, and local Keystore key material. This cannot be undone without a backup file.</string>
+    <string name="db_locked_wipe_step2_title">Final Confirmation</string>
+    <string name="db_locked_wipe_step2_prompt">Type %1$s to permanently delete all local financial data:</string>
+    <string name="db_locked_wipe_confirm_button">Erase Everything</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_restore_backup">Restore backup</string>
+    <string name="onboarding_finish">Finish</string>
+    <string name="onboarding_step_progress">%1$d of %2$d</string>
+    <string name="onboarding_hero_title">Private by\ndefault.</string>
+    <string name="onboarding_hero_subtitle">Automatic local ledger from your bank &amp; e-wallet alerts.</string>
+    <string name="onboarding_trust1_title">Stays on your phone</string>
+    <string name="onboarding_trust1_subtitle">No cloud servers, no bank logins</string>
+    <string name="onboarding_trust2_title">Only apps you choose</string>
+    <string name="onboarding_trust2_subtitle">OTPs and login codes are ignored</string>
+    <string name="onboarding_trust3_title">You stay in control</string>
+    <string name="onboarding_trust3_subtitle">Uncertain alerts wait for your confirmation</string>
+    <string name="onboarding_step2_title">Turn on auto-capture</string>
+    <string name="onboarding_step2_subtitle">Allow notification access so W-Track can read alerts on your device.</string>
+    <string name="onboarding_notification_access">Notification access</string>
+    <string name="onboarding_run_quick_check">Run quick check</string>
+    <string name="onboarding_verify_capture">Verify capture is ready</string>
+    <string name="onboarding_supported_providers">Supported out of the box: %1$s.</string>
+    <string name="onboarding_supported_fallback">Supports built-in bank/e-wallet alerts and custom notification patterns.</string>
+    <string name="onboarding_battery_help_link">Need help with battery or restricted settings? ›</string>
+    <string name="onboarding_step3_title">Currency &amp; first account</string>
+    <string name="onboarding_step3_subtitle">Pick your main currency and optionally add your first account.</string>
+    <string name="onboarding_first_account">First account</string>
+    <string name="onboarding_account_name">Account name</string>
+    <string name="onboarding_opening_balance">Opening balance (optional)</string>
+    <string name="onboarding_save_account">Save account</string>
+    <string name="onboarding_first_account_added">First account added.</string>
+    <string name="onboarding_battery_dialog_title">Battery &amp; restricted settings</string>
+    <string name="onboarding_battery_dialog_body">If Android 13+ blocks Notification Access for sideloaded apps, open App Info → ⋮ → Allow restricted settings.\n\nIf alerts stop arriving in the background, allow high background power and Autostart in App Info → Battery.</string>
+    <string name="onboarding_restore_dialog_title">Restore backup</string>
+    <string name="onboarding_backup_passphrase">Backup passphrase</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_cd_needs_review">Needs Review</string>
+    <string name="dashboard_cd_settings">Settings</string>
+    <string name="dashboard_cd_prev_month">Previous month</string>
+    <string name="dashboard_cd_next_month">Next month</string>
+    <string name="dashboard_net_cash_flow">Net cash flow · %1$s</string>
+    <string name="dashboard_income_spent">Income %1$s · Spent %2$s</string>
+    <plurals name="dashboard_need_review">
+        <item quantity="one">%1$d need review</item>
+        <item quantity="other">%1$d need review</item>
+    </plurals>
+    <string name="dashboard_backup_reminder">Back up your ledger</string>
+    <string name="dashboard_back_up_action">Back up</string>
+    <string name="dashboard_recent_activity">Recent activity</string>
+    <string name="dashboard_no_activity">No activity yet.</string>
+
+    <!-- Activity & Transaction Detail -->
+    <string name="activity_title">Activity</string>
+    <string name="activity_cd_add_tx">Add transaction</string>
+    <string name="activity_search_placeholder">Search</string>
+    <string name="activity_cd_clear_search">Clear search</string>
+    <string name="activity_cd_filters">Filters</string>
+    <string name="activity_empty_title">No matching transactions</string>
+    <string name="activity_empty_subtitle">Try clearing your search or filters, or tap + to add an entry.</string>
+    <string name="activity_filters_title">Filters</string>
+    <string name="activity_filter_needs_category">Needs category</string>
+    <string name="activity_filter_include_voided">Include voided</string>
+    <string name="activity_add_tx_title">Add transaction</string>
+    <string name="activity_amount_label">Amount (%1$s)</string>
+    <string name="activity_merchant_desc_label">Merchant / description</string>
+    <string name="tx_detail_not_found">Transaction not found.</string>
+    <string name="tx_detail_add_note">Add note</string>
+    <string name="tx_detail_more_details">More details</string>
+    <string name="tx_detail_captured_notif">Captured notification</string>
+    <string name="tx_detail_original_unchanged">Original captured amount unchanged</string>
+    <string name="tx_detail_edited_after_capture">Edited after capture</string>
+    <string name="tx_detail_parser_version">Parser v%1$d</string>
+    <string name="tx_detail_parser_version_with_rule">Parser v%1$d · Auto-rule #%2$d</string>
+    <string name="tx_detail_paired_transfer">Paired transfer ↔ %1$s (Fee %2$s)</string>
+    <string name="tx_detail_add_tag_pill">+ Tag</string>
+    <string name="tx_detail_link_transfer">Link transfer</string>
+    <string name="tx_detail_unlink_transfer">Unlink transfer</string>
+    <string name="tx_detail_link_original">Link original</string>
+    <string name="tx_detail_change_original">Change original</string>
+    <string name="tx_detail_delete_manual">Delete manual entry</string>
+    <string name="tx_detail_void_action">Void transaction</string>
+    <string name="tx_detail_restore_action">Restore transaction</string>
+    <string name="tx_detail_edit_title">Edit transaction</string>
+    <string name="tx_detail_datetime_label">Date &amp; time (yyyy-MM-dd HH:mm)</string>
+    <string name="tx_detail_save_changes">Save changes</string>
+    <string name="tx_detail_remember_rule">Remember for future transactions here</string>
+    <string name="tx_detail_apply_backfill">Apply to past uncategorized ones</string>
+    <string name="tx_detail_new_tag">New tag</string>
+    <string name="tx_detail_unlink_void_title">Unlink transfer &amp; void?</string>
+    <string name="tx_detail_unlink_void_body">This transaction is part of a transfer pair. Voiding it will unlink the pair.</string>
+    <string name="tx_detail_unlink_void_confirm">Unlink &amp; void</string>
+    <string name="tx_detail_unlink_delete_title">Unlink transfer &amp; delete?</string>
+    <string name="tx_detail_unlink_delete_body">This manual transaction is part of a transfer pair. Deleting it will unlink the pair.</string>
+    <string name="tx_detail_unlink_delete_confirm">Unlink &amp; delete</string>
+    <string name="tx_detail_link_transfer_title">Link matching transfer</string>
+    <string name="tx_detail_no_transfer_candidates">No matching opposite-direction transactions in %1$s on another account.</string>
+    <string name="tx_detail_link_refund_title">Link original purchase</string>
+    <string name="tx_detail_clear_link">Clear link</string>
+
+    <!-- Accounts -->
+    <string name="accounts_title">Accounts</string>
+    <string name="accounts_add">Add account</string>
+    <string name="accounts_total_balance">Total balance</string>
+    <string name="accounts_empty_title">No accounts yet</string>
+    <string name="accounts_empty_subtitle">Add a bank, e-wallet, or cash account to start tracking.</string>
+    <string name="accounts_needs_check">Needs check</string>
+    <string name="accounts_archived_title">Archived accounts</string>
+    <string name="accounts_update_balance">Update balance</string>
+    <string name="accounts_edit_account">Edit account</string>
+    <string name="accounts_link_notification_app">Link notification app</string>
+    <string name="accounts_not_linked">Not linked</string>
+    <string name="accounts_linked_count">%1$d linked</string>
+    <string name="accounts_parser_rules">Parser rules</string>
+    <string name="accounts_auto_capture_health">Auto-capture health</string>
+    <string name="accounts_linked_apps">Linked apps</string>
+    <string name="accounts_archive_account">Archive account</string>
+    <string name="accounts_new_account">New account</string>
+    <string name="accounts_provider_label">Provider</string>
+    <string name="accounts_currency_hint">Currency (e.g., IDR)</string>
+    <string name="accounts_current_balance">Current %1$s</string>
+    <string name="accounts_actual_balance_label">Actual balance (%1$s)</string>
+    <string name="accounts_adjustment">Adjustment</string>
+    <string name="accounts_no_change">No change</string>
+    <string name="accounts_adjustment_note">Updates your balance only — won\'t affect spending.</string>
+    <string name="accounts_adjustment_placeholder">e.g. Missed parking fee</string>
+    <string name="accounts_save_balance">Save balance</string>
+    <string name="accounts_android_package_name">Android package name</string>
+    <string name="accounts_display_name">Display name</string>
+    <string name="accounts_hint_optional">Account hint (optional)</string>
+    <string name="accounts_link_app_button">Link app</string>
+
+    <!-- Insights -->
+    <string name="insights_title">Insights</string>
+    <string name="insights_total_spending">Total spending</string>
+    <string name="insights_no_spending">No spending recorded in %1$s.</string>
+    <string name="insights_budgets">Budgets</string>
+    <string name="insights_add_budget">+ Add</string>
+    <string name="insights_no_budgets">No budgets set yet.</string>
+    <string name="insights_cd_delete_budget">Delete budget</string>
+    <string name="insights_more_title">More insights · %1$s</string>
+    <string name="insights_all_categories">All categories</string>
+    <string name="insights_top_merchants">Top merchants</string>
+    <string name="insights_transfer_fees">Transfer fees</string>
+    <plurals name="insights_transactions_count">
+        <item quantity="one">%1$d transaction</item>
+        <item quantity="other">%1$d transactions</item>
+    </plurals>
+    <plurals name="insights_category_share">
+        <item quantity="one">%1$d transaction · %2$d%%</item>
+        <item quantity="other">%1$d transactions · %2$d%%</item>
+    </plurals>
+    <string name="insights_set_budget_title">Set monthly budget</string>
+    <string name="insights_account_scope">Account scope</string>
+    <string name="insights_all_accounts">All accounts</string>
+    <string name="insights_monthly_limit_label">Monthly limit (%1$s)</string>
+    <string name="insights_save_budget">Save budget</string>
+
+    <!-- Needs Review -->
+    <string name="review_title">Needs review</string>
+    <string name="review_details_title">Review details</string>
+    <string name="review_all_caught_up">All caught up</string>
+    <string name="review_empty_subtitle">No notifications waiting for review.</string>
+    <string name="review_amount_needed">Amount needed</string>
+    <string name="review_text_hidden">Notification text hidden by Android. Tap below to enter the amount.</string>
+    <string name="review_details_category">Details &amp; category</string>
+    <string name="review_remember_hint">Remember hint \"%1$s\" for this account</string>
+    <string name="review_remember_format">Remember notification format</string>
+    <string name="review_pattern_template">Pattern template</string>
+
+    <!-- Settings & Subscreens -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_capture_working">Working smoothly</string>
+    <string name="settings_capture_paused">Paused — tap to check</string>
+    <string name="settings_capture_attention">Needs attention</string>
+    <string name="settings_capture_manual">Manual mode</string>
+    <string name="settings_last_backed_up">Last backed up %1$s</string>
+    <string name="settings_not_backed_up_yet">Not backed up yet</string>
+    <string name="settings_erase_all_data">Erase all data</string>
+    <string name="settings_footer_version">W-Track %1$s</string>
+    <string name="settings_post_restore_prompt">Backup restored — allow Notification Access to resume auto-capture.</string>
+    <string name="settings_auto_capture">Auto-capture</string>
+    <string name="settings_backup_export">Backup &amp; export</string>
+    <string name="settings_categories_rules">Categories &amp; rules</string>
+    <plurals name="settings_categories_count">
+        <item quantity="one">%1$d category</item>
+        <item quantity="other">%1$d categories</item>
+    </plurals>
+    <plurals name="settings_rules_count">
+        <item quantity="one">%1$d rule</item>
+        <item quantity="other">%1$d rules</item>
+    </plurals>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_currency_security">Currency &amp; security</string>
+    <string name="settings_lock_on_suffix"> · Lock on</string>
+    <string name="settings_about">About</string>
+
+    <string name="settings_backup_desc">Backups are encrypted with your passphrase and stored wherever you choose.</string>
+    <plurals name="settings_backup_pending_review_warning">
+        <item quantity="one">%1$d item still in Needs Review won\'t be included until confirmed.</item>
+        <item quantity="other">%1$d items still in Needs Review won\'t be included until confirmed.</item>
+    </plurals>
+    <string name="settings_back_up_now">Back up now</string>
+    <string name="settings_scheduled_folder">Scheduled folder</string>
+    <string name="settings_choose_backup_folder">Choose backup folder</string>
+    <string name="settings_folder_label">Folder: %1$s</string>
+    <string name="settings_backup_reminders">Backup reminders</string>
+    <string name="settings_every_n_days">Every %1$dd</string>
+    <string name="settings_back_up_here">Back up here</string>
+    <string name="settings_reminder_frequency">Reminder frequency</string>
+    <string name="settings_n_days">%1$dd</string>
+    <string name="settings_n_tx">%1$d tx</string>
+    <string name="settings_export_csv_unencrypted">Export CSV (unencrypted)</string>
+
+    <string name="settings_auto_categorization_rules">Auto-categorization rules</string>
+    <string name="settings_custom_notification_patterns">Custom notification patterns</string>
+    <string name="settings_appearance_desc">Choose how W-Track looks on your device.</string>
+    <string name="settings_main_currency">Main currency</string>
+    <string name="settings_app_lock">App lock</string>
+    <string name="settings_app_lock_desc">Require fingerprint, face, or PIN to open.</string>
+    <string name="settings_app_lock_setup_hint">Set up a screen lock in Android Settings first.</string>
+    <string name="settings_lock_immediate">Immediate</string>
+    <string name="settings_lock_1_min">1 min</string>
+    <string name="settings_lock_5_min">5 min</string>
+    <string name="settings_status_reminders">Status reminders</string>
+    <string name="settings_status_reminders_desc">Alert me if capture pauses or items need review.</string>
+    <string name="settings_keep_history">Keep notification history</string>
+    <string name="settings_dont_keep">Don\'t keep</string>
+    <string name="settings_pause_warning_after">Pause warning after</string>
+    <string name="settings_n_hours">%1$dh</string>
+
+    <string name="settings_protect_backup_title">Protect backup with a passphrase</string>
+    <string name="settings_protect_backup_desc">Choose a passphrase (at least 8 characters). Keep it safe — it cannot be reset.</string>
+    <string name="settings_save_backup">Save backup</string>
+    <string name="settings_csv_warning_title">Export unencrypted CSV?</string>
+    <string name="settings_csv_warning_desc">CSV files are readable by any app. Use encrypted backup for secure storage.</string>
+    <string name="settings_csv_export_action">Export CSV</string>
+    <string name="settings_wipe_step1_title">Erase all local data?</string>
+    <string name="settings_wipe_step1_desc">This permanently deletes all transactions, accounts, logs, and settings from this device.</string>
+    <string name="settings_wipe_step2_title">Type %1$s to confirm</string>
+    <string name="settings_wipe_confirm_action">Erase everything</string>
+
+    <!-- Rules & Categories Screens -->
+    <string name="rules_title">Categorization Rules</string>
+    <string name="rules_empty_title">No categorization rules yet.</string>
+    <string name="rules_empty_desc">Create rules to automatically assign categories based on merchant key, keyword, and direction.</string>
+    <string name="rules_cd_delete">Delete rule</string>
+    <string name="rules_create_title">Create Categorization Rule</string>
+    <string name="rules_merchant_key_label">Merchant key (optional)</string>
+    <string name="rules_desc_keyword_label">Description keyword (optional)</string>
+    <string name="rules_direction_filter">Direction Filter</string>
+    <string name="rules_target_category">Target Category</string>
+    <string name="rules_save">Save Rule</string>
+    <string name="rules_summary_merchant"> · merchant=%1$s</string>
+    <string name="rules_summary_desc"> · desc=%1$s</string>
+
+    <string name="categories_title">Categories</string>
+    <string name="categories_rename">Rename</string>
+    <string name="categories_archive">Archive</string>
+    <string name="categories_new_title">New Category</string>
+    <string name="categories_name_label">Category Name</string>
+    <string name="categories_direction_scope">Direction Scope</string>
+    <string name="categories_create">Create</string>
+    <string name="categories_rename_title">Rename Category</string>
+    <string name="categories_rename_label">Category name</string>
+
+    <!-- Diagnostics Screen -->
+    <string name="diagnostics_technical_details">Technical details ›</string>
+    <string name="diagnostics_technical_title">Technical details</string>
+    <string name="diagnostics_status_active">Active</string>
+    <string name="diagnostics_status_attention">Needs attention</string>
+    <string name="diagnostics_hero_active">All set</string>
+    <string name="diagnostics_hero_attention">Turn on access</string>
+    <string name="diagnostics_listening_to">Listening to %1$s</string>
+    <string name="diagnostics_listening_fallback">Automatically reads bank &amp; e-wallet alerts</string>
+    <string name="diagnostics_tap_to_allow">Tap to allow</string>
+    <string name="diagnostics_monitored_apps">Monitored apps</string>
+    <plurals name="diagnostics_supported_apps_count">
+        <item quantity="one">%1$d supported app</item>
+        <item quantity="other">%1$d supported apps</item>
+    </plurals>
+    <string name="diagnostics_battery_background">Battery &amp; background</string>
+    <string name="diagnostics_battery_subtitle">Fix if alerts stop arriving</string>
+    <string name="diagnostics_battery_guide">If notifications stop arriving while the app is closed:\n\n1. Open App Info → Battery and allow background power.\n2. On devices with aggressive background limits (e.g. vivo, Xiaomi, OPPO, Realme, Samsung), enable Autostart / Unrestricted battery.\n3. On Android 13+, tap ⋮ → Allow restricted settings before enabling Notification Access.</string>
+    <string name="diagnostics_permission_granted">Permission granted</string>
+    <string name="diagnostics_listener_connected">Listener connected</string>
+    <string name="diagnostics_last_heartbeat">Last heartbeat</string>
+    <string name="diagnostics_not_recorded">Not recorded yet</string>
+    <string name="diagnostics_m3a_title">M3a Sample Collection (%1$d retained)</string>
+    <string name="diagnostics_extra_redact">Extra names to redact (optional)</string>
+    <string name="diagnostics_export_json">Export JSON</string>
+    <string name="diagnostics_reparse">Re-parse</string>
+    <string name="diagnostics_purge">Purge</string>
+    <string name="diagnostics_parser_updates">Parser updates</string>
+    <string name="diagnostics_scan_retained">Scan retained events</string>
+    <string name="diagnostics_proposal_item">%1$s · Tx #%2$d (v%3$d → v%4$d)</string>
+    <string name="diagnostics_gate_g1_title">Gate G1 Evaluator</string>
+    <string name="diagnostics_gate_provider_label">Provider name</string>
+    <string name="diagnostics_gate_provider_hint">e.g. Bank Jago</string>
+    <string name="diagnostics_gate_days">Days</string>
+    <string name="diagnostics_gate_days_hint">e.g. 14</string>
+    <string name="diagnostics_gate_a">A</string>
+    <string name="diagnostics_gate_a_hint">e.g. 35</string>
+    <string name="diagnostics_gate_b">B</string>
+    <string name="diagnostics_gate_b_hint">e.g. 34</string>
+    <string name="diagnostics_gate_c">C</string>
+    <string name="diagnostics_gate_c_hint">e.g. 33</string>
+    <string name="diagnostics_gate_d">D</string>
+    <string name="diagnostics_gate_d_hint">e.g. 32</string>
+    <string name="diagnostics_gate_wrong">Wrong</string>
+    <string name="diagnostics_gate_wrong_hint">e.g. 0</string>
+    <string name="diagnostics_check_thresholds">Check thresholds</string>
+    <string name="diagnostics_verdict">Verdict: %1$s — %2$s</string>
+    <string name="diagnostics_capture_gaps">Capture gaps (%1$d)</string>
+    <string name="diagnostics_no_gaps">No capture gaps recorded.</string>
+    <string name="diagnostics_logs_7d">Logs (7d)</string>
+
+    <!-- Custom Parsers Screen -->
+    <string name="custom_parsers_title">Notification Parsers</string>
+    <string name="custom_parsers_add_pattern">Add Pattern</string>
+    <string name="custom_parsers_intro_title">Teach W-Track Any Bank or E-Wallet</string>
+    <string name="custom_parsers_intro_body">Paste a sample notification here (or check \"Remember this pattern\" when resolving in Needs Review). Matching patterns auto-parse future alerts locally with zero JSON exports.</string>
+    <string name="custom_parsers_empty_title">No custom parser patterns yet.</string>
+    <string name="custom_parsers_empty_body">Newly linked apps already auto-detect amounts into Needs Review. Add a pattern here anytime by pasting an example notification.</string>
+    <string name="custom_parsers_paste_sample_cta">Paste Sample &amp; Create Pattern</string>
+    <string name="custom_parsers_cd_edit">Edit pattern</string>
+    <string name="custom_parsers_cd_delete">Delete pattern</string>
+    <string name="custom_parsers_teach_title">Teach Notification Pattern</string>
+    <string name="custom_parsers_edit_title">Edit Notification Pattern</string>
+    <string name="custom_parsers_source_package">Source App Package</string>
+    <string name="custom_parsers_package_id_label">Android package ID (e.g. com.gojek.app)</string>
+    <string name="custom_parsers_paste_section">Paste Sample Notification (Optional)</string>
+    <string name="custom_parsers_sample_title_label">Sample title (optional)</string>
+    <string name="custom_parsers_sample_body_label">Sample notification text</string>
+    <string name="custom_parsers_sample_placeholder">e.g. Pembayaran Rp25.000 ke Kopi Kenangan berhasil</string>
+    <string name="custom_parsers_autogenerate">Auto-Generate Pattern from Sample</string>
+    <string name="custom_parsers_template_label">Pattern template ({AMOUNT} required)</string>
+    <string name="custom_parsers_template_placeholder">Pembayaran {AMOUNT} ke {MERCHANT} berhasil</string>
+    <string name="custom_parsers_placeholders_hint">Placeholders: {AMOUNT} (required), {MERCHANT} (counterparty), {REF}, {IGNORE}</string>
+    <string name="custom_parsers_name_label">Pattern name (optional)</string>
+    <string name="custom_parsers_title_filter_label">Title filter (optional, e.g. QRIS)</string>
+    <string name="custom_parsers_tx_type">Transaction Type</string>
+    <string name="custom_parsers_number_format">Number Format</string>
+    <string name="custom_parsers_matched_preview">Matched: %1$s · %2$s · %3$s</string>
+    <string name="custom_parsers_matched_merchant_suffix"> · Merchant: %1$s</string>
+    <string name="custom_parsers_save">Save Pattern</string>
+
+    <!-- About Screen -->
+    <string name="about_tagline">Private, local-first expense tracker</string>
+    <string name="about_privacy_title">Local &amp; private</string>
+    <string name="about_privacy_body">All transactions, accounts, and backups stay on your device. No cloud sync, no ads, and no tracking.</string>
+    <string name="about_github_title">GitHub repository</string>
+    <string name="about_github_subtitle">Source code &amp; documentation</string>
+    <string name="about_releases_title">Releases &amp; changelog</string>
+    <string name="about_releases_subtitle">Check for the latest version</string>
+    <string name="about_issues_title">Report an issue</string>
+    <string name="about_issues_subtitle">Share feedback or report a bug</string>
+    <string name="about_license_title">License</string>
+    <string name="about_license_subtitle">GNU General Public License v3.0</string>
+
+    <!-- ViewModel Feedback Messages -->
+    <string name="msg_capture_self_check_failed">Capture self-check failed.</string>
+    <string name="msg_account_name_required">Account name is required.</string>
+    <string name="msg_invalid_opening_balance">Invalid opening balance format for %1$s.</string>
+    <string name="msg_account_added_named">Account \"%1$s\" added.</string>
+    <string name="msg_failed_create_account">Failed to create account.</string>
+    <string name="msg_enter_backup_passphrase">Enter backup passphrase.</string>
+    <string name="msg_unable_open_backup_file">Unable to open selected backup file.</string>
+    <string name="msg_restore_success_onboarding">Restored %1$d accounts and %2$d transactions. Re-grant Notification Access to resume capture.</string>
+    <string name="msg_backup_restore_failed">Backup restore failed.</string>
+    <string name="msg_local_data_wiped_cleanly">Local data wiped cleanly.</string>
+    <string name="msg_failed_wipe_storage">Failed to wipe local storage.</string>
+
+    <string name="msg_account_created">Account created.</string>
+    <string name="msg_account_updated">Account updated.</string>
+    <string name="msg_failed_update_account">Failed to update account.</string>
+    <string name="msg_account_archived">Account archived.</string>
+    <string name="msg_account_restored">Account restored.</string>
+    <string name="msg_enter_android_package_id">Enter an Android package ID.</string>
+    <string name="msg_source_linked">Source %1$s allowlisted and linked.</string>
+    <string name="msg_source_link_failed">Could not link source (hint may already belong to another account).</string>
+    <string name="msg_source_unlinked">Source link removed.</string>
+    <string name="msg_source_allowlisted">\"%1$s\" allowlisted.</string>
+    <string name="msg_source_removed_allowlist">\"%1$s\" removed from allowlist.</string>
+    <string name="msg_sample_collection_enabled">Sample collection enabled for 14 days (stored encrypted locally).</string>
+    <string name="msg_sample_collection_disabled">Sample collection disabled.</string>
+    <string name="msg_invalid_balance_input">Invalid balance input for %1$s.</string>
+    <string name="msg_balance_matches">Balance matches estimate (no adjustment required).</string>
+    <string name="msg_adjustment_recorded">Recorded adjustment %1$s.</string>
+    <string name="msg_adjustment_failed">Failed to record balance adjustment.</string>
+
+    <string name="msg_select_account">Select an account.</string>
+    <string name="msg_invalid_amount_for_currency">Invalid amount for %1$s.</string>
+    <string name="msg_tx_added">Transaction added.</string>
+    <string name="msg_tx_create_failed">Could not create transaction.</string>
+    <string name="msg_invalid_amount_format">Invalid amount format for %1$s.</string>
+    <string name="msg_tx_updated">Transaction updated.</string>
+    <string name="msg_update_failed">Update failed.</string>
+    <string name="msg_category_updated_and_rule">Category updated and rule saved (%1$d past updated).</string>
+    <string name="msg_category_updated">Category updated.</string>
+    <string name="msg_category_update_failed">Failed to update category.</string>
+    <string name="msg_tx_voided">Transaction voided.</string>
+    <string name="msg_tx_void_failed">Failed to void transaction.</string>
+    <string name="msg_tx_restored">Transaction restored.</string>
+    <string name="msg_tx_restore_failed">Failed to restore transaction.</string>
+    <string name="msg_manual_tx_deleted">Manual transaction deleted.</string>
+    <string name="msg_delete_captured_blocked">Cannot delete captured transaction; void instead.</string>
+    <string name="msg_transfer_linked">Transfer pair linked.</string>
+    <string name="msg_transfer_link_failed">Failed to link transfer pair.</string>
+    <string name="msg_transfer_unlinked">Transfer pair unlinked.</string>
+    <string name="msg_transfer_unlink_failed">Failed to unlink transfer.</string>
+    <string name="msg_suggested_transfer_linked">Suggested transfer linked.</string>
+    <string name="msg_suggested_transfer_failed">Failed to link suggested transfer.</string>
+    <string name="msg_suggestion_dismissed">Transfer suggestion dismissed.</string>
+    <string name="msg_suggestion_dismiss_failed">Failed to dismiss suggestion.</string>
+    <string name="msg_refund_unlinked">Refund unlinked.</string>
+    <string name="msg_refund_linked">Refund linked to original.</string>
+    <string name="msg_refund_link_failed">Failed to link refund.</string>
+    <string name="msg_tag_added">Tag #%1$s added.</string>
+    <string name="msg_tag_add_failed">Failed to add tag.</string>
+    <string name="msg_tag_removed">Tag removed.</string>
+    <string name="msg_tag_remove_failed">Failed to remove tag.</string>
+
+    <string name="msg_invalid_budget_limit">Invalid budget limit for %1$s.</string>
+    <string name="msg_budget_saved">Budget saved.</string>
+    <string name="msg_budget_save_failed">Failed to save budget.</string>
+    <string name="msg_budget_deleted">Budget deleted.</string>
+
+    <string name="msg_enter_positive_amount">Enter a valid positive amount for %1$s.</string>
+    <string name="msg_review_saved_with_pattern">Transaction saved &amp; pattern remembered.</string>
+    <plurals name="msg_review_saved_with_pattern_and_autoparsed">
+        <item quantity="one">Transaction saved &amp; pattern remembered. Auto-parsed %1$d more pending notification.</item>
+        <item quantity="other">Transaction saved &amp; pattern remembered. Auto-parsed %1$d more pending notifications.</item>
+    </plurals>
+    <string name="msg_review_saved_pattern_failed">Transaction saved, but pattern was not saved: %1$s</string>
+    <string name="msg_review_confirmed">Transaction confirmed and saved.</string>
+    <string name="msg_review_save_failed">Failed to save transaction.</string>
+    <string name="msg_review_ignored">Event ignored and payload purged.</string>
+    <string name="msg_review_ignore_failed">Ignore failed.</string>
+    <string name="msg_review_retry_done">Re-run completed.</string>
+    <string name="msg_review_retry_failed">Retry failed.</string>
+
+    <string name="msg_base_currency_updated">Base currency updated to %1$s.</string>
+    <string name="msg_backup_thresholds_updated">Backup reminder thresholds updated.</string>
+    <string name="msg_scheduled_folder_cleared">Scheduled backup folder cleared.</string>
+    <string name="msg_scheduled_settings_updated">Scheduled backup settings updated.</string>
+    <string name="msg_app_lock_enabled">App Lock enabled.</string>
+    <string name="msg_app_lock_disabled">App Lock disabled.</string>
+    <string name="msg_local_alerts_enabled">Local status alerts enabled.</string>
+    <string name="msg_local_alerts_disabled">Local status alerts disabled.</string>
+    <string name="msg_category_created">Category created.</string>
+    <string name="msg_category_create_failed">Failed to create category.</string>
+    <string name="msg_category_renamed">Category renamed.</string>
+    <string name="msg_category_rename_failed">Rename failed.</string>
+    <string name="msg_rule_deleted">Rule deleted.</string>
+    <string name="msg_rule_saved">Rule saved.</string>
+    <string name="msg_rule_save_failed">Failed to save rule.</string>
+    <string name="msg_sample_export_open_failed">Could not open sample export destination.</string>
+    <string name="msg_sample_exported">Exported %1$d anonymized sample(s).</string>
+    <string name="msg_sample_exported_with_skipped">Exported %1$d anonymized sample(s) (skipped %2$d security notice(s)).</string>
+    <string name="msg_sample_export_failed">Sample export failed.</string>
+    <string name="msg_sample_purged">Purged %1$d retained sample payload(s) from encrypted storage.</string>
+    <string name="msg_sample_purge_failed">Failed to purge retained samples.</string>
+    <string name="msg_sample_reparsed">Re-parsed %1$d retained sample(s) using active parsers.</string>
+    <string name="msg_sample_reparse_none">No retained samples matched an active parser yet.</string>
+    <string name="msg_sample_reparse_failed">Sample re-parse failed.</string>
+    <string name="msg_reparse_none">No parser update proposals for retained events.</string>
+    <string name="msg_reparse_found">Found %1$d parser update proposal(s) (PAR-11).</string>
+    <string name="msg_reparse_scan_failed">Scan for re-parse proposals failed.</string>
+    <string name="msg_reparse_applied">Applied parser v%1$d update to transaction #%2$d.</string>
+    <string name="msg_reparse_skipped">Proposal skipped (already applied or transaction edited by user).</string>
+    <string name="msg_reparse_apply_failed">Could not apply re-parse proposal.</string>
+    <string name="msg_logs_cleared">Diagnostic logs cleared.</string>
+    <string name="msg_backup_dest_open_failed">Could not open backup destination.</string>
+    <string name="msg_backup_exported_verified">Backup exported &amp; verified: %1$d transactions, %2$d accounts.</string>
+    <string name="msg_backup_export_failed">Backup export failed.</string>
+    <string name="msg_backup_file_open_failed">Could not open backup file.</string>
+    <string name="msg_restore_success_settings">Restored %1$d accounts, %2$d transactions. Re-grant Notification Access to resume capture.</string>
+    <string name="msg_restore_failed">Restore failed.</string>
+    <string name="msg_csv_dest_open_failed">Could not open CSV destination.</string>
+    <string name="msg_csv_exported">Exported %1$d transactions to CSV.</string>
+    <string name="msg_csv_export_failed">CSV export failed.</string>
+    <string name="msg_all_local_data_wiped">All local data wiped.</string>
+    <string name="msg_wipe_failed">Wipe failed.</string>
+
+    <string name="msg_custom_parser_saved">Custom parser pattern saved.</string>
+    <string name="msg_custom_parser_updated">Custom parser pattern updated.</string>
+    <string name="msg_custom_parser_saved_autoparsed">Custom parser pattern saved. Auto-parsed %1$d pending notification(s).</string>
+    <string name="msg_custom_parser_updated_autoparsed">Custom parser pattern updated. Auto-parsed %1$d pending notification(s).</string>
+    <string name="msg_custom_parser_save_failed">Failed to save custom parser pattern.</string>
+    <string name="msg_custom_parser_deleted">Custom parser pattern deleted.</string>
+
+    <!-- Local Status Notifications -->
+    <string name="notif_channel_name">W-Track Status Alerts</string>
+    <string name="notif_channel_description">Opt-in local status alerts for W-Track review queue, capture health, and backup reminders.</string>
+    <string name="notif_needs_review_title">W-Track Needs Review</string>
+    <plurals name="notif_needs_review_body">
+        <item quantity="one">%1$d notification needs review in W-Track.</item>
+        <item quantity="other">%1$d notifications need review in W-Track.</item>
+    </plurals>
+    <string name="notif_capture_paused_title">W-Track Capture Paused</string>
+    <string name="notif_capture_paused_body">Notification capture paused. Tap to open W-Track and check listener access.</string>
+    <string name="notif_backup_reminder_title">W-Track Backup Reminder</string>
+    <string name="notif_backup_reminder_body">Time for an encrypted W-Track backup to keep your ledger safe.</string>
 </resources>

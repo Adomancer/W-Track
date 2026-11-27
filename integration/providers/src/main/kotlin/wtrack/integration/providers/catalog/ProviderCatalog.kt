@@ -11,7 +11,7 @@ data class ProviderCandidate(
     val id: String,
     val displayName: String,
     val category: String,
-    /** Candidate Google Play package IDs checked on physical iQOO Z10R. */
+    /** Candidate Google Play package IDs monitored for this provider. */
     val candidatePackageIds: List<String>,
     val verifiedPackageId: String?,
     val verificationStatus: VerificationStatus,
@@ -20,9 +20,7 @@ data class ProviderCandidate(
 )
 
 /**
- * M3a provider discovery metadata catalog (docs/PROVIDERS.md).
- * Package IDs verified via ADB on physical iQOO Z10R (`I2505`, Android 16); notification schemas
- * remain pending live M3a sample capture (`ProviderParsers.registered()` stays empty until then).
+ * Built-in provider discovery metadata catalog (docs/PROVIDERS.md).
  */
 object ProviderCatalog {
     val initialPoCTargets: List<ProviderCandidate> = listOf(
@@ -34,7 +32,7 @@ object ProviderCatalog {
             candidatePackageIds = listOf("com.jago.digitalBanking"),
             verifiedPackageId = "com.jago.digitalBanking",
             verificationStatus = VerificationStatus.VERIFIED_ACTIVE,
-            notes = "v8.99.1 verified on iQOO Z10R; JagoTransactionParser v2 live for transfers and Main Pocket-only pocket movements (sub-pocket-to-sub-pocket moves ignored; unseen formats route to Review).",
+            notes = "Supports incoming/outgoing transfers and Main Pocket movements (internal sub-pocket moves ignored; unrecognized formats route to Review).",
             verifiedPackageIds = listOf("com.jago.digitalBanking"),
         ),
         ProviderCandidate(
@@ -45,7 +43,7 @@ object ProviderCatalog {
             candidatePackageIds = listOf("id.dana"),
             verifiedPackageId = "id.dana",
             verificationStatus = VerificationStatus.VERIFIED_ACTIVE,
-            notes = "v2.152.0 verified on iQOO Z10R; DanaTransactionParser v1 live for incoming transfers & quest/mission promo filtering (unseen outgoing formats route to Review).",
+            notes = "Supports incoming transfers with promotional notification filtering (unrecognized formats route to Review).",
             verifiedPackageIds = listOf("id.dana"),
         ),
         ProviderCandidate(
@@ -56,7 +54,7 @@ object ProviderCatalog {
             candidatePackageIds = listOf("com.bca", "com.bca.mybca.omni.android"),
             verifiedPackageId = "com.bca.mybca.omni.android",
             verificationStatus = VerificationStatus.VERIFIED_ACTIVE,
-            notes = "BcaTransactionParser v1 live for myBCA (com.bca.mybca.omni.android v2.23.0); BCA mobile (com.bca v4.9.5) also installed.",
+            notes = "Supports myBCA Financial Diary income and expense notifications (unrecognized formats route to Review).",
             verifiedPackageIds = listOf("com.bca", "com.bca.mybca.omni.android"),
         ),
     )

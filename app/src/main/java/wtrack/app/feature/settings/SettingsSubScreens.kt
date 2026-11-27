@@ -54,11 +54,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.util.Locale
+import wtrack.app.R
+import wtrack.app.core.i18n.AppLocaleHelper
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.tabularNums
 import wtrack.app.domain.model.CaptureStatus
@@ -71,6 +74,7 @@ import wtrack.app.feature.common.V2SettingRow
 import wtrack.app.feature.common.V2StatusDot
 import wtrack.app.feature.common.WtrackCard
 import wtrack.app.feature.common.WtrackTopBar
+import wtrack.app.feature.common.labelRes
 import wtrack.integration.Direction
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -85,7 +89,7 @@ fun RulesScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         WtrackTopBar(
-            title = "Categorization Rules",
+            title = stringResource(R.string.rules_title),
             onBack = onBack,
             trailing = {
                 Button(
@@ -95,7 +99,7 @@ fun RulesScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Add")
+                    Text(" " + stringResource(R.string.action_add))
                 }
             },
         )
@@ -114,9 +118,9 @@ fun RulesScreen(
                             modifier = Modifier.padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Text("No categorization rules yet.", style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.rules_empty_title), style = MaterialTheme.typography.titleSmall)
                             Text(
-                                text = "Create rules to automatically assign categories based on merchant key, keyword, and direction.",
+                                text = stringResource(R.string.rules_empty_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ext.mutedText,
                             )
@@ -125,7 +129,8 @@ fun RulesScreen(
                 }
             } else {
                 items(state.rules, key = { it.id }) { rule ->
-                    val catName = state.categories.firstOrNull { it.id == rule.categoryId }?.name ?: "Category"
+                    val catName = state.categories.firstOrNull { it.id == rule.categoryId }?.name
+                        ?: stringResource(R.string.label_category_fallback)
                     WtrackCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
@@ -141,8 +146,8 @@ fun RulesScreen(
                                 Text(rule.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                                 Text(
                                     text = "→ $catName" +
-                                        (rule.merchantKey?.let { " · merchant=$it" } ?: "") +
-                                        (rule.descriptionFragment?.let { " · desc=$it" } ?: ""),
+                                        (rule.merchantKey?.let { stringResource(R.string.rules_summary_merchant, it) } ?: "") +
+                                        (rule.descriptionFragment?.let { stringResource(R.string.rules_summary_desc, it) } ?: ""),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = ext.mutedText,
                                 )
@@ -161,7 +166,7 @@ fun RulesScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.DeleteOutline,
-                                        contentDescription = "Delete rule",
+                                        contentDescription = stringResource(R.string.rules_cd_delete),
                                         tint = ext.mutedText,
                                         modifier = Modifier.size(18.dp),
                                     )
@@ -192,12 +197,12 @@ fun RulesScreen(
                     .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Create Categorization Rule", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.rules_create_title), style = MaterialTheme.typography.titleMedium)
 
                 OutlinedTextField(
                     value = merchantKey,
                     onValueChange = { merchantKey = it },
-                    label = { Text("Merchant key (optional)") },
+                    label = { Text(stringResource(R.string.rules_merchant_key_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -205,20 +210,32 @@ fun RulesScreen(
                 OutlinedTextField(
                     value = fragment,
                     onValueChange = { fragment = it },
-                    label = { Text("Description keyword (optional)") },
+                    label = { Text(stringResource(R.string.rules_desc_keyword_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Text("Direction Filter", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.rules_direction_filter), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = dir == Direction.OUTFLOW, onClick = { dir = Direction.OUTFLOW }, label = { Text("OUTFLOW") })
-                    FilterChip(selected = dir == Direction.INFLOW, onClick = { dir = Direction.INFLOW }, label = { Text("INFLOW") })
-                    FilterChip(selected = dir == null, onClick = { dir = null }, label = { Text("ANY") })
+                    FilterChip(
+                        selected = dir == Direction.OUTFLOW,
+                        onClick = { dir = Direction.OUTFLOW },
+                        label = { Text(stringResource(Direction.OUTFLOW.labelRes())) },
+                    )
+                    FilterChip(
+                        selected = dir == Direction.INFLOW,
+                        onClick = { dir = Direction.INFLOW },
+                        label = { Text(stringResource(Direction.INFLOW.labelRes())) },
+                    )
+                    FilterChip(
+                        selected = dir == null,
+                        onClick = { dir = null },
+                        label = { Text(stringResource(R.string.label_any)) },
+                    )
                 }
 
-                Text("Target Category", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.rules_target_category), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -238,7 +255,7 @@ fun RulesScreen(
                         onClick = { showAddSheet = false },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                    ) { Text("Cancel") }
+                    ) { Text(stringResource(R.string.action_cancel)) }
                     Button(
                         onClick = {
                             showAddSheet = false
@@ -246,7 +263,7 @@ fun RulesScreen(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                    ) { Text("Save Rule") }
+                    ) { Text(stringResource(R.string.rules_save)) }
                 }
             }
         }
@@ -267,7 +284,7 @@ fun CategoriesScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         WtrackTopBar(
-            title = "Categories",
+            title = stringResource(R.string.categories_title),
             onBack = onBack,
             trailing = {
                 Button(
@@ -276,7 +293,7 @@ fun CategoriesScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Add")
+                    Text(" " + stringResource(R.string.action_add))
                 }
             },
         )
@@ -303,10 +320,10 @@ fun CategoriesScreen(
                         ) {
                             Text(cat.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                StatusPill(label = if (cat.isSystem) "System" else "Custom")
+                                StatusPill(label = stringResource(if (cat.isSystem) R.string.label_system else R.string.label_custom))
                                 if (cat.isArchived) {
                                     StatusPill(
-                                        label = "Archived",
+                                        label = stringResource(R.string.label_archived),
                                         containerColor = ext.warningContainer,
                                         contentColor = ext.onWarningContainer,
                                     )
@@ -319,10 +336,10 @@ fun CategoriesScreen(
                                     renamingCategoryId = cat.id
                                     renameInput = cat.name
                                 }) {
-                                    Text("Rename")
+                                    Text(stringResource(R.string.categories_rename))
                                 }
                                 TextButton(onClick = { viewModel.setCategoryArchived(cat.id, !cat.isArchived) }) {
-                                    Text(if (cat.isArchived) "Restore" else "Archive")
+                                    Text(stringResource(if (cat.isArchived) R.string.action_restore else R.string.categories_archive))
                                 }
                             }
                         }
@@ -346,20 +363,32 @@ fun CategoriesScreen(
                     .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("New Category", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.categories_new_title), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Category Name") },
+                    label = { Text(stringResource(R.string.categories_name_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Direction Scope", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.categories_direction_scope), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = scope == Direction.OUTFLOW, onClick = { scope = Direction.OUTFLOW }, label = { Text("OUTFLOW") })
-                    FilterChip(selected = scope == Direction.INFLOW, onClick = { scope = Direction.INFLOW }, label = { Text("INFLOW") })
-                    FilterChip(selected = scope == null, onClick = { scope = null }, label = { Text("BOTH") })
+                    FilterChip(
+                        selected = scope == Direction.OUTFLOW,
+                        onClick = { scope = Direction.OUTFLOW },
+                        label = { Text(stringResource(Direction.OUTFLOW.labelRes())) },
+                    )
+                    FilterChip(
+                        selected = scope == Direction.INFLOW,
+                        onClick = { scope = Direction.INFLOW },
+                        label = { Text(stringResource(Direction.INFLOW.labelRes())) },
+                    )
+                    FilterChip(
+                        selected = scope == null,
+                        onClick = { scope = null },
+                        label = { Text(stringResource(R.string.label_both)) },
+                    )
                 }
                 Row(
                     modifier = Modifier
@@ -371,7 +400,7 @@ fun CategoriesScreen(
                         onClick = { showCreate = false },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                    ) { Text("Cancel") }
+                    ) { Text(stringResource(R.string.action_cancel)) }
                     Button(
                         enabled = name.isNotBlank(),
                         onClick = {
@@ -380,7 +409,7 @@ fun CategoriesScreen(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                    ) { Text("Create") }
+                    ) { Text(stringResource(R.string.categories_create)) }
                 }
             }
         }
@@ -390,12 +419,12 @@ fun CategoriesScreen(
         val catId = renamingCategoryId!!
         AlertDialog(
             onDismissRequest = { renamingCategoryId = null },
-            title = { Text("Rename Category") },
+            title = { Text(stringResource(R.string.categories_rename_title)) },
             text = {
                 OutlinedTextField(
                     value = renameInput,
                     onValueChange = { renameInput = it },
-                    label = { Text("Category name") },
+                    label = { Text(stringResource(R.string.categories_rename_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -408,9 +437,9 @@ fun CategoriesScreen(
                         renamingCategoryId = null
                         viewModel.renameCategory(catId, renameInput)
                     },
-                ) { Text("Rename") }
+                ) { Text(stringResource(R.string.categories_rename)) }
             },
-            dismissButton = { TextButton(onClick = { renamingCategoryId = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renamingCategoryId = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -422,6 +451,7 @@ fun DiagnosticsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val activeLocale = AppLocaleHelper.activeLocale(context)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ext = WtrackTheme.colors
 
@@ -430,12 +460,13 @@ fun DiagnosticsScreen(
     var showTechnicalSheet by remember { mutableStateOf(false) }
 
     var redactTermsInput by remember { mutableStateOf("") }
-    var jagoDays by remember { mutableStateOf("14") }
-    var jagoA by remember { mutableStateOf("35") }
-    var jagoB by remember { mutableStateOf("34") }
-    var jagoC by remember { mutableStateOf("33") }
-    var jagoD by remember { mutableStateOf("32") }
-    var jagoWrong by remember { mutableStateOf("0") }
+    var gateProviderName by remember { mutableStateOf("") }
+    var jagoDays by remember { mutableStateOf("") }
+    var jagoA by remember { mutableStateOf("") }
+    var jagoB by remember { mutableStateOf("") }
+    var jagoC by remember { mutableStateOf("") }
+    var jagoD by remember { mutableStateOf("") }
+    var jagoWrong by remember { mutableStateOf("") }
 
     val exportSamplesLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -453,13 +484,13 @@ fun DiagnosticsScreen(
 
     val isActive = state.captureSummary.appStatus == CaptureStatus.ACTIVE && state.captureSummary.isPermissionGranted
     val statusDotColor = if (isActive) ext.inflow else ext.warning
-    val statusLabel = if (isActive) "Active" else "Needs attention"
-    val heroTitle = if (isActive) "All set" else "Turn on access"
+    val statusLabel = stringResource(if (isActive) R.string.diagnostics_status_active else R.string.diagnostics_status_attention)
+    val heroTitle = stringResource(if (isActive) R.string.diagnostics_hero_active else R.string.diagnostics_hero_attention)
     val appNamesSummary = state.providerCatalog.joinToString(", ") { it.displayName }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { WtrackTopBar(title = "Auto-capture", onBack = onBack) },
+        topBar = { WtrackTopBar(title = stringResource(R.string.settings_auto_capture), onBack = onBack) },
         bottomBar = {
             Column(
                 modifier = Modifier
@@ -475,11 +506,11 @@ fun DiagnosticsScreen(
                         .fillMaxWidth()
                         .height(52.dp),
                 ) {
-                    Text("Run quick check", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.onboarding_run_quick_check), style = MaterialTheme.typography.titleMedium)
                 }
                 TextButton(onClick = { showTechnicalSheet = true }) {
                     Text(
-                        text = "Technical details ›",
+                        text = stringResource(R.string.diagnostics_technical_details),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -503,7 +534,7 @@ fun DiagnosticsScreen(
                 }
             }
 
-            // Block 1: Hero Status (pure whitespace, plain English)
+            // Block 1: Hero Status (pure whitespace)
             item(key = "hero-status") {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
@@ -524,9 +555,9 @@ fun DiagnosticsScreen(
                     )
                     Text(
                         text = if (appNamesSummary.isNotBlank()) {
-                            "Listening to $appNamesSummary"
+                            stringResource(R.string.diagnostics_listening_to, appNamesSummary)
                         } else {
-                            "Automatically reads bank & e-wallet alerts"
+                            stringResource(R.string.diagnostics_listening_fallback)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -538,8 +569,10 @@ fun DiagnosticsScreen(
             item(key = "health-rows") {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     V2SettingRow(
-                        title = "Notification access",
-                        subtitle = if (state.captureSummary.isPermissionGranted) "Allowed" else "Tap to allow",
+                        title = stringResource(R.string.onboarding_notification_access),
+                        subtitle = stringResource(
+                            if (state.captureSummary.isPermissionGranted) R.string.label_allowed else R.string.diagnostics_tap_to_allow,
+                        ),
                         trailingColor = if (state.captureSummary.isPermissionGranted) ext.inflow else ext.warning,
                         onClick = {
                             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -547,14 +580,18 @@ fun DiagnosticsScreen(
                     )
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "Monitored apps",
-                        subtitle = "${state.providerCatalog.size} supported apps",
+                        title = stringResource(R.string.diagnostics_monitored_apps),
+                        subtitle = pluralStringResource(
+                            R.plurals.diagnostics_supported_apps_count,
+                            state.providerCatalog.size,
+                            state.providerCatalog.size,
+                        ),
                         onClick = { showAppsSheet = true },
                     )
                     HorizontalDivider(color = ext.divider)
                     V2SettingRow(
-                        title = "Battery & background",
-                        subtitle = "Fix if alerts stop arriving",
+                        title = stringResource(R.string.diagnostics_battery_background),
+                        subtitle = stringResource(R.string.diagnostics_battery_subtitle),
                         onClick = { showBatterySheet = true },
                     )
                 }
@@ -575,7 +612,7 @@ fun DiagnosticsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Monitored apps", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.diagnostics_monitored_apps), style = MaterialTheme.typography.titleLarge)
                 state.providerCatalog.forEachIndexed { idx, p ->
                     Column(
                         modifier = Modifier
@@ -611,9 +648,9 @@ fun DiagnosticsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("Battery & background", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.diagnostics_battery_background), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    text = "If notifications stop arriving while the app is closed:\n\n1. Open App Info → Battery and allow background power.\n2. On vivo / iQOO OriginOS, turn on Autostart.\n3. On Android 13+, tap ⋮ → Allow restricted settings before enabling Notification Access.",
+                    text = stringResource(R.string.diagnostics_battery_guide),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -629,7 +666,7 @@ fun DiagnosticsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                ) { Text("Open App Info", style = MaterialTheme.typography.titleMedium) }
+                ) { Text(stringResource(R.string.action_open_app_info), style = MaterialTheme.typography.titleMedium) }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -649,26 +686,29 @@ fun DiagnosticsScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Technical details", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.diagnostics_technical_title), style = MaterialTheme.typography.titleLarge)
 
-                DiagnosticsKvRow("Permission granted", "${state.captureSummary.isPermissionGranted}")
-                DiagnosticsKvRow("Listener connected", "${state.captureSummary.isListenerConnected}")
+                DiagnosticsKvRow(stringResource(R.string.diagnostics_permission_granted), "${state.captureSummary.isPermissionGranted}")
+                DiagnosticsKvRow(stringResource(R.string.diagnostics_listener_connected), "${state.captureSummary.isListenerConnected}")
                 DiagnosticsKvRow(
-                    "Last heartbeat",
+                    stringResource(R.string.diagnostics_last_heartbeat),
                     if (state.captureSummary.lastAliveAt > 0L) {
-                        UiDateHelper.formatDateTime(state.captureSummary.lastAliveAt)
+                        UiDateHelper.formatDateTime(state.captureSummary.lastAliveAt, locale = activeLocale)
                     } else {
-                        "Not recorded yet"
+                        stringResource(R.string.diagnostics_not_recorded)
                     },
                 )
 
                 HorizontalDivider(color = ext.divider)
 
-                Text("M3a Sample Collection (${state.retainedSampleCount} retained)", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.diagnostics_m3a_title, state.retainedSampleCount),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 OutlinedTextField(
                     value = redactTermsInput,
                     onValueChange = { redactTermsInput = it },
-                    label = { Text("Extra names to redact (optional)") },
+                    label = { Text(stringResource(R.string.diagnostics_extra_redact)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -679,32 +719,38 @@ fun DiagnosticsScreen(
                         enabled = !state.isBusy && state.retainedSampleCount > 0,
                         shape = RoundedCornerShape(999.dp),
                         modifier = Modifier.weight(1f),
-                    ) { Text("Export JSON") }
+                    ) { Text(stringResource(R.string.diagnostics_export_json)) }
                     OutlinedButton(
                         onClick = viewModel::reparseRetainedM3aSamples,
                         enabled = !state.isBusy && state.retainedSampleCount > 0,
                         shape = RoundedCornerShape(999.dp),
                         modifier = Modifier.weight(1f),
-                    ) { Text("Re-parse") }
+                    ) { Text(stringResource(R.string.diagnostics_reparse)) }
                     TextButton(
                         onClick = viewModel::purgeRetainedM3aSamplesNow,
                         enabled = !state.isBusy && state.retainedSampleCount > 0,
-                    ) { Text("Purge") }
+                    ) { Text(stringResource(R.string.diagnostics_purge)) }
                 }
 
                 HorizontalDivider(color = ext.divider)
 
-                Text("Parser updates", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.diagnostics_parser_updates), style = MaterialTheme.typography.titleMedium)
                 OutlinedButton(
                     onClick = viewModel::scanReparseProposals,
                     enabled = !state.isBusy,
                     shape = RoundedCornerShape(999.dp),
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Scan retained events") }
+                ) { Text(stringResource(R.string.diagnostics_scan_retained)) }
                 state.reparseProposals.forEach { prop ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = "${prop.sourceId} · Tx #${prop.transactionId} (v${prop.oldParserVersion} → v${prop.newParserVersion})",
+                            text = stringResource(
+                                R.string.diagnostics_proposal_item,
+                                prop.sourceId,
+                                prop.transactionId,
+                                prop.oldParserVersion,
+                                prop.newParserVersion,
+                            ),
                             style = MaterialTheme.typography.labelLarge,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -712,60 +758,119 @@ fun DiagnosticsScreen(
                                 onClick = { viewModel.applyReparseProposal(prop) },
                                 enabled = !state.isBusy,
                                 shape = RoundedCornerShape(999.dp),
-                            ) { Text("Apply") }
+                            ) { Text(stringResource(R.string.action_apply)) }
                             TextButton(
                                 onClick = { viewModel.dismissReparseProposal(prop.eventId) },
                                 enabled = !state.isBusy,
-                            ) { Text("Dismiss") }
+                            ) { Text(stringResource(R.string.action_dismiss)) }
                         }
                     }
                 }
 
                 HorizontalDivider(color = ext.divider)
 
-                Text("Gate G1 Evaluator", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.diagnostics_gate_g1_title), style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = gateProviderName,
+                    onValueChange = { gateProviderName = it },
+                    label = { Text(stringResource(R.string.diagnostics_gate_provider_label)) },
+                    placeholder = { Text(stringResource(R.string.diagnostics_gate_provider_hint)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(value = jagoDays, onValueChange = { jagoDays = it }, label = { Text("Days") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = jagoA, onValueChange = { jagoA = it }, label = { Text("A") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = jagoB, onValueChange = { jagoB = it }, label = { Text("B") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(
+                        value = jagoDays,
+                        onValueChange = { jagoDays = it },
+                        label = { Text(stringResource(R.string.diagnostics_gate_days)) },
+                        placeholder = { Text(stringResource(R.string.diagnostics_gate_days_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = jagoA,
+                        onValueChange = { jagoA = it },
+                        label = { Text(stringResource(R.string.diagnostics_gate_a)) },
+                        placeholder = { Text(stringResource(R.string.diagnostics_gate_a_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = jagoB,
+                        onValueChange = { jagoB = it },
+                        label = { Text(stringResource(R.string.diagnostics_gate_b)) },
+                        placeholder = { Text(stringResource(R.string.diagnostics_gate_b_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(value = jagoC, onValueChange = { jagoC = it }, label = { Text("C") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = jagoD, onValueChange = { jagoD = it }, label = { Text("D") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = jagoWrong, onValueChange = { jagoWrong = it }, label = { Text("Wrong") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(
+                        value = jagoC,
+                        onValueChange = { jagoC = it },
+                        label = { Text(stringResource(R.string.diagnostics_gate_c)) },
+                        placeholder = { Text(stringResource(R.string.diagnostics_gate_c_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = jagoD,
+                        onValueChange = { jagoD = it },
+                        label = { Text(stringResource(R.string.diagnostics_gate_d)) },
+                        placeholder = { Text(stringResource(R.string.diagnostics_gate_d_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = jagoWrong,
+                        onValueChange = { jagoWrong = it },
+                        label = { Text(stringResource(R.string.diagnostics_gate_wrong)) },
+                        placeholder = { Text(stringResource(R.string.diagnostics_gate_wrong_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                val parsedGateInput = remember(gateProviderName, jagoDays, jagoA, jagoB, jagoC, jagoD, jagoWrong) {
+                    parseGateG1FormInput(
+                        providerName = gateProviderName,
+                        days = jagoDays,
+                        statementTxCountA = jagoA,
+                        capturedTxNotificationsB = jagoB,
+                        usableNotificationsC = jagoC,
+                        matchedStatementTxD = jagoD,
+                        unexplainedWrong = jagoWrong,
+                    )
                 }
                 OutlinedButton(
+                    enabled = parsedGateInput != null,
                     onClick = {
-                        viewModel.evaluateGateG1(
-                            listOf(
-                                ProviderMeasurementInput(
-                                    providerName = "Provider Sample",
-                                    days = jagoDays.toIntOrNull() ?: 0,
-                                    statementTxCountA = jagoA.toIntOrNull() ?: 0,
-                                    capturedTxNotificationsB = jagoB.toIntOrNull() ?: 0,
-                                    usableNotificationsC = jagoC.toIntOrNull() ?: 0,
-                                    matchedStatementTxD = jagoD.toIntOrNull() ?: 0,
-                                    unexplainedWrongAmountOrDirection = jagoWrong.toIntOrNull() ?: 0,
-                                ),
-                            ),
-                        )
+                        parsedGateInput?.let { input ->
+                            viewModel.evaluateGateG1(listOf(input))
+                        }
                     },
                     shape = RoundedCornerShape(999.dp),
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Check thresholds") }
+                ) { Text(stringResource(R.string.diagnostics_check_thresholds)) }
                 state.gateG1Report?.let { rep ->
-                    Text("Verdict: ${rep.verdict.name} — ${rep.summary}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.diagnostics_verdict, rep.verdict.name, rep.summary),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
 
                 HorizontalDivider(color = ext.divider)
 
-                Text("Capture gaps (${state.captureGaps.size})", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.diagnostics_capture_gaps, state.captureGaps.size),
+                    style = MaterialTheme.typography.titleMedium,
+                )
                 if (state.captureGaps.isEmpty()) {
-                    Text("No capture gaps recorded.", style = MaterialTheme.typography.bodyMedium, color = ext.mutedText)
+                    Text(stringResource(R.string.diagnostics_no_gaps), style = MaterialTheme.typography.bodyMedium, color = ext.mutedText)
                 } else {
                     state.captureGaps.take(10).forEach { gap ->
                         Text(
-                            text = "${gap.reason.name} · ${UiDateHelper.formatDateTime(gap.startedAt)}",
+                            text = "${gap.reason.name} · ${UiDateHelper.formatDateTime(gap.startedAt, locale = activeLocale)}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -777,8 +882,8 @@ fun DiagnosticsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Logs (7d)", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = viewModel::clearDiagnosticLogs) { Text("Clear") }
+                    Text(stringResource(R.string.diagnostics_logs_7d), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = viewModel::clearDiagnosticLogs) { Text(stringResource(R.string.action_clear)) }
                 }
                 state.diagnosticLogs.take(20).forEach { line ->
                     Text(
@@ -803,4 +908,32 @@ private fun DiagnosticsKvRow(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = WtrackTheme.colors.mutedText)
         Text(value, style = MaterialTheme.typography.labelLarge)
     }
+}
+
+internal fun parseGateG1FormInput(
+    providerName: String,
+    days: String,
+    statementTxCountA: String,
+    capturedTxNotificationsB: String,
+    usableNotificationsC: String,
+    matchedStatementTxD: String,
+    unexplainedWrong: String,
+): ProviderMeasurementInput? {
+    val cleanName = providerName.trim()
+    if (cleanName.isEmpty()) return null
+    val parsedDays = days.trim().toIntOrNull()?.takeIf { it >= 0 } ?: return null
+    val parsedA = statementTxCountA.trim().toIntOrNull()?.takeIf { it >= 0 } ?: return null
+    val parsedB = capturedTxNotificationsB.trim().toIntOrNull()?.takeIf { it >= 0 } ?: return null
+    val parsedC = usableNotificationsC.trim().toIntOrNull()?.takeIf { it >= 0 } ?: return null
+    val parsedD = matchedStatementTxD.trim().toIntOrNull()?.takeIf { it >= 0 } ?: return null
+    val parsedWrong = unexplainedWrong.trim().toIntOrNull()?.takeIf { it >= 0 } ?: return null
+    return ProviderMeasurementInput(
+        providerName = cleanName,
+        days = parsedDays,
+        statementTxCountA = parsedA,
+        capturedTxNotificationsB = parsedB,
+        usableNotificationsC = parsedC,
+        matchedStatementTxD = parsedD,
+        unexplainedWrongAmountOrDirection = parsedWrong,
+    )
 }

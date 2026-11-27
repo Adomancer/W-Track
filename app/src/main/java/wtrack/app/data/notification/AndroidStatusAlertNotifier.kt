@@ -29,8 +29,8 @@ class AndroidStatusAlertNotifier(
         val count = pendingCount.coerceAtLeast(1)
         postNotification(
             notificationId = NOTIF_ID_NEEDS_REVIEW,
-            title = "W-Track Needs Review",
-            body = "$count notification(s) need review in W-Track.",
+            title = context.getString(R.string.notif_needs_review_title),
+            body = context.resources.getQuantityString(R.plurals.notif_needs_review_body, count, count),
         )
     }
 
@@ -38,8 +38,8 @@ class AndroidStatusAlertNotifier(
         if (!canPostLocalAlerts()) return
         postNotification(
             notificationId = NOTIF_ID_CAPTURE_DISCONNECTED,
-            title = "W-Track Capture Paused",
-            body = "Notification capture paused. Tap to open W-Track and check listener access.",
+            title = context.getString(R.string.notif_capture_paused_title),
+            body = context.getString(R.string.notif_capture_paused_body),
         )
     }
 
@@ -53,8 +53,8 @@ class AndroidStatusAlertNotifier(
         if (!canPostLocalAlerts()) return
         postNotification(
             notificationId = NOTIF_ID_BACKUP_REMINDER,
-            title = "W-Track Backup Reminder",
-            body = "Time for an encrypted W-Track backup to keep your ledger safe.",
+            title = context.getString(R.string.notif_backup_reminder_title),
+            body = context.getString(R.string.notif_backup_reminder_body),
         )
     }
 
@@ -111,17 +111,16 @@ class AndroidStatusAlertNotifier(
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            CHANNEL_NAME,
+            context.getString(R.string.notif_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "Opt-in local status alerts for W-Track review queue, capture health, and backup reminders."
+            description = context.getString(R.string.notif_channel_description)
         }
         manager.createNotificationChannel(channel)
     }
 
     private companion object {
         const val CHANNEL_ID = "wtrack_status_alerts"
-        const val CHANNEL_NAME = "W-Track Status Alerts"
         const val NOTIF_ID_NEEDS_REVIEW = 4101
         const val NOTIF_ID_CAPTURE_DISCONNECTED = 4102
         const val NOTIF_ID_BACKUP_REMINDER = 4103

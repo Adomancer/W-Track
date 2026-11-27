@@ -14,22 +14,26 @@ data class CurrencySpec(
 )
 
 object CurrencyRegistry {
+    const val DEFAULT_CURRENCY = "IDR"
+
     private val knownSpecs = listOf(
         CurrencySpec(code = "IDR", minorUnitDigits = 2, symbol = "Rp"),
         CurrencySpec(code = "USD", minorUnitDigits = 2, symbol = "$"),
-        CurrencySpec(code = "EUR", minorUnitDigits = 2, symbol = "EUR "),
         CurrencySpec(code = "SGD", minorUnitDigits = 2, symbol = "S$"),
         CurrencySpec(code = "MYR", minorUnitDigits = 2, symbol = "RM"),
+        CurrencySpec(code = "EUR", minorUnitDigits = 2, symbol = "EUR "),
         CurrencySpec(code = "JPY", minorUnitDigits = 0, symbol = "JPY "),
         CurrencySpec(code = "KRW", minorUnitDigits = 0, symbol = "KRW "),
     ).associateBy { it.code }
 
+    val supportedCodes: List<String> = knownSpecs.keys.toList()
+
     fun specFor(currencyCode: String): CurrencySpec {
         val normalized = currencyCode.trim().uppercase()
         return knownSpecs[normalized] ?: CurrencySpec(
-            code = normalized.ifEmpty { "IDR" },
+            code = normalized.ifEmpty { DEFAULT_CURRENCY },
             minorUnitDigits = 2,
-            symbol = "${normalized.ifEmpty { "IDR" }} ",
+            symbol = "${normalized.ifEmpty { DEFAULT_CURRENCY }} ",
         )
     }
 

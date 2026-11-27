@@ -44,10 +44,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import wtrack.app.R
+import wtrack.app.core.i18n.AppLocaleHelper
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.core.theme.providerBrandStyle
 import wtrack.app.core.theme.tabularNums
@@ -59,7 +63,9 @@ import wtrack.app.feature.common.ActionFeedbackBanner
 import wtrack.app.feature.common.MoneyAmountTextField
 import wtrack.app.feature.common.UiDateHelper
 import wtrack.app.feature.common.WtrackTopBar
+import wtrack.app.feature.common.exampleLabelRes
 import wtrack.app.feature.common.isValidMoneyInput
+import wtrack.app.feature.common.labelRes
 import wtrack.integration.Direction
 import wtrack.integration.ReviewReason
 
@@ -74,6 +80,7 @@ fun ReviewScreen(
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
     var resolvingItem by remember { mutableStateOf<NeedsReviewItem?>(null) }
 
+    val activeLocale = AppLocaleHelper.activeLocale(LocalContext.current)
     val safeIndex = if (state.items.isNotEmpty()) currentIndex.coerceIn(0, state.items.lastIndex) else 0
     val currentItem = state.items.getOrNull(safeIndex)
 
@@ -81,12 +88,12 @@ fun ReviewScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             WtrackTopBar(
-                title = "Needs review",
+                title = stringResource(R.string.review_title),
                 onBack = onBack,
                 trailing = {
                     if (state.items.isNotEmpty()) {
                         Text(
-                            text = "${safeIndex + 1} of ${state.items.size}",
+                            text = stringResource(R.string.onboarding_step_progress, safeIndex + 1, state.items.size),
                             style = MaterialTheme.typography.bodyMedium.tabularNums(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -137,7 +144,7 @@ fun ReviewScreen(
                             .height(52.dp),
                     ) {
                         Text(
-                            text = if (canQuickConfirm) "Confirm" else "Review details",
+                            text = stringResource(if (canQuickConfirm) R.string.action_confirm else R.string.review_details_title),
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
@@ -154,7 +161,7 @@ fun ReviewScreen(
                             .height(44.dp),
                     ) {
                         Text(
-                            text = if (state.items.size > 1) "Skip" else "Dismiss",
+                            text = stringResource(if (state.items.size > 1) R.string.action_skip else R.string.action_dismiss),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -196,12 +203,12 @@ fun ReviewScreen(
                             modifier = Modifier.size(36.dp),
                         )
                         Text(
-                            text = "All caught up",
+                            text = stringResource(R.string.review_all_caught_up),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                         )
                         Text(
-                            text = "No notifications waiting for review.",
+                            text = stringResource(R.string.review_empty_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -229,13 +236,13 @@ fun ReviewScreen(
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         Text(
-                            text = "${brand.displayName} · ${UiDateHelper.formatDateTime(currentItem.postedAt)}",
+                            text = "${brand.displayName} · ${UiDateHelper.formatDateTime(currentItem.postedAt, locale = activeLocale)}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
 
                         Text(
-                            text = amountLabel ?: "Amount needed",
+                            text = amountLabel ?: stringResource(R.string.review_amount_needed),
                             style = if (amountLabel != null) {
                                 MaterialTheme.typography.displaySmall.tabularNums()
                             } else {
@@ -252,7 +259,7 @@ fun ReviewScreen(
                             text = if (!currentItem.payloadText.isNullOrBlank()) {
                                 "“${currentItem.payloadText}”"
                             } else {
-                                "Notification text hidden by Android. Tap below to enter the amount."
+                                stringResource(R.string.review_text_hidden)
                             },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.secondary,
@@ -268,12 +275,12 @@ fun ReviewScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Details & category",
+                                text = stringResource(R.string.review_details_category),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                text = (currentItem.draftDescription ?: currentItem.draftMerchantRaw ?: "Edit") + " ›",
+                                text = (currentItem.draftDescription ?: currentItem.draftMerchantRaw ?: stringResource(R.string.action_edit)) + " ›",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
@@ -324,9 +331,9 @@ fun ReviewScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Review details", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.review_details_title), style = MaterialTheme.typography.titleLarge)
 
-                Text("Account", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_account), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -347,11 +354,11 @@ fun ReviewScreen(
                     value = amountInput,
                     onValueChange = { amountInput = it },
                     currency = currencyInput,
-                    label = "Amount ($currencyInput)",
+                    label = stringResource(R.string.activity_amount_label, currencyInput),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Text("Direction", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_direction), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Direction.entries.forEach { d ->
                         FilterChip(
@@ -362,12 +369,12 @@ fun ReviewScreen(
                                     type = DomainTransactionType.OTHER
                                 }
                             },
-                            label = { Text(d.name) },
+                            label = { Text(stringResource(d.labelRes())) },
                         )
                     }
                 }
 
-                Text("Type", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_type), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -376,20 +383,24 @@ fun ReviewScreen(
                         .filter { it != DomainTransactionType.ADJUSTMENT }
                         .filter { it != DomainTransactionType.REFUND || direction == Direction.INFLOW }
                         .forEach { t ->
-                            FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.name) })
+                            FilterChip(
+                                selected = type == t,
+                                onClick = { type = t },
+                                label = { Text(stringResource(t.labelRes())) },
+                            )
                         }
                 }
 
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Merchant / description") },
+                    label = { Text(stringResource(R.string.activity_merchant_desc_label)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Text("Category", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.label_category), style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -407,7 +418,7 @@ fun ReviewScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = rememberHint, onCheckedChange = { rememberHint = it })
                         Text(
-                            text = "Remember hint \"${item.draftAccountHint}\" for this account",
+                            text = stringResource(R.string.review_remember_hint, item.draftAccountHint),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -426,7 +437,7 @@ fun ReviewScreen(
                             },
                         )
                         Text(
-                            text = "Remember notification format",
+                            text = stringResource(R.string.review_remember_format),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -434,7 +445,7 @@ fun ReviewScreen(
                         OutlinedTextField(
                             value = patternInput,
                             onValueChange = { patternInput = it },
-                            label = { Text("Pattern template") },
+                            label = { Text(stringResource(R.string.review_pattern_template)) },
                             textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
@@ -443,12 +454,12 @@ fun ReviewScreen(
                             FilterChip(
                                 selected = patternLocale == CustomNumberLocale.INDONESIAN,
                                 onClick = { patternLocale = CustomNumberLocale.INDONESIAN },
-                                label = { Text("ID (50.000)") },
+                                label = { Text(stringResource(CustomNumberLocale.INDONESIAN.exampleLabelRes())) },
                             )
                             FilterChip(
                                 selected = patternLocale == CustomNumberLocale.ENGLISH,
                                 onClick = { patternLocale = CustomNumberLocale.ENGLISH },
-                                label = { Text("EN (50,000.00)") },
+                                label = { Text(stringResource(CustomNumberLocale.ENGLISH.exampleLabelRes())) },
                             )
                         }
                     }
@@ -485,16 +496,16 @@ fun ReviewScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         shape = RoundedCornerShape(999.dp),
-                    ) { Text("Confirm", style = MaterialTheme.typography.titleMedium) }
+                    ) { Text(stringResource(R.string.action_confirm), style = MaterialTheme.typography.titleMedium) }
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         TextButton(onClick = {
                             resolvingItem = null
                             viewModel.retry(item.id)
-                        }) { Text("Retry") }
+                        }) { Text(stringResource(R.string.action_retry)) }
                         TextButton(onClick = {
                             resolvingItem = null
                             viewModel.ignore(item.id)
-                        }) { Text("Ignore", color = MaterialTheme.colorScheme.error) }
+                        }) { Text(stringResource(R.string.action_ignore), color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }

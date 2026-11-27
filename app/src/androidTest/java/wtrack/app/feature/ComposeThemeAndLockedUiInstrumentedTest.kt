@@ -1,12 +1,15 @@
 package wtrack.app.feature
 
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Rule
 import org.junit.Test
+import wtrack.app.R
 import wtrack.app.core.theme.WtrackTheme
 import wtrack.app.domain.model.LockedReason
 import wtrack.app.domain.model.ThemeMode
@@ -47,6 +50,7 @@ class ComposeThemeAndLockedUiInstrumentedTest {
 
     @Test
     fun rendersDarkThemeDatabaseLockedScreenWithNonDestructiveRecoveryControls() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.setContent {
             WtrackTheme(themeMode = ThemeMode.DARK) {
                 DatabaseLockedScreen(
@@ -62,14 +66,15 @@ class ComposeThemeAndLockedUiInstrumentedTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Encrypted Database Locked").assertIsDisplayed()
-        composeRule.onNodeWithText("Wrapped Key Missing").assertIsDisplayed()
-        composeRule.onNodeWithText("Restore from Encrypted Backup (.wtrackbackup)").assertIsDisplayed()
-        composeRule.onNodeWithText("Erase Local Data & Start Fresh").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.db_locked_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.locked_reason_key_missing)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.db_locked_restore_button)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.db_locked_erase_button)).assertIsDisplayed()
     }
 
     @Test
     fun rendersAppLockOverlayCleanly() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.setContent {
             WtrackTheme(themeMode = ThemeMode.DARK) {
                 AppLockOverlay(onUnlocked = {})
@@ -77,7 +82,7 @@ class ComposeThemeAndLockedUiInstrumentedTest {
         }
 
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("W-Track is Locked").assertIsDisplayed()
-        composeRule.onNodeWithText("Unlock W-Track").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.app_lock_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.app_lock_unlock_button)).assertIsDisplayed()
     }
 }
